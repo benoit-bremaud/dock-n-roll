@@ -1,0 +1,5 @@
+# pnpm 10 blocks dependency lifecycle scripts by default.
+# Only esbuild (used by Vite) may run its install script, to fetch its native binary.
+# Electron needs no entry: since v44 it downloads its runtime on first launch, not at install.
+allowBuilds:
+  esbuild: true
