@@ -2,7 +2,7 @@ import type { ContainerSnapshot } from './types'
 
 const COMPOSE = 'com.docker.compose'
 
-/** Test builder: a running Compose container with sensible defaults. */
+/** Test builder: a running container with no labels (not Compose) — pass `labels` to make it one. */
 export function container(overrides: Partial<ContainerSnapshot> = {}): ContainerSnapshot {
   return {
     id: 'c1',

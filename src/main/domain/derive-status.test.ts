@@ -50,6 +50,34 @@ describe('deriveStatus — spec §4 precedence', () => {
     expect(deriveStatus(inputs({ containers: [running], healthGate: 'passed' }))).toBe('on')
   })
 
+  it('waits for the healthUrl gate even when an init job is done', () => {
+    expect(deriveStatus(inputs({ containers: [running, initJobDone], healthGate: 'waiting' }))).toBe('starting')
+  })
+
+  it('ignores the healthUrl gate when a container has its own HEALTHCHECK (spec §3)', () => {
+    expect(deriveStatus(inputs({ containers: [healthy], healthGate: 'waiting' }))).toBe('on')
+  })
+
+  it('does not apply the healthUrl gate while some containers are stopped', () => {
+    expect(deriveStatus(inputs({ containers: [running, stopped], healthGate: 'waiting' }))).toBe('partial')
+  })
+
+  it('ignores a stale health status left on a stopped container', () => {
+    expect(deriveStatus(inputs({ containers: [container({ state: 'exited', exitCode: 0, health: 'starting' })] }))).toBe('off')
+  })
+
+  it('does not count an init job as done next to a container still booting', () => {
+    expect(deriveStatus(inputs({ containers: [booting, initJobDone] }))).toBe('starting')
+  })
+
+  it('counts a dead container as stopped', () => {
+    expect(deriveStatus(inputs({ containers: [container({ state: 'dead' })] }))).toBe('off')
+  })
+
+  it.each(['restarting', 'paused', 'removing'] as const)('is partial when a container is %s', (state) => {
+    expect(deriveStatus(inputs({ containers: [container({ state })] }))).toBe('partial')
+  })
+
   it('is partial when a container is unhealthy', () => {
     expect(deriveStatus(inputs({ containers: [container({ state: 'running', health: 'unhealthy' })] }))).toBe('partial')
   })
@@ -77,7 +105,7 @@ describe('allowedControls — spec §4 Start / Stop columns', () => {
   })
 
   it('allows only stop when on', () => {
-    expect(allowedControls('on', inputs())).toEqual({ start: false, stop: true })
+    expect(allowedControls('on', inputs({ containers: [running] }))).toEqual({ start: false, stop: true })
   })
 
   it('allows both when partial', () => {
@@ -89,13 +117,21 @@ describe('allowedControls — spec §4 Start / Stop columns', () => {
   })
 
   it('allows stop on missing only while containers still run', () => {
-    expect(allowedControls('missing', inputs({ filesExist: false }))).toEqual({ start: false, stop: true })
+    expect(allowedControls('missing', inputs({ filesExist: false, containers: [running, stopped] }))).toEqual({ start: false, stop: true })
     expect(allowedControls('missing', inputs({ filesExist: false, containers: [stopped] }))).toEqual({ start: false, stop: false })
+  })
+
+  it('allows nothing on missing while an operation is pending', () => {
+    expect(allowedControls('missing', inputs({ filesExist: false, containers: [running], pending: 'start' }))).toEqual({ start: false, stop: false })
+  })
+
+  it.each(['restarting', 'removing'] as const)('disables start on partial while a container is %s', (state) => {
+    expect(allowedControls('partial', inputs({ containers: [running, container({ id: 'x', state })] }))).toEqual({ start: false, stop: true })
   })
 
   it('allows stop on a container-driven starting, not on a pending start', () => {
     expect(allowedControls('starting', inputs({ containers: [booting] }))).toEqual({ start: false, stop: true })
-    expect(allowedControls('starting', inputs({ pending: 'start' }))).toEqual({ start: false, stop: false })
+    expect(allowedControls('starting', inputs({ containers: [running], pending: 'start' }))).toEqual({ start: false, stop: false })
   })
 
   it('allows nothing while stopping', () => {

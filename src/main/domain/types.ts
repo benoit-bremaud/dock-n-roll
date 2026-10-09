@@ -10,7 +10,7 @@ export type ContainerState =
   | 'exited'
   | 'dead'
 
-/** Docker `State.Health.Status`; `null` when the image has no HEALTHCHECK. */
+/** Docker `State.Health.Status`. */
 export type Health = 'starting' | 'healthy' | 'unhealthy'
 
 export interface PortBinding {
@@ -26,6 +26,7 @@ export interface ContainerSnapshot {
   readonly image: string
   readonly state: ContainerState
   readonly exitCode: number | null
+  /** `null` when the image has no HEALTHCHECK; only meaningful while running. */
   readonly health: Health | null
   readonly labels: Readonly<Record<string, string>>
   readonly publishedPorts: readonly PortBinding[]
@@ -37,13 +38,17 @@ export interface ComposeProjectRef {
   readonly configFiles: readonly string[]
 }
 
+/** One validated entry of the pin file (spec §8); `workingDir` is normalized. */
 export interface PinEntry {
   readonly workingDir: string
+  /** Narrows the pin to one project of the dir; absent → applies to every project of that dir. */
   readonly project?: string
   readonly name?: string
   readonly url?: string
   readonly healthUrl?: string
+  /** Pinned services come first, in pin-file order. */
   readonly pinned: boolean
+  /** Hidden services are left out of the list. */
   readonly hidden: boolean
 }
 
@@ -54,7 +59,11 @@ export interface PinFileResult {
 }
 
 export interface Service {
-  /** `workingDir + "\0" + projectName`, or `workingDir` alone for a pin with no container yet. */
+  /**
+   * `workingDir + "\0" + projectName`; `workingDir` alone only for a never-started pin with no
+   * `project` key. Such an id changes when the first container appears: callers that track
+   * pending operations key them by `workingDir` + project name, not by id.
+   */
   readonly id: string
   readonly projectName: string | null
   readonly workingDir: string
@@ -63,13 +72,19 @@ export interface Service {
   readonly containers: readonly ContainerSnapshot[]
   readonly pin: PinEntry | undefined
   readonly displayName: string
-  /** Other working dirs using the same project name; non-empty means `conflict` (ADR-0003). */
+  /**
+   * Other working dirs using the same project name — including a never-started pin that would
+   * start under it; non-empty means `conflict` (ADR-0003).
+   */
   readonly conflictingDirs: readonly string[]
 }
 
 export type PendingOperation = 'start' | 'stop'
 
-/** Spec §3: `healthUrl` gates readiness only when no relevant container has a HEALTHCHECK. */
+/**
+ * Spec §3: `none` = no `healthUrl` in the pin; `waiting` / `passed` = probe result. The gate is
+ * ignored by `deriveStatus` when any container has its own HEALTHCHECK.
+ */
 export type HealthGate = 'none' | 'waiting' | 'passed'
 
 export interface StatusInputs {
@@ -77,6 +92,7 @@ export interface StatusInputs {
   readonly pending: PendingOperation | null
   /** Working dir and every config file exist — checked by the adapter (IO). */
   readonly filesExist: boolean
+  /** Same as `Service.conflictingDirs.length > 0`. */
   readonly conflict: boolean
   readonly healthGate: HealthGate
 }

@@ -12,7 +12,9 @@ Electron means its CLI. Starting containers one by one through the Engine API wo
 ## Decision outcome
 
 - **Start**: spawn, with Node `execFile` (argument array, no shell), cwd = working dir:
-  `docker compose --project-name=<name> --file=<f>… up -d --wait --wait-timeout 180`.
+  `docker compose --project-name=<name> --project-directory=<dir> --file=<f>… up -d --wait --wait-timeout=180`.
+  `--project-directory` keeps relative paths and `.env` resolved from the working dir the
+  project was created from.
   `--wait` makes Compose block until every service is running or healthy (flag defined in
   Compose `cmd/compose/up.go`, checked via Context7 on 2026-10-09), so exit code 0 means ready
   and the app needs no readiness loop of its own. A pinned project with no container yet runs
@@ -30,7 +32,11 @@ Electron means its CLI. Starting containers one by one through the Engine API wo
   - on stream end or error: app banner, reconnect with backoff (1 s doubling to 30 s),
     full re-list, resubscribe.
 - **Argument hardening**: `--flag=<value>` forms only; the comma-separated
-  `config_files` label is split into one `--file=` per path; non-absolute paths rejected.
+  `config_files` label is split into one `--file=` per path; project names must match
+  Compose's rule `^[a-z0-9][a-z0-9_-]*$`; paths must be absolute and NUL-free. The domain
+  builds the argument arrays and re-checks these rules (`InvalidServiceError`).
+- **Environment**: the runner removes inherited `COMPOSE_FILE`, `COMPOSE_PROFILES` and
+  `COMPOSE_PROJECT_NAME` from the child environment, so the arguments alone decide the target.
 
 ### Consequences
 

@@ -61,6 +61,17 @@ classDiagram
     +boolean conflict
     +HealthGate healthGate
   }
+  class PinFileResult {
+    +PinEntry[] entries
+    +string[] errors
+  }
+  class Controls {
+    +boolean start
+    +boolean stop
+  }
+  class InvalidServiceError {
+    <<Error>>
+  }
   class ServiceStatus {
     <<enumeration>>
     conflict
@@ -85,6 +96,9 @@ classDiagram
     <<functions>>
     +composeProjectOf(ContainerSnapshot) ComposeProjectRef|null
     +isRelevant(ContainerSnapshot) boolean
+    +isValidProjectName(string) boolean
+    +defaultProjectName(string) string|null
+    +normalizeAbsolutePath(string) string|null
     +validatePinFile(unknown) PinFileResult
     +buildServices(ContainerSnapshot[], PinEntry[]) Service[]
     +deriveStatus(StatusInputs) ServiceStatus
@@ -102,6 +116,10 @@ classDiagram
   domain ..> StatusInputs : derives from
   domain ..> ServiceStatus : returns
   domain ..> BackgroundPort : joins into
+  domain ..> PinFileResult : validates into
+  domain ..> Controls : allows
+  domain ..> InvalidServiceError : throws
+  PinFileResult "1" o-- "0..*" PinEntry
   BackgroundPort ..> ListeningSocket
 ```
 
@@ -112,17 +130,29 @@ classDiagram
   `starting | healthy | unhealthy`; `PendingOperation` = `start | stop`;
   `HealthGate` = `none | waiting | passed` (spec §3: `healthUrl` gate only when no container
   has a `HEALTHCHECK`); `PortOwner` = `process(name, pid) | container(name) | unknown`.
-- **`Service.id`** = `workingDir` + `\0` + project name, or `workingDir` alone for a pin with
-  no container yet (spec §3). `conflictingDirs` is non-empty iff the project name is seen
-  with ≥ 2 working dirs (ADR-0003).
+- **`Service.id`** = `workingDir` + `\0` + project name; `workingDir` alone only for a
+  never-started pin with no `project` key (spec §3). That id changes when the first container
+  appears, so pending operations are keyed by `workingDir` + project name, not by id.
+- **`conflictingDirs`** is non-empty iff the project name is used by ≥ 2 working dirs,
+  counting a never-started pin under the name it would start with: its `project`, or the name
+  Compose derives from its dir (`defaultProjectName`) (ADR-0003).
+- **Validation (spec R4)**: project names follow Compose's rule `^[a-z0-9][a-z0-9_-]*$`;
+  paths are absolute, NUL-free and normalized (`/home/x/` matches the label `/home/x`). Labels
+  failing these checks make `composeProjectOf` return `null`; an invalid pin `project` drops
+  the whole entry rather than widening it to the dir; duplicate pins are rejected.
 - **`deriveStatus`** implements the spec §4 precedence, `on` requiring ≥ 1 relevant
-  container. `allowedControls` implements the §4 Start / Stop columns.
+  container; health is read on running containers only; the `healthUrl` gate holds a stack
+  whose containers all run or are done. `allowedControls` implements the §4 Start / Stop
+  columns (Start disabled while a container is `restarting` or `removing`).
 - **`filesExist`** is computed by the adapter (path check is IO) and passed in, keeping
   `deriveStatus` pure.
-- **`buildUpArgs` / `buildStopArgs`** produce the R4 argument arrays (`--flag=value`,
-  one `--file=` per config file, absolute paths only); for a pin with a `project` key and no
-  container, `--project-name=<project>` is passed (review finding E).
-- **`joinPorts`** de-duplicates IPv4 / IPv6 bindings of the same host port (observed on
-  `sonarqube`: `0.0.0.0:9000` and `[::]:9000`).
+- **`buildUpArgs` / `buildStopArgs`** produce the R4 argument arrays (`--flag=value` only,
+  `--project-directory=<workingDir>`, one `--file=` per config file) and throw
+  `InvalidServiceError` on an invalid name or path; for a pin with a `project` key and no
+  container, `--project-name=<project>` is passed.
+- **`joinPorts`** merges the IPv4 / IPv6 **wildcard** sockets of one port (observed on
+  `sonarqube`: `0.0.0.0:9000` and `[::]:9000`), keeping the best-known owner (process >
+  container > unknown). A container is credited only for a TCP binding on a compatible address.
+  The caller passes TCP sockets only.
 - Parsing `ss` text and Docker API objects stays in the adapters; the domain only sees the
   typed snapshots above.

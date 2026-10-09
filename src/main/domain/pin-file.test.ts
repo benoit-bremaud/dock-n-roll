@@ -19,7 +19,7 @@ describe('validatePinFile', () => {
         {
           workingDir: '/home/u/sonarqube-stack',
           name: 'SonarQube',
-          url: 'http://localhost:9000',
+          url: 'http://localhost:9000/',
           healthUrl: 'https://localhost:9000/api/system/status',
           pinned: false,
           hidden: false
@@ -32,39 +32,85 @@ describe('validatePinFile', () => {
   it('keeps the optional project key that narrows a pin to one project of a shared dir', () => {
     const result = validatePinFile({ services: [{ workingDir: '/srv/app', project: 'app-qa', pinned: true }] })
 
-    expect(result.entries).toEqual([{ workingDir: '/srv/app', project: 'app-qa', pinned: true, hidden: false }])
+    expect(result).toEqual({ entries: [{ workingDir: '/srv/app', project: 'app-qa', pinned: true, hidden: false }], errors: [] })
   })
 
-  it('treats an empty file as no entries and no errors', () => {
-    expect(validatePinFile(null)).toEqual({ entries: [], errors: [] })
+  it('normalizes the working dir so it matches the Compose label', () => {
+    expect(validatePinFile({ services: [{ workingDir: '/srv//app/' }] }).entries).toEqual([
+      { workingDir: '/srv/app', pinned: false, hidden: false }
+    ])
   })
 
-  it('rejects a document that is not a mapping with a services list', () => {
-    expect(validatePinFile(['/srv/app']).errors).toHaveLength(1)
-    expect(validatePinFile({ services: 'nope' }).errors).toHaveLength(1)
+  it.each([null, undefined])('treats an empty file (%s) as no entries and no errors', (document) => {
+    expect(validatePinFile(document)).toEqual({ entries: [], errors: [] })
   })
 
-  it('rejects an entry whose workingDir is missing or relative (spec R4)', () => {
-    const result = validatePinFile({ services: [{ name: 'no dir' }, { workingDir: 'projects/app' }] })
-
-    expect(result.entries).toEqual([])
-    expect(result.errors).toHaveLength(2)
+  it('accepts an empty services list', () => {
+    expect(validatePinFile({ services: [] })).toEqual({ entries: [], errors: [] })
   })
 
-  it.each(['file:///etc/passwd', 'javascript:alert(1)', 'ssh://host', 'not a url'])(
-    'drops a url that is not http or https (spec R6): %s',
-    (url) => {
-      const result = validatePinFile({ services: [{ workingDir: '/srv/app', url, healthUrl: url }] })
+  it.each([['/srv/app'], { services: 'nope' }, {}])('rejects a document that is not a mapping with a services list: %j', (document) => {
+    expect(validatePinFile(document)).toEqual({ entries: [], errors: ['expected a mapping with a `services` list'] })
+  })
 
-      expect(result.entries).toEqual([{ workingDir: '/srv/app', pinned: false, hidden: false }])
-      expect(result.errors).toHaveLength(2)
+  it('rejects an entry that is not a mapping', () => {
+    expect(validatePinFile({ services: ['/srv/app'] })).toEqual({ entries: [], errors: ['services[0]: expected a mapping'] })
+  })
+
+  it.each([{ name: 'no dir' }, { workingDir: 'projects/app' }, { workingDir: '/a\0b' }])(
+    'rejects an entry whose workingDir is missing, relative or invalid (spec R4): %j',
+    (entry) => {
+      expect(validatePinFile({ services: [entry] })).toEqual({ entries: [], errors: ['services[0]: workingDir must be an absolute path'] })
     }
   )
 
-  it('reports fields of the wrong type and unknown keys, and keeps the entry', () => {
-    const result = validatePinFile({ services: [{ workingDir: '/srv/app', pinned: 'yes', colour: 'blue' }] })
+  it.each(['', 'App', 'my app', '--project-directory=/tmp'])(
+    'rejects the whole entry when project is not a valid Compose name, instead of widening it to the dir: %j',
+    (project) => {
+      expect(validatePinFile({ services: [{ workingDir: '/srv/app', project, hidden: true }] })).toEqual({
+        entries: [],
+        errors: ['services[0].project: not a valid Compose project name; entry ignored']
+      })
+    }
+  )
 
-    expect(result.entries).toEqual([{ workingDir: '/srv/app', pinned: false, hidden: false }])
-    expect(result.errors).toHaveLength(2)
+  it.each(['file:///etc/passwd', 'javascript:alert(1)', 'ssh://host', 'not a url', 'http://user:pass@host'])(
+    'drops a url that is not plain http or https (spec R6): %s',
+    (url) => {
+      expect(validatePinFile({ services: [{ workingDir: '/srv/app', url, healthUrl: url }] })).toEqual({
+        entries: [{ workingDir: '/srv/app', pinned: false, hidden: false }],
+        errors: [
+          'services[0].url: only http and https URLs without credentials are allowed',
+          'services[0].healthUrl: only http and https URLs without credentials are allowed'
+        ]
+      })
+    }
+  )
+
+  it('stores the normalized URL, not the raw text', () => {
+    expect(validatePinFile({ services: [{ workingDir: '/srv/app', url: ' HTTP://localhost:9000' }] }).entries[0]?.url).toBe('http://localhost:9000/')
+  })
+
+  it('reports fields of the wrong type and unknown keys, and keeps the entry', () => {
+    const result = validatePinFile({ services: [{ workingDir: '/srv/app', name: '   ', pinned: 'yes', hidden: 1, colour: 'blue' }] })
+
+    expect(result).toEqual({
+      entries: [{ workingDir: '/srv/app', pinned: false, hidden: false }],
+      errors: [
+        'services[0].colour: unknown key',
+        'services[0].name: expected a non-empty string',
+        'services[0].pinned: expected true or false',
+        'services[0].hidden: expected true or false'
+      ]
+    })
+  })
+
+  it('rejects a second entry for the same working dir and project', () => {
+    const result = validatePinFile({ services: [{ workingDir: '/srv/app' }, { workingDir: '/srv/app/', name: 'dup' }] })
+
+    expect(result).toEqual({
+      entries: [{ workingDir: '/srv/app', pinned: false, hidden: false }],
+      errors: ['services[1]: duplicate of an earlier entry for the same workingDir and project; entry ignored']
+    })
   })
 })

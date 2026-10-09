@@ -16,7 +16,7 @@ function service(overrides: Partial<Service> = {}): Service {
   }
 }
 
-const WAIT = ['up', '-d', '--wait', '--wait-timeout', '180']
+const WAIT = ['up', '-d', '--wait', '--wait-timeout=180']
 
 describe('buildUpArgs — spec UC1 and R4', () => {
   it('uses --flag=value forms and one --file= per config file', () => {
@@ -25,6 +25,7 @@ describe('buildUpArgs — spec UC1 and R4', () => {
     expect(args).toEqual([
       'compose',
       '--project-name=app',
+      '--project-directory=/srv/app',
       '--file=/srv/app/compose.yaml',
       '--file=/srv/app/compose.override.yaml',
       ...WAIT
@@ -32,22 +33,29 @@ describe('buildUpArgs — spec UC1 and R4', () => {
   })
 
   it('lets Compose resolve name and files for a pin never started (UC1-3a)', () => {
-    expect(buildUpArgs(service({ projectName: null, configFiles: [] }))).toEqual(['compose', ...WAIT])
+    expect(buildUpArgs(service({ projectName: null, configFiles: [] }))).toEqual(['compose', '--project-directory=/srv/app', ...WAIT])
   })
 
   it('passes the pin project name for a never-started pin that names one', () => {
-    expect(buildUpArgs(service({ projectName: 'app-qa', configFiles: [] }))).toEqual(['compose', '--project-name=app-qa', ...WAIT])
+    expect(buildUpArgs(service({ projectName: 'app-qa', configFiles: [] }))).toEqual([
+      'compose',
+      '--project-name=app-qa',
+      '--project-directory=/srv/app',
+      ...WAIT
+    ])
   })
 
-  it('rejects a relative config file path', () => {
-    expect(() => buildUpArgs(service({ configFiles: ['compose.yaml'] }))).toThrow(InvalidServiceError)
+  it.each(['compose.yaml', '-f/etc/x'])('rejects a config file that is not an absolute path: %j', (file) => {
+    expect(() => buildUpArgs(service({ configFiles: [file] }))).toThrow(InvalidServiceError)
   })
 
-  it('keeps a flag-shaped label value as a single inert argument', () => {
-    const args = buildUpArgs(service({ projectName: '--project-directory=/tmp' }))
+  it('rejects a working dir that is not an absolute path', () => {
+    expect(() => buildUpArgs(service({ workingDir: 'srv/app' }))).toThrow(InvalidServiceError)
+  })
 
-    expect(args).toContain('--project-name=--project-directory=/tmp')
-    expect(args).not.toContain('--project-directory=/tmp')
+  it.each(['', '--project-directory=/tmp', 'My App'])('refuses a project name Compose would not accept: %j', (projectName) => {
+    expect(() => buildUpArgs(service({ projectName }))).toThrow(InvalidServiceError)
+    expect(() => buildStopArgs(service({ projectName }))).toThrow(InvalidServiceError)
   })
 })
 

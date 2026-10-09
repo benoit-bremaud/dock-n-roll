@@ -64,4 +64,16 @@ Chronological operational logbook. Complements `git log` with the human context.
     flag-shaped label values kept inert.
   - `Domain dependency rule enforced by lint` — `no-restricted-imports` on `src/main/domain`
     (Electron, dockerode, Node IO, YAML, parent imports).
-  - `Pin validation hand-written` — six keys; zod rejected as an extra dependency for little gain.
+  - `Pin validation hand-written` — seven keys; zod rejected as an extra dependency for little gain.
+  - Pre-push review (design, tests, security, docs): 6 Must, 10 Should, 7 Nice. Owner decision:
+    Must + Should, Nice deferred. Fixed test-first (39 red tests, then green; 131 tests):
+    - `healthUrl gate held by done jobs` — an exited-0 init job no longer turns a stack `on`
+      before its `healthUrl` answers.
+    - `Compose name and path rules` — project names must match Compose's
+      `^[a-z0-9][a-z0-9_-]*$`; paths absolute, NUL-free, normalized. An empty `project` label
+      would otherwise have produced `--project-name=` and stopped another project.
+    - `Never-started pins checked for conflicts` — under their `project` or the name Compose
+      derives from their dir, so Start cannot take over a project running from another dir.
+    - `--project-directory` added to `up`; inherited `COMPOSE_*` variables to be removed by the
+      runner (ADR-0002).
+    - Spec §3 / §4 / R4, ADR-0002 and the class diagram updated in the same change.

@@ -62,7 +62,25 @@ describe('buildServices — identity and discovery (ADR-0003)', () => {
     )
 
     expect(services.map((s) => s.id)).toEqual(['/srv/app\0qa1', '/srv/app\0qa2'])
-    expect(services.every((s) => s.conflictingDirs.length === 0)).toBe(true)
+    expect(services.map((s) => s.conflictingDirs)).toEqual([[], []])
+  })
+
+  it('discovers a project whose containers are all stopped', () => {
+    const services = buildServices([container({ state: 'exited', exitCode: 0, labels: composeLabels('blog', '/srv/blog') })], [])
+
+    expect(services.map((s) => s.id)).toEqual(['/srv/blog\0blog'])
+  })
+
+  it('merges and de-duplicates config files across the containers of a project', () => {
+    const services = buildServices(
+      [
+        container({ id: '1', labels: composeLabels('app', '/srv/app', '/srv/app/a.yaml,/srv/app/b.yaml') }),
+        container({ id: '2', labels: composeLabels('app', '/srv/app', '/srv/app/b.yaml') })
+      ],
+      []
+    )
+
+    expect(services[0]?.configFiles).toEqual(['/srv/app/a.yaml', '/srv/app/b.yaml'])
   })
 })
 
@@ -73,8 +91,8 @@ describe('buildServices — pin file merge and ordering', () => {
       [pin({ workingDir: STACK, name: 'SonarQube', url: 'http://localhost:9000' })]
     )
 
-    expect(services[0]?.displayName).toBe('SonarQube')
-    expect(services[0]?.pin?.url).toBe('http://localhost:9000')
+    expect(services).toHaveLength(1)
+    expect(services[0]).toMatchObject({ id: `${STACK}\0sonarqube`, displayName: 'SonarQube', pin: { url: 'http://localhost:9000' } })
   })
 
   it('prefers a project-specific pin over a dir-only pin', () => {
@@ -83,7 +101,19 @@ describe('buildServices — pin file merge and ordering', () => {
       [pin({ workingDir: '/srv/app', name: 'Any' }), pin({ workingDir: '/srv/app', project: 'qa2', name: 'QA 2' })]
     )
 
-    expect(services[0]?.displayName).toBe('QA 2')
+    expect(services.map((s) => [s.id, s.displayName])).toEqual([['/srv/app\0qa2', 'QA 2']])
+  })
+
+  it('does not apply a pin narrowed to another project of the same dir', () => {
+    const services = buildServices(
+      [container({ labels: composeLabels('qa2', '/srv/app') })],
+      [pin({ workingDir: '/srv/app', project: 'qa1', name: 'QA 1' })]
+    )
+
+    expect(services.map((s) => [s.id, s.displayName])).toEqual([
+      ['/srv/app\0qa1', 'QA 1'],
+      ['/srv/app\0qa2', 'qa2']
+    ])
   })
 
   it('creates a service with no container for a pin never started yet', () => {
@@ -101,7 +131,26 @@ describe('buildServices — pin file merge and ordering', () => {
   it('uses the pin project as identity when a never-started pin names one', () => {
     const [service] = buildServices([], [pin({ workingDir: '/srv/app', project: 'app-qa' })])
 
-    expect(service).toMatchObject({ id: '/srv/app\0app-qa', projectName: 'app-qa' })
+    expect(service).toMatchObject({ id: '/srv/app\0app-qa', projectName: 'app-qa', displayName: 'app-qa' })
+  })
+
+  it('flags a never-started pin whose project name already runs from another dir', () => {
+    const services = buildServices(
+      [container({ labels: composeLabels('foo', '/x') })],
+      [pin({ workingDir: '/y', project: 'foo' })]
+    )
+
+    expect(services.find((s) => s.workingDir === '/y')?.conflictingDirs).toEqual(['/x'])
+    expect(services.find((s) => s.workingDir === '/x')?.conflictingDirs).toEqual(['/y'])
+  })
+
+  it('flags a never-started pin whose dir name Compose would turn into a running project name', () => {
+    const services = buildServices(
+      [container({ labels: composeLabels('blog', '/srv/blog') })],
+      [pin({ workingDir: '/home/u/Blog' })]
+    )
+
+    expect(services.find((s) => s.workingDir === '/home/u/Blog')?.conflictingDirs).toEqual(['/srv/blog'])
   })
 
   it('excludes hidden services', () => {
@@ -120,5 +169,13 @@ describe('buildServices — pin file merge and ordering', () => {
     )
 
     expect(services.map((s) => s.displayName)).toEqual(['sonar', 'blog', 'alpha', 'zeta'])
+  })
+
+  it('orders ties deterministically, whatever the container list order', () => {
+    const a = container({ id: '1', labels: composeLabels('qa2', '/srv/app') })
+    const b = container({ id: '2', labels: composeLabels('qa1', '/srv/app') })
+    const pins = [pin({ workingDir: '/srv/app', pinned: true })]
+
+    expect(buildServices([a, b], pins).map((s) => s.id)).toEqual(buildServices([b, a], pins).map((s) => s.id))
   })
 })

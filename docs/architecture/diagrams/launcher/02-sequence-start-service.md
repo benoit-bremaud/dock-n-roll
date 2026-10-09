@@ -28,7 +28,7 @@ sequenceDiagram
   SC->>SC: pending = start
   SC-->>UI: push statusChanged starting (orange)
   SC->>CR: up(name, workingDir, files)
-  CR->>CLI: execFile compose --project-name=n --file=f up -d --wait --wait-timeout 180
+  CR->>CLI: execFile compose --project-name=n --project-directory=d --file=f up -d --wait --wait-timeout=180
   CLI->>DE: create or start containers, wait running or healthy
   par events while the command runs
     DE-->>DO: event start or health_status

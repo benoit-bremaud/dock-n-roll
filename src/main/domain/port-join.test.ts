@@ -26,7 +26,33 @@ describe('joinPorts — spec UC4 and R3', () => {
   it('lists the IPv4 and IPv6 sockets of one published port once', () => {
     const ports = joinPorts([{ address: '0.0.0.0', port: 9000 }, { address: '[::]', port: 9000 }], [sonarqube])
 
-    expect(ports).toHaveLength(1)
+    expect(ports).toEqual([{ address: '0.0.0.0', port: 9000, owner: { kind: 'container', name: 'sonarqube' } }])
+  })
+
+  it('keeps the best-known owner when merging the IPv4 and IPv6 sockets of a port', () => {
+    const ports = joinPorts([{ address: '0.0.0.0', port: 80 }, { address: '[::]', port: 80, process: { name: 'nginx', pid: 7 } }], [])
+
+    expect(ports).toEqual([{ address: '0.0.0.0', port: 80, owner: { kind: 'process', name: 'nginx', pid: 7 } }])
+  })
+
+  it('prefers the process seen by ss over a container publishing the same port', () => {
+    expect(joinPorts([{ address: '0.0.0.0', port: 9000, process: { name: 'java', pid: 9 } }], [sonarqube])[0]?.owner).toEqual({
+      kind: 'process',
+      name: 'java',
+      pid: 9
+    })
+  })
+
+  it('does not credit a container publishing a UDP port with a TCP listener', () => {
+    const dns = container({ name: 'dns', publishedPorts: [{ hostIp: '127.0.0.1', hostPort: 53, containerPort: 53, protocol: 'udp' }] })
+
+    expect(joinPorts([{ address: '127.0.0.53%lo', port: 53 }], [dns])[0]?.owner).toEqual({ kind: 'unknown' })
+  })
+
+  it('does not credit a container bound to one address with a listener on another', () => {
+    const db = container({ name: 'db', publishedPorts: [{ hostIp: '127.0.0.1', hostPort: 5432, containerPort: 5432, protocol: 'tcp' }] })
+
+    expect(joinPorts([{ address: '[::1]', port: 5432 }], [db])[0]?.owner).toEqual({ kind: 'unknown' })
   })
 
   it('reports an unknown owner when neither ss nor Docker knows it', () => {
