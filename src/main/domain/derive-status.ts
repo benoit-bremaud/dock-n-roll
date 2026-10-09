@@ -43,8 +43,9 @@ export function deriveStatus(inputs: StatusInputs): ServiceStatus {
     return 'stopping'
   }
   const allUp = containers.length > 0 && containers.every((container) => isRunning(container) || isDone(container, containers))
-  // Spec §3: the healthUrl gate only applies when no container has its own HEALTHCHECK.
-  const gateApplies = containers.every((container) => container.health === null)
+  // Spec §3: the healthUrl gate only applies when no running container has its own
+  // HEALTHCHECK (a stopped container's health is stale and says nothing).
+  const gateApplies = containers.filter(isRunning).every((container) => container.health === null)
   if (
     inputs.pending === 'start' ||
     containers.some(isBooting) ||

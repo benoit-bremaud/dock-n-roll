@@ -128,8 +128,8 @@ classDiagram
 - Literal unions, not classes: `ContainerState` = Docker `State.Status`
   (`created | running | paused | restarting | removing | exited | dead`); `Health` =
   `starting | healthy | unhealthy`; `PendingOperation` = `start | stop`;
-  `HealthGate` = `none | waiting | passed` (spec §3: `healthUrl` gate only when no container
-  has a `HEALTHCHECK`); `PortOwner` = `process(name, pid) | container(name) | unknown`.
+  `HealthGate` = `none | waiting | passed` (spec §3: `healthUrl` gate only when no running
+  container has a `HEALTHCHECK`); `PortOwner` = `process(name, pid) | container(name) | unknown`.
 - **`Service.id`** = `workingDir` + `\0` + project name; `workingDir` alone only for a
   never-started pin with no `project` key (spec §3). That id changes when the first container
   appears, so pending operations are keyed by `workingDir` + project name, not by id.

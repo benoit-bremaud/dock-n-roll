@@ -83,7 +83,7 @@ export type PendingOperation = 'start' | 'stop'
 
 /**
  * Spec §3: `none` = no `healthUrl` in the pin; `waiting` / `passed` = probe result. The gate is
- * ignored by `deriveStatus` when any container has its own HEALTHCHECK.
+ * ignored by `deriveStatus` when any running container has its own HEALTHCHECK.
  */
 export type HealthGate = 'none' | 'waiting' | 'passed'
 

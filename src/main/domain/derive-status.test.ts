@@ -58,6 +58,12 @@ describe('deriveStatus — spec §4 precedence', () => {
     expect(deriveStatus(inputs({ containers: [healthy], healthGate: 'waiting' }))).toBe('on')
   })
 
+  it('keeps the healthUrl gate when only a stopped init job carries a stale health status', () => {
+    const staleInitJob = container({ id: 'f', state: 'exited', exitCode: 0, health: 'healthy' })
+
+    expect(deriveStatus(inputs({ containers: [running, staleInitJob], healthGate: 'waiting' }))).toBe('starting')
+  })
+
   it('does not apply the healthUrl gate while some containers are stopped', () => {
     expect(deriveStatus(inputs({ containers: [running, stopped], healthGate: 'waiting' }))).toBe('partial')
   })
