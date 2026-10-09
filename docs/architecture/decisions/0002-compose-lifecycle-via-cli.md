@@ -27,8 +27,8 @@ Electron means its CLI. Starting containers one by one through the Engine API wo
 - **Observe**: Docker Engine API through `dockerode`:
   - subscribe to container events `create`, `start`, `die`, `stop`, `destroy`,
     `health_status` **before** the initial list, then apply buffered events;
-  - on stream end or error: app banner, reconnect with backoff (1 s doubling to 30 s),
-    full re-list, resubscribe.
+  - on stream end or error: app banner, reconnect with backoff (1 s doubling to 30 s), then
+    the startup sequence again: resubscribe with buffering, full re-list, apply the buffer.
 - **Argument hardening**: `--flag=<value>` forms only; the comma-separated
   `config_files` label is split into one `--file=` per path; non-absolute paths rejected.
 

@@ -115,8 +115,10 @@ Primary actor for all: **Developer**. Supporting actor: **Docker Engine**.
 - **Event stream contract**: subscribe to container events (`create`, `start`, `die`, `stop`,
   `destroy`, `health_status`) **before** the initial container list, then apply buffered
   events. On stream end or error: banner, reconnect with backoff (1 s doubling up to 30 s),
-  full re-list (resync), resubscribe. Path existence (`missing`) is checked at each resync
-  and before each start, since no event reports it.
+  then the same sequence as at startup — resubscribe with buffering, full re-list (resync),
+  apply the buffered events — so no change is lost between the list and the subscription.
+  Path existence (`missing`) is checked at each resync and before each start, since no event
+  reports it.
 
 ### UC4 — Inspect background activity
 
