@@ -1,0 +1,35 @@
+/* Design tokens — single source of truth for colours, spacing and typography.
+   Status colours follow spec §4: on → --status-on, off → --status-off,
+   starting/stopping/partial → --status-transitional, conflict/missing → --status-unavailable. */
+:root {
+  --color-bg: #ffffff;
+  --color-fg: #1f2328;
+  --color-muted: #59636e;
+
+  --status-on: #1a7f37;
+  --status-off: #cf222e;
+  --status-transitional: #bc4c00;
+  --status-unavailable: #8c959f;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+
+  --font-family: system-ui, sans-serif;
+  --font-size-body: 14px;
+  --font-size-title: 20px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0d1117;
+    --color-fg: #e6edf3;
+    --color-muted: #9198a1;
+
+    --status-on: #3fb950;
+    --status-off: #f85149;
+    --status-transitional: #db6d28;
+    --status-unavailable: #6e7681;
+  }
+}

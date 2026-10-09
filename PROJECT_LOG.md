@@ -35,3 +35,19 @@ Chronological operational logbook. Complements `git log` with the human context.
     readiness loop.
   - `Pending-operation guard` — one start/stop at a time per service; no stop during a start in V1.
   - `Stop by project label` — `stop` without `--file`, so it works when the folder is gone.
+- **Repository published**: `benoit-bremaud/dock-n-roll` created private; empty root commit
+  `9a9a5ab` (`chore: initialize repository`) pushed to `main` as the only direct commit, needed
+  to give PR #1 a base. PR #1 opened from `docs/v1-conception`.
+- **Implementation plan validated**: six PRs — scaffold, domain, adapters, controller,
+  dashboard, autostart/packaging.
+- **Scaffold** (branch `chore/scaffold`, ADR-0004):
+  - `Renderer` — React + CSS design tokens; vanilla TypeScript rejected (hand-written live DOM sync).
+  - `Hand-written scaffold` — no generator executed; exact version pins; pnpm `allowBuilds`
+    limited to `esbuild`. Electron 44 has no install script and downloads its runtime lazily,
+    but electron-vite 5 does not trigger that download, so `dev` / `start` run
+    `install-electron` first.
+  - `Version constraints` — electron-vite 5 needs Vite ≤ 7; typescript-eslint 8 needs TypeScript < 6.1.
+  - `CI while private` — Gitleaks + `pnpm audit`; CodeQL and dependency-review deferred to the
+    public release (both need GitHub code security, unavailable on a private personal repo).
+  - Smoke run: the app starts and the single-instance lock works. The tray icon could not be
+    checked on screen because the GNOME AppIndicator extension was inactive on the workstation.

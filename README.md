@@ -4,7 +4,18 @@ A tiny GNOME top-bar launcher for local dev services: one button per Docker Comp
 **green = ON, red = OFF** — plus a view of everything running in the background
 (containers, listening ports).
 
-> **Status**: V1 conception validated. No application code yet.
+> **Status**: V1 conception validated; Electron skeleton in place (tray icon + empty dashboard).
+
+## Development
+
+Requirements: Ubuntu GNOME with the AppIndicator extension enabled
+(`gnome-extensions enable ubuntu-appindicators@ubuntu.com`), Node.js ≥ 22.12, pnpm 10.30.3 (pinned in `packageManager`; `corepack enable` provides it).
+
+```bash
+pnpm install
+pnpm dev          # first run downloads the Electron runtime
+pnpm lint && pnpm typecheck && pnpm test && pnpm build
+```
 
 ## Conception
 
