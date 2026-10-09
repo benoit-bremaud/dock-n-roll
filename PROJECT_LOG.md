@@ -24,3 +24,14 @@ Chronological operational logbook. Complements `git log` with the human context.
 - **Conception gate passed** — owner validated spec + ADRs (now `accepted`) + UML. Open
   questions resolved: pin file reloaded automatically on change; non-Compose containers shown
   in the monitor only.
+- **Pre-push local review** of branch `docs/v1-conception` (design, docs, spec-level security,
+  cross-doc consistency; tests not applicable): 4 Must, 7 Should, 4 Nice — report in
+  `docs/architecture/review-local.md`. Owner decision: apply Must + Should, defer Nice.
+- **Decisions** (from the review):
+  - `Derived status` — the service status is a pure function with a fixed precedence
+    (`conflict > missing > stopping > starting > on > off > partial`), not a stored state
+    machine; Docker changes state on its own, a transition list could never stay complete.
+  - `Readiness delegated to Compose` — `up -d --wait --wait-timeout 180` replaces a custom
+    readiness loop.
+  - `Pending-operation guard` — one start/stop at a time per service; no stop during a start in V1.
+  - `Stop by project label` — `stop` without `--file`, so it works when the folder is gone.

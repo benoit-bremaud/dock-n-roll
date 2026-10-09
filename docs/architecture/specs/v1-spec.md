@@ -38,25 +38,34 @@ I want a small desktop tool, always reachable from the GNOME top bar, that:
 
 | Term | Definition |
 |---|---|
-| **Service** | One Docker Compose project, identified by the pair *(project name, working dir)* — never by the project name alone (see §6, R1). |
-| **Pin file** | `~/.config/dock-n-roll/services.yaml` — owner-edited overrides keyed by working dir. |
-| **Health source** | Where "ready" comes from, in priority order: Docker `HEALTHCHECK` status → `healthUrl` from the pin file (HTTP 2xx/3xx) → container `running`. |
+| **Service** | One Docker Compose project, identified by the pair *(project name, working dir)* — never by the project name alone (see §6, R1). A pinned project with no container yet is identified by its working dir until its first container is seen. |
+| **Pin file** | `~/.config/dock-n-roll/services.yaml` — owner-edited overrides keyed by working dir, optionally narrowed by `project` (§8). Watched: reloaded on change. |
+| **Relevant container** | A container of the project, excluding one-off containers (label `com.docker.compose.oneoff=True`). A relevant container exited with code 0 counts as *done* (init / migration job) when at least one other relevant container runs. |
+| **Health source** | Per container, its Docker `HEALTHCHECK` status wins. Only when **no** relevant container has a `HEALTHCHECK`, the service-level `healthUrl` from the pin file gates readiness (HTTP 2xx/3xx, polled every 2 s while all relevant containers run and the gate has not passed yet, whatever started them). Otherwise: container `running`. |
+| **Pending operation** | Per service, `start` or `stop` requested by the app and not finished yet. Owned by ServiceController; at most one at a time. |
 | **Listening port** | A TCP socket in `LISTEN` state on the host, from `ss -ltnp` joined with Docker port bindings. |
 
-## 4. Service status (aggregated over the project's containers)
+## 4. Service status (derived, never stored)
 
-| Status | Colour | Rule |
-|---|---|---|
-| `off` | red | all containers stopped |
-| `starting` | orange | start requested, or ≥ 1 container `health=starting`, until all ready |
-| `on` | green | all containers running and ready per their health source |
-| `stopping` | orange | stop requested, until all containers stopped |
-| `partial` | orange | some running, some stopped, no operation in flight |
-| `missing` | grey | working dir or compose file no longer exists — start disabled |
-| `conflict` | grey | same project name seen with ≥ 2 working dirs — controls disabled, both listed |
+The status is a **pure function** of the relevant containers, the pending operation, the
+existence of the compose files and the conflict check. It is recomputed on every input
+change; it is not a state machine maintained by the app.
 
-If the Docker daemon is unreachable, the dashboard shows an app-level banner and all
-services are displayed as unknown; no per-service status is invented.
+| Status | Colour | Meaning | Start | Stop |
+|---|---|---|---|---|
+| `conflict` | grey | same project name seen with ≥ 2 working dirs — both listed | disabled | disabled |
+| `missing` | grey | working dir or a `config_files` path no longer exists | disabled | allowed if containers run |
+| `stopping` | orange | stop pending | disabled | disabled |
+| `starting` | orange | start pending, or ≥ 1 container `health=starting`, or all running but the `healthUrl` gate not passed yet | disabled | allowed if no pending operation |
+| `on` | green | ≥ 1 relevant container, and all ready (or done) | disabled | allowed |
+| `off` | red | all relevant containers stopped (or none yet, pinned) | allowed | disabled |
+| `partial` | orange | anything else (some running, some stopped) | allowed | allowed |
+
+**Precedence** — first match wins, top to bottom of the table:
+`conflict > missing > stopping > starting > on > off > partial`.
+
+If the Docker daemon is unreachable, the dashboard shows an app-level banner and service
+rows are greyed out **without** a status badge — this is not a service status.
 
 ## 5. Use cases (Cockburn, brief)
 
@@ -64,30 +73,50 @@ Primary actor for all: **Developer**. Supporting actor: **Docker Engine**.
 
 ### UC1 — Start a service
 
-- **Precondition**: service status is `off` or `partial`; Docker reachable.
+- **Precondition**: no pending operation; status `off` or `partial`; Docker reachable.
 - **Main success scenario**:
   1. Developer clicks the red button (dashboard) or the menu item (tray).
-  2. System marks the service `starting`.
-  3. System runs `docker compose -p <name> -f <config files> up -d` in the working dir.
-  4. System follows container events until every container is ready.
-  5. System marks the service `on` (green).
+  2. System sets pending `start` → status `starting`.
+  3. System runs, in the working dir,
+     `docker compose --project-name=<name> --file=<f1> [--file=<f2>…] up -d --wait --wait-timeout 180`.
+     Compose itself waits until every service is running or healthy.
+  4. Command exits 0 → System clears pending; the status is derived again (`on` once the
+     `healthUrl` gate, if any, passes).
 - **Extensions**:
-  - 3a. Command exits non-zero → status recomputed from real state (`off`/`partial`), error message shown with stderr excerpt.
-  - 4a. Not ready after the start timeout (default 180 s, SonarQube is slow) → status `partial`, warning shown.
-  - \*a. Status is `missing` or `conflict` → button disabled with tooltip explaining why.
+  - 3a. Pinned service with no container yet → System runs `docker compose up -d --wait --wait-timeout 180`
+    in the working dir without `--project-name` / `--file` (Compose resolves both itself).
+  - 4a. Command exits non-zero (error, unhealthy or 180 s timeout) → pending cleared, status
+    derived from real state, error shown with an stderr excerpt.
+  - \*a. Status is `missing` or `conflict` → button disabled with a tooltip explaining why.
+  - \*b. Developer clicks again while pending → ignored (button disabled).
 
 ### UC2 — Stop a service
 
-- **Precondition**: status `on`, `starting` or `partial`.
-- **Main success scenario**: click green button → `stopping` → `docker compose -p <name> stop` → all stopped → `off`.
-- **Note**: `stop`, never `down` — `down` removes containers, which would erase the Compose labels auto-discovery relies on (ADR-0003) and make the service disappear.
-- **Extensions**: 3a. command fails → same as UC1-3a.
+- **Precondition**: no pending operation; status `on`, `partial`, `starting` (container-driven, e.g. booting after a terminal start) or `missing` with running containers.
+- **Main success scenario**:
+  1. Developer clicks the green button (dashboard) or the menu item (tray).
+  2. System sets pending `stop` → status `stopping`.
+  3. System runs `docker compose --project-name=<name> stop` from a neutral cwd (`$HOME`),
+     without `--file`: Compose stops by project label, so it works even if the folder is gone.
+  4. Command exits 0 → pending cleared, status derived (`off`).
+- **Extensions**:
+  - 3a. Command exits non-zero → pending cleared, status derived from real state
+    (`on`, `partial` or `off`), error shown with an stderr excerpt.
+- **Note**: `stop`, never `down` — `down` removes containers, which would erase the Compose
+  labels auto-discovery relies on (ADR-0003) and make the service disappear.
+- **Note**: stopping during a pending start is not offered in V1 (avoids `stop` racing with `up`).
 
 ### UC3 — Consult services status
 
 - Developer opens the tray menu or the dashboard; system lists services (pinned first, then
   discovered, hidden excluded) with their live status. Status refreshes on Docker events,
-  no polling of the Docker API.
+  no polling of the Docker API; the main process pushes every change to the dashboard and
+  the tray menu.
+- **Event stream contract**: subscribe to container events (`create`, `start`, `die`, `stop`,
+  `destroy`, `health_status`) **before** the initial container list, then apply buffered
+  events. On stream end or error: banner, reconnect with backoff (1 s doubling up to 30 s),
+  full re-list (resync), resubscribe. Path existence (`missing`) is checked at each resync
+  and before each start, since no event reports it.
 
 ### UC4 — Inspect background activity
 
@@ -112,9 +141,14 @@ Primary actor for all: **Developer**. Supporting actor: **Docker Engine**.
   ports → join with Docker port bindings; never ask for sudo.
 - **R4 — Docker socket = root-equivalent**: the app stays local-only: no HTTP server, no
   remote input; commands are spawned with `execFile` and an argument array (no shell), only
-  with values read from Docker labels / the pin file.
+  with values read from Docker labels / the pin file. Arguments use the `--flag=<value>` form;
+  `config_files` (comma-separated label) is split into one `--file=` per path; non-absolute
+  paths are rejected.
 - **R5 — Tray click on Linux**: StatusNotifierItem does not guarantee which click activates
   the icon (Electron `Tray` docs) → all actions are reachable through the tray **menu**.
+- **R6 — URL opening**: `url` and `healthUrl` must use the `http:` or `https:` scheme; any
+  other value is rejected at pin-file load (`shell.openExternal` on a `file:` or custom scheme
+  can launch local programs).
 
 ## 7. Acceptance criteria (V1)
 
@@ -140,7 +174,19 @@ services:
     pinned: true
   - workingDir: /home/vev/Documents/Codex/bulle-de-je
     hidden: true
+  - workingDir: /home/vev/Documents/02_personal/some-app
+    project: some-app-qa   # optional: narrows the pin to one project of a shared dir
+    name: Some app (QA)
 ```
+
+| Key | Required | Meaning |
+|---|---|---|
+| `workingDir` | yes | absolute path; matches the `com.docker.compose.project.working_dir` label |
+| `project` | no | narrows the entry to one project name; absent → applies to every project of that dir |
+| `name` | no | display name |
+| `url` | no | `http:`/`https:` only (R6) — enables UC5 |
+| `healthUrl` | no | `http:`/`https:` only — readiness gate when no container has a `HEALTHCHECK` (§3) |
+| `pinned` / `hidden` | no | ordering / exclusion |
 
 ## 9. Resolved questions (owner, 2026-10-09)
 
