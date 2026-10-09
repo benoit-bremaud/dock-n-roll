@@ -59,23 +59,17 @@ export function buildServices(containers: readonly ContainerSnapshot[], pins: re
       !projects.some((project) => project.workingDir === pin.workingDir && (pin.project === undefined || pin.project === project.name))
   )
 
-  // A never-started pin would run `up` under its own project name, or the one Compose derives
-  // from its dir: if that name already runs from another dir, `up` would take over its containers.
-  const effectiveName = (pin: PinEntry): string | null => pin.project ?? defaultProjectName(pin.workingDir)
+  // Only discovered projects own containers: they define which dirs use which project name.
   const dirsByName = new Map<string, string[]>()
-  const addDir = (name: string | null, dir: string): void => {
-    if (name === null) return
-    const dirs = dirsByName.get(name) ?? []
-    if (!dirs.includes(dir)) dirsByName.set(name, [...dirs, dir])
+  for (const project of projects) {
+    dirsByName.set(project.name, [...(dirsByName.get(project.name) ?? []), project.workingDir])
   }
-  projects.forEach((project) => {
-    addDir(project.name, project.workingDir)
-  })
-  neverStartedPins.forEach((pin) => {
-    addDir(effectiveName(pin), pin.workingDir)
-  })
   const otherDirs = (name: string | null, dir: string): string[] =>
     name === null ? [] : (dirsByName.get(name) ?? []).filter((other) => other !== dir)
+  // A never-started pin would run `up` under its own project name, or the one Compose derives
+  // from its dir: if that name is already used by another dir, `up` would take over its
+  // containers. Only the pin is flagged — it must never block the running project's Stop.
+  const effectiveName = (pin: PinEntry): string | null => pin.project ?? defaultProjectName(pin.workingDir)
 
   const discovered: Service[] = projects.map((project) => {
     const pin = findPin(pins, project.workingDir, project.name)

@@ -73,8 +73,8 @@ export interface Service {
   readonly pin: PinEntry | undefined
   readonly displayName: string
   /**
-   * Other working dirs using the same project name — including a never-started pin that would
-   * start under it; non-empty means `conflict` (ADR-0003).
+   * Other discovered working dirs using the same project name. For a never-started pin: the
+   * discovered dirs using the name it would start under. Non-empty means `conflict` (ADR-0003).
    */
   readonly conflictingDirs: readonly string[]
 }

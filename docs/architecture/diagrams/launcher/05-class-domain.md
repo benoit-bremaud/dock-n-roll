@@ -133,9 +133,11 @@ classDiagram
 - **`Service.id`** = `workingDir` + `\0` + project name; `workingDir` alone only for a
   never-started pin with no `project` key (spec §3). That id changes when the first container
   appears, so pending operations are keyed by `workingDir` + project name, not by id.
-- **`conflictingDirs`** is non-empty iff the project name is used by ≥ 2 working dirs,
-  counting a never-started pin under the name it would start with: its `project`, or the name
-  Compose derives from its dir (`defaultProjectName`) (ADR-0003).
+- **`conflictingDirs`** is non-empty iff the project name is used by ≥ 2 discovered working
+  dirs (ADR-0003). A never-started pin is flagged when a discovered project in another dir
+  already uses the name it would start with — its `project`, or the name Compose derives from
+  its dir (`defaultProjectName`). Only the pin is flagged: it never blocks the running
+  project, and two never-started pins never flag each other.
 - **Validation (spec R4)**: project names follow Compose's rule `^[a-z0-9][a-z0-9_-]*$`;
   paths are absolute, NUL-free and normalized (`/home/x/` matches the label `/home/x`). Labels
   failing these checks make `composeProjectOf` return `null`; an invalid pin `project` drops

@@ -141,7 +141,19 @@ describe('buildServices — pin file merge and ordering', () => {
     )
 
     expect(services.find((s) => s.workingDir === '/y')?.conflictingDirs).toEqual(['/x'])
-    expect(services.find((s) => s.workingDir === '/x')?.conflictingDirs).toEqual(['/y'])
+  })
+
+  it('never blocks the running project because of a pin elsewhere', () => {
+    const services = buildServices([container({ labels: composeLabels('x', '/b/x') })], [pin({ workingDir: '/a/x' })])
+
+    expect(services.find((s) => s.workingDir === '/b/x')?.conflictingDirs).toEqual([])
+    expect(services.find((s) => s.workingDir === '/a/x')?.conflictingDirs).toEqual(['/b/x'])
+  })
+
+  it('does not flag two never-started pins against each other while nothing runs', () => {
+    const services = buildServices([], [pin({ workingDir: '/work/api' }), pin({ workingDir: '/perso/api' })])
+
+    expect(services.map((s) => s.conflictingDirs)).toEqual([[], []])
   })
 
   it('flags a never-started pin whose dir name Compose would turn into a running project name', () => {
