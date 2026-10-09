@@ -21,6 +21,13 @@ export default tseslint.config(
     }
   },
   {
+    // Dependency rule (03-component.md): the domain imports nothing from Electron, Docker or Node IO.
+    files: ['src/main/domain/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: ['electron', 'dockerode', 'node:*', 'fs', 'child_process', 'path', 'os', 'yaml', '../*'] }]
+    }
+  },
+  {
     files: ['src/renderer/**/*.tsx'],
     plugins: { 'react-hooks': reactHooks },
     rules: reactHooks.configs.recommended.rules

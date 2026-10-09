@@ -51,3 +51,17 @@ Chronological operational logbook. Complements `git log` with the human context.
     public release (both need GitHub code security, unavailable on a private personal repo).
   - Smoke run: the app starts and the single-instance lock works. The tray icon could not be
     checked on screen because the GNOME AppIndicator extension was inactive on the workstation.
+  - Pre-push review: 3 Must (dev CSP, quit flow, Electron download docs) resolved; PR #2 opened,
+    stacked on PR #1. CI follow-up `ed57e1f`: gitleaks-action needs `pull-requests: read` to
+    list the PR commits (403 without it).
+- **Domain** (branch `feat/domain`, class diagram `05-class-domain.md`), written test-first
+  (owner decision: TDD for the pure domain):
+  - Six pure modules under `src/main/domain`: Compose labels, pin-file validation, service
+    catalog (identity, conflicts, pin merge, ordering), status derivation and allowed controls,
+    compose argument builder, port join.
+  - Tests pin the workstation cases: the `sonarqube` name collision, a pinned service with no
+    container deriving `off` (not `on`), the IPv4 + IPv6 binding of port 9000 listed once,
+    flag-shaped label values kept inert.
+  - `Domain dependency rule enforced by lint` — `no-restricted-imports` on `src/main/domain`
+    (Electron, dockerode, Node IO, YAML, parent imports).
+  - `Pin validation hand-written` — six keys; zod rejected as an extra dependency for little gain.
