@@ -1,12 +1,12 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, Menu, nativeImage, Tray } from 'electron'
+import { app, BrowserWindow, Menu, nativeImage, session, Tray } from 'electron'
 
 const TRAY_ICON_PATH = join(__dirname, '../../resources/tray-icon.png')
 
 let dashboard: BrowserWindow | null = null
 // Kept at module level: a garbage-collected Tray disappears from the top bar.
 let tray: Tray | null = null
-// Set by the tray "Quit" item: lets the dashboard close for real instead of hiding.
+// Set on any quit (tray item, logout, SIGTERM): lets the dashboard close for real instead of hiding.
 let isQuitting = false
 
 function createDashboard(): BrowserWindow {
@@ -64,7 +64,6 @@ function createTray(): Tray {
       {
         label: 'Quit',
         click: () => {
-          isQuitting = true
           app.quit()
         }
       }
@@ -79,11 +78,22 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on('second-instance', showDashboard)
   app.on('before-quit', () => {
+    // Emitted before windows close, whatever triggered the quit.
+    isQuitting = true
     tray?.destroy()
   })
   // A tray app keeps running with no window open.
   app.on('window-all-closed', () => undefined)
   void app.whenReady().then(() => {
+    // The dashboard needs no browser permission (camera, notifications, ...): deny them all.
+    session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
+      callback(false)
+    })
+    session.defaultSession.setPermissionCheckHandler(() => false)
+    // A hidden default menu still opens with Alt (Reload, Toggle DevTools): remove it in builds.
+    if (app.isPackaged) {
+      Menu.setApplicationMenu(null)
+    }
     tray = createTray()
   })
 }

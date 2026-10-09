@@ -1,5 +1,6 @@
 /* Design tokens — single source of truth for colours, spacing and typography.
-   Status colours follow spec §4: on green, off red, transitional orange, unavailable grey. */
+   Status colours follow spec §4: on → --status-on, off → --status-off,
+   starting/stopping/partial → --status-transitional, conflict/missing → --status-unavailable. */
 :root {
   --color-bg: #ffffff;
   --color-fg: #1f2328;

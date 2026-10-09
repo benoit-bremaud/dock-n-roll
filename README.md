@@ -9,7 +9,7 @@ A tiny GNOME top-bar launcher for local dev services: one button per Docker Comp
 ## Development
 
 Requirements: Ubuntu GNOME with the AppIndicator extension enabled
-(`gnome-extensions enable ubuntu-appindicators@ubuntu.com`), Node.js ≥ 22.12, pnpm 10.
+(`gnome-extensions enable ubuntu-appindicators@ubuntu.com`), Node.js ≥ 22.12, pnpm 10.30.3 (pinned in `packageManager`; `corepack enable` provides it).
 
 ```bash
 pnpm install
