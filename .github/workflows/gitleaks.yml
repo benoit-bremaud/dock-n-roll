@@ -10,6 +10,8 @@ on:
 # Private personal repository: no code scanning, so the SARIF report is kept as a job artifact.
 permissions:
   contents: read
+  # gitleaks-action lists the PR commits to scan (GET /pulls/{n}/commits); read is enough.
+  pull-requests: read
 
 jobs:
   secrets:

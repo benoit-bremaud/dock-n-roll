@@ -17,7 +17,7 @@
 - `src/main/index.ts` `[security]` · No permission handlers: Electron grants every permission request by default (Electron security checklist item 5). · Deny all with `setPermissionRequestHandler` / `setPermissionCheckHandler`. **Done.**
 - `src/main/index.ts` `[security]` · `autoHideMenuBar` only hides the default menu: Alt reveals Reload / Toggle DevTools in builds. · `Menu.setApplicationMenu(null)` when packaged. **Done.**
 - `.github/workflows/*.yml` `[security]` · `actions/checkout` leaves the token in `.git/config` while third-party install scripts run. · `persist-credentials: false` on every checkout. **Done.**
-- `.github/workflows/gitleaks.yml:12` `[security|docs]` · `pull-requests: write` only served PR comments; stray SARIF comment. · Permission removed, `GITLEAKS_ENABLE_COMMENTS: 'false'`, comment moved to the permissions block. **Done.**
+- `.github/workflows/gitleaks.yml:12` `[security|docs]` · `pull-requests: write` only served PR comments; stray SARIF comment. · Permission removed, `GITLEAKS_ENABLE_COMMENTS: 'false'`, comment moved to the permissions block. **Done.** Follow-up from CI: the action lists the PR commits, so `pull-requests: read` is required (403 without it) — granted read-only.
 - `docs/architecture/decisions/0004-react-renderer-and-scaffold.md:24,33` `[docs]` · SARIF wording contradicted the workflow; argument-builder tests stated in the present tense. · Reworded. **Done.**
 - `src/preload/index.ts:2` `[docs]` · IPC API attributed to the spec; it comes from `03-component.md`. · Fixed. **Done.**
 - `README.md:12` `[docs]` · "pnpm 10" too loose for `allowBuilds`. · Exact version from `packageManager` + `corepack enable`. **Done.**
