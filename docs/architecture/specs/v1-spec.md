@@ -38,10 +38,10 @@ I want a small desktop tool, always reachable from the GNOME top bar, that:
 
 | Term | Definition |
 |---|---|
-| **Service** | One Docker Compose project, identified by the pair *(project name, working dir)* — never by the project name alone (see §6, R1). A pinned project with no container yet is identified by its working dir until its first container is seen. |
+| **Service** | One Docker Compose project, identified by the pair *(project name, working dir)* — never by the project name alone (see §6, R1). A pinned project with no container yet is identified by its working dir (plus its pin `project`, if any) until its first container is seen. Such a pin is shown in conflict when a discovered project in another dir already uses the project name it would start with (its `project`, or the name Compose derives from its dir); the running project itself is not affected. |
 | **Pin file** | `~/.config/dock-n-roll/services.yaml` — owner-edited overrides keyed by working dir, optionally narrowed by `project` (§8). Watched: reloaded on change. |
 | **Relevant container** | A container of the project, excluding one-off containers (label `com.docker.compose.oneoff=True`). A relevant container exited with code 0 counts as *done* (init / migration job) when at least one other relevant container runs. |
-| **Health source** | Per container, its Docker `HEALTHCHECK` status wins. Only when **no** relevant container has a `HEALTHCHECK`, the service-level `healthUrl` from the pin file gates readiness (HTTP 2xx/3xx, polled every 2 s while all relevant containers run and the gate has not passed yet, whatever started them). Otherwise: container `running`. |
+| **Health source** | Per container, its Docker `HEALTHCHECK` status wins. Only when **no** relevant container has a `HEALTHCHECK`, the service-level `healthUrl` from the pin file gates readiness (HTTP 2xx/3xx, polled every 2 s while all relevant containers run or are done and the gate has not passed yet, whatever started them). Health is read on running containers only: a stopped container may keep a stale value. Otherwise: container `running`. |
 | **Pending operation** | Per service, `start` or `stop` requested by the app and not finished yet. Owned by ServiceController; at most one at a time. |
 | **Listening port** | A TCP socket in `LISTEN` state on the host, from `ss -ltnp` joined with Docker port bindings. |
 
@@ -59,7 +59,7 @@ change; it is not a state machine maintained by the app.
 | `starting` | orange | start pending, or ≥ 1 container `health=starting`, or all running but the `healthUrl` gate not passed yet | disabled | allowed if no pending operation |
 | `on` | green | ≥ 1 relevant container, and all ready (or done) | disabled | allowed |
 | `off` | red | all relevant containers stopped (or none yet, pinned) | allowed | disabled |
-| `partial` | orange | anything else (some running, some stopped) | allowed | allowed |
+| `partial` | orange | anything else (some running, some stopped, or a container paused, restarting, removing or unhealthy) | allowed, except while a container is `restarting` or `removing` | allowed |
 
 **Precedence** — first match wins, top to bottom of the table:
 `conflict > missing > stopping > starting > on > off > partial`.
@@ -78,13 +78,14 @@ Primary actor for all: **Developer**. Supporting actor: **Docker Engine**.
   1. Developer clicks the red button (dashboard) or the menu item (tray).
   2. System sets pending `start` → status `starting`.
   3. System runs, in the working dir,
-     `docker compose --project-name=<name> --file=<f1> [--file=<f2>…] up -d --wait --wait-timeout 180`.
+     `docker compose --project-name=<name> --project-directory=<dir> --file=<f1> [--file=<f2>…] up -d --wait --wait-timeout=180`.
      Compose itself waits until every service is running or healthy.
   4. Command exits 0 → System clears pending; the status is derived again (`on` once the
      `healthUrl` gate, if any, passes).
 - **Extensions**:
-  - 3a. Pinned service with no container yet → System runs `docker compose up -d --wait --wait-timeout 180`
-    in the working dir without `--project-name` / `--file` (Compose resolves both itself).
+  - 3a. Pinned service with no container yet → System runs
+    `docker compose [--project-name=<pin project>] --project-directory=<dir> up -d --wait --wait-timeout=180`
+    without `--file` (Compose finds the files; it derives the name when the pin has no `project`).
   - 4a. Command exits non-zero (error, unhealthy or 180 s timeout) → pending cleared, status
     derived from real state, error shown with an stderr excerpt.
   - \*a. Status is `missing` or `conflict` → button disabled with a tooltip explaining why.
@@ -144,8 +145,10 @@ Primary actor for all: **Developer**. Supporting actor: **Docker Engine**.
 - **R4 — Docker socket = root-equivalent**: the app stays local-only: no HTTP server, no
   remote input; commands are spawned with `execFile` and an argument array (no shell), only
   with values read from Docker labels / the pin file. Arguments use the `--flag=<value>` form;
-  `config_files` (comma-separated label) is split into one `--file=` per path; non-absolute
-  paths are rejected.
+  `config_files` (comma-separated label) is split into one `--file=` per path. Project names
+  must follow Compose's rule `^[a-z0-9][a-z0-9_-]*$`; paths must be absolute and NUL-free and
+  are normalized (`/home/x/` = `/home/x`). A label failing these checks is not discovered as a
+  service; an invalid pin entry is rejected with a message.
 - **R5 — Tray click on Linux**: StatusNotifierItem does not guarantee which click activates
   the icon (Electron `Tray` docs) → all actions are reachable through the tray **menu**.
 - **R6 — URL opening**: `url` and `healthUrl` must use the `http:` or `https:` scheme; any
@@ -196,3 +199,14 @@ services:
   config and shows a warning (never a crash).
 - Q2 — Containers not part of any Compose project (e.g. `pyinstaller-test`): **monitor only**,
   never exposed as services.
+
+## 10. Open points (owner decision 2026-10-09: address in the adapters PR)
+
+- **P1 — Real project name of a never-started pin.** Without a `project` key, Compose takes the
+  name from the compose file's top-level `name:` (or `COMPOSE_PROJECT_NAME`) before the dir
+  basename; the domain only knows the basename (`defaultProjectName`), so a conflict can be
+  missed. The adapter resolves the real name (e.g. `docker compose config`) and passes it in.
+- **P2 — Containers with invalid labels.** A container whose Compose labels fail the R4 checks
+  is dropped from discovery, which can hide a whole project or one of its containers. Target:
+  keep the project, disable its controls and show the reason — designed together with the
+  Docker adapter, which sees the real labels.
