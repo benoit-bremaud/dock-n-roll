@@ -197,3 +197,14 @@ services:
   config and shows a warning (never a crash).
 - Q2 — Containers not part of any Compose project (e.g. `pyinstaller-test`): **monitor only**,
   never exposed as services.
+
+## 10. Open points (owner decision 2026-10-09: address in the adapters PR)
+
+- **P1 — Real project name of a never-started pin.** Without a `project` key, Compose takes the
+  name from the compose file's top-level `name:` (or `COMPOSE_PROJECT_NAME`) before the dir
+  basename; the domain only knows the basename (`defaultProjectName`), so a conflict can be
+  missed. The adapter resolves the real name (e.g. `docker compose config`) and passes it in.
+- **P2 — Containers with invalid labels.** A container whose Compose labels fail the R4 checks
+  is dropped from discovery, which can hide a whole project or one of its containers. Target:
+  keep the project, disable its controls and show the reason — designed together with the
+  Docker adapter, which sees the real labels.

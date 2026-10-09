@@ -45,8 +45,8 @@ Findings 1–11: 10 resolved, 1 partially (`paused` / `unhealthy` stay `partial`
 | New finding | Severity | Response |
 |---|---|---|
 | N1 — a never-started pin elsewhere put the running project in `conflict` (Stop blocked); two never-started pins blocked each other | 🔴 Must | done — only the pin is flagged, against discovered projects only (2 red tests, then green) |
-| N2 — `defaultProjectName` ignores the compose file `name:` / `COMPOSE_PROJECT_NAME` | 🟡 Should | see owner decision below |
-| N3 — one bad label hides a whole project, or one of its containers | 🟡 Should | see owner decision below |
+| N2 — `defaultProjectName` ignores the compose file `name:` / `COMPOSE_PROJECT_NAME` | 🟡 Should | deferred to the adapters PR (owner decision; needs IO / adapter design) — spec §10 P1 |
+| N3 — one bad label hides a whole project, or one of its containers | 🟡 Should | deferred to the adapters PR (owner decision; needs IO / adapter design) — spec §10 P2 |
 | N4 — prototype keys read by the pin validator | 🔵 Nice | deferred — same item as above (YAML parser choice) |
 | N5 — `::ffff:` addresses, wildcard socket credited to a loopback-bound container, paused containers | 🔵 Nice | deferred — backlog |
 
