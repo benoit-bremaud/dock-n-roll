@@ -77,3 +77,18 @@ Chronological operational logbook. Complements `git log` with the human context.
     - `--project-directory` added to `up`; inherited `COMPOSE_*` variables to be removed by the
       runner (ADR-0002).
     - Spec §3 / §4 / R4, ADR-0002 and the class diagram updated in the same change.
+- **Automated PR review round** (the second configured bot reviewer could not be requested:
+  HTTP 422, not a collaborator): two findings, each verified against the source and validated
+  by the owner, fixed and answered inline.
+  - PR #1: the reconnect path re-listed before resubscribing, losing changes in between →
+    `ff51690`, reconnect repeats the startup sequence.
+  - PR #3: a stopped container's stale health disabled the `healthUrl` gate → `9a52770`.
+- **PR #1 merged** (`618bac5`) — `docs(architecture): add V1 conception for dock-n-roll`.
+- **PR #2 merged** (`4b11790`) — `chore(scaffold): add Electron + React + TypeScript skeleton with CI`.
+  - **Incident**: merging #1 with `--delete-branch` deleted the base of stacked #2, and GitHub
+    closed #2 instead of retargeting it. Recovery: base branch pushed back at `ff51690`, #2
+    reopened, retargeted to `main`, base deleted again. No code lost.
+  - **Decision** `Stacked PRs merge with merge commits` — squash would have required a rebase
+    and a force-push of every upper branch. The next PR is retargeted before a branch is deleted.
+- **PR #3 merged** (`e8d142b`) — `feat(domain): add pure service domain with tests`.
+- **Next**: PR 4, adapters, carrying spec §10 P1 and P2.
