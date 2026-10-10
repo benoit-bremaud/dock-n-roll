@@ -26,7 +26,7 @@ Electron means its CLI. Starting containers one by one through the Engine API wo
 - **Concurrency**: at most one pending operation per service, owned by ServiceController;
   the guard is on the pending operation, not on the displayed status. No stop during a
   pending start in V1.
-- **Observe**: Docker Engine API through `dockerode`:
+- **Observe**: Docker Engine API, called directly over its Unix socket (ADR-0005):
   - subscribe to container events `create`, `start`, `die`, `stop`, `destroy`,
     `health_status` **before** the initial list, then apply buffered events;
   - on stream end or error: app banner, reconnect with backoff (1 s doubling to 30 s), then

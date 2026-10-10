@@ -12,6 +12,7 @@ function service(overrides: Partial<Service> = {}): Service {
     pin: undefined,
     displayName: 'app',
     conflictingDirs: [],
+    invalidReason: null,
     ...overrides
   }
 }

@@ -53,6 +53,7 @@ change; it is not a state machine maintained by the app.
 
 | Status | Colour | Meaning | Start | Stop |
 |---|---|---|---|---|
+| `invalid` | grey | a container of the project carries Compose labels that fail the R4 checks — the reason is shown | disabled | disabled |
 | `conflict` | grey | same project name seen with ≥ 2 working dirs — both listed | disabled | disabled |
 | `missing` | grey | working dir or a `config_files` path no longer exists | disabled | allowed if containers run |
 | `stopping` | orange | stop pending | disabled | disabled |
@@ -62,7 +63,7 @@ change; it is not a state machine maintained by the app.
 | `partial` | orange | anything else (some running, some stopped, or a container paused, restarting, removing or unhealthy) | allowed, except while a container is `restarting` or `removing` | allowed |
 
 **Precedence** — first match wins, top to bottom of the table:
-`conflict > missing > stopping > starting > on > off > partial`.
+`invalid > conflict > missing > stopping > starting > on > off > partial`.
 
 If the Docker daemon is unreachable, the dashboard shows an app-level banner and service
 rows are greyed out **without** a status badge — this is not a service status.
@@ -147,8 +148,8 @@ Primary actor for all: **Developer**. Supporting actor: **Docker Engine**.
   with values read from Docker labels / the pin file. Arguments use the `--flag=<value>` form;
   `config_files` (comma-separated label) is split into one `--file=` per path. Project names
   must follow Compose's rule `^[a-z0-9][a-z0-9_-]*$`; paths must be absolute and NUL-free and
-  are normalized (`/home/x/` = `/home/x`). A label failing these checks is not discovered as a
-  service; an invalid pin entry is rejected with a message.
+  are normalized (`/home/x/` = `/home/x`). A label failing these checks puts its project in status
+  `invalid` (§4, §10 P2); an invalid pin entry is rejected with a message.
 - **R5 — Tray click on Linux**: StatusNotifierItem does not guarantee which click activates
   the icon (Electron `Tray` docs) → all actions are reachable through the tray **menu**.
 - **R6 — URL opening**: `url` and `healthUrl` must use the `http:` or `https:` scheme; any
@@ -200,13 +201,18 @@ services:
 - Q2 — Containers not part of any Compose project (e.g. `pyinstaller-test`): **monitor only**,
   never exposed as services.
 
-## 10. Open points (owner decision 2026-10-09: address in the adapters PR)
+## 10. Points resolved in the adapters PR (designed 2026-10-10)
 
 - **P1 — Real project name of a never-started pin.** Without a `project` key, Compose takes the
   name from the compose file's top-level `name:` (or `COMPOSE_PROJECT_NAME`) before the dir
   basename; the domain only knows the basename (`defaultProjectName`), so a conflict can be
-  missed. The adapter resolves the real name (e.g. `docker compose config`) and passes it in.
+  missed. **Design**: ComposeRunner resolves the real name with
+  `docker compose --project-directory=<dir> config --format json` (field `name`, checked
+  against the Compose name rule) for each never-started pin without `project`, and passes the
+  results to `buildServices`. Observed on the workstation: dir `sonarqube-stack`, real name
+  `sonarqube`. If resolution fails, the basename rule stays the fallback.
 - **P2 — Containers with invalid labels.** A container whose Compose labels fail the R4 checks
-  is dropped from discovery, which can hide a whole project or one of its containers. Target:
-  keep the project, disable its controls and show the reason — designed together with the
-  Docker adapter, which sees the real labels.
+  is dropped from discovery, which can hide a whole project or one of its containers.
+  **Design**: such containers are grouped by their raw project / working-dir labels like any
+  other; a project with at least one invalid container gets status `invalid` (§4: grey,
+  controls disabled, reason shown) instead of disappearing or showing a misleading status.

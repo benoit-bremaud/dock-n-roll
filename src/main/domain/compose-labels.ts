@@ -1,5 +1,5 @@
 import { isValidProjectName, normalizeAbsolutePath } from './names'
-import type { ComposeProjectRef, ContainerSnapshot } from './types'
+import type { ComposeLabels, ContainerSnapshot } from './types'
 
 const PROJECT = 'com.docker.compose.project'
 const WORKING_DIR = 'com.docker.compose.project.working_dir'
@@ -7,25 +7,38 @@ const CONFIG_FILES = 'com.docker.compose.project.config_files'
 const ONE_OFF = 'com.docker.compose.oneoff'
 
 /**
- * The Compose project a container belongs to, or `null` if it was not started by Compose or
- * its labels could not produce a safe command (spec R4: any container creator writes labels).
+ * What a container's Compose labels say. Any container creator writes labels (spec R4): values
+ * that could not produce a safe command make the container `invalid`, keeping its raw labels so
+ * its project stays visible and flagged (spec §10 P2) rather than silently disappearing.
  */
-export function composeProjectOf(container: ContainerSnapshot): ComposeProjectRef | null {
-  const name = container.labels[PROJECT]
+export function composeLabelsOf(container: ContainerSnapshot): ComposeLabels {
+  const rawProject = container.labels[PROJECT]
+  if (rawProject === undefined) {
+    return { kind: 'none' }
+  }
   const rawWorkingDir = container.labels[WORKING_DIR]
-  if (name === undefined || rawWorkingDir === undefined || !isValidProjectName(name)) {
-    return null
+  const invalid = (reason: string): ComposeLabels => ({ kind: 'invalid', rawProject, rawWorkingDir: rawWorkingDir ?? '', reason })
+  if (rawWorkingDir === undefined) {
+    return invalid('missing working dir label')
+  }
+  if (!isValidProjectName(rawProject)) {
+    return invalid(`not a valid Compose project name: ${JSON.stringify(rawProject)}`)
   }
   const workingDir = normalizeAbsolutePath(rawWorkingDir)
-  const configFiles = (container.labels[CONFIG_FILES] ?? '')
-    .split(',')
-    .map((file) => file.trim())
-    .filter((file) => file !== '')
-    .map(normalizeAbsolutePath)
-  if (workingDir === null || configFiles.includes(null)) {
-    return null
+  if (workingDir === null) {
+    return invalid(`working dir is not an absolute path: ${JSON.stringify(rawWorkingDir)}`)
   }
-  return { name, workingDir, configFiles: configFiles.filter((file) => file !== null) }
+  const configFiles: string[] = []
+  for (const raw of (container.labels[CONFIG_FILES] ?? '').split(',')) {
+    const file = raw.trim()
+    if (file === '') continue
+    const normalized = normalizeAbsolutePath(file)
+    if (normalized === null) {
+      return invalid(`config file is not an absolute path: ${JSON.stringify(file)}`)
+    }
+    configFiles.push(normalized)
+  }
+  return { kind: 'valid', ref: { name: rawProject, workingDir, configFiles } }
 }
 
 /**

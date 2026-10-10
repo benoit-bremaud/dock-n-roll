@@ -1,7 +1,7 @@
 # Component diagram — launcher — V1 structure
 
-> **Source specs**: `docs/architecture/specs/v1-spec.md` §3, §4, §6
-> **Related ADRs**: ADR-0001, ADR-0002, ADR-0003
+> **Source specs**: `docs/architecture/specs/v1-spec.md` §3, §4, §6, §10
+> **Related ADRs**: ADR-0001, ADR-0002, ADR-0003, ADR-0005
 
 ## Context
 
@@ -28,11 +28,14 @@ flowchart LR
       Merge["pin-file merge + validation"]
       Join["port join (ss x Docker bindings)"]
     end
-    DO["DockerObserver (dockerode events)"]
-    CR["ComposeRunner (execFile)"]
-    HP["HealthProbe (fetch)"]
-    PS["PortScanner (ss -ltnp)"]
-    PF["PinFileStore (yaml + watch)"]
+    subgraph Adapters ["adapters (IO, src/main/adapters)"]
+      DO["DockerObserver (node:http, unix socket)"]
+      CR["ComposeRunner (execFile docker compose)"]
+      HP["HealthProbe (fetch)"]
+      FP["FileProbe (fs.stat)"]
+      PS["PortScanner (execFile ss)"]
+      PF["PinFileStore (yaml + dir watch)"]
+    end
   end
   Preload -->|"ipcRenderer.invoke"| SC
   Preload -->|"ipcRenderer.invoke listBackground"| BM
@@ -44,14 +47,16 @@ flowchart LR
   SC --> DO
   SC --> CR
   SC --> HP
+  SC --> FP
   SC --> PF
   BM --> PS
   BM --> DO
-  DO -->|"/var/run/docker.sock"| Docker[("Docker Engine")]
-  CR -->|"spawn, no shell"| CLI[["docker compose CLI"]]
-  PS -->|"spawn, no shell"| SS[["ss"]]
+  DO -->|"/var/run/docker.sock"| Docker[("Docker Engine API")]
+  CR -->|"spawn, no shell, COMPOSE_* removed"| CLI[["docker compose CLI"]]
+  PS -->|"spawn, no shell"| SS[["ss -ltnpH"]]
   HP -->|"HTTP GET"| Local[["service healthUrl"]]
-  PF -->|"read"| YAML[/"~/.config/dock-n-roll/services.yaml"/]
+  FP -->|"stat"| Disk[/"working dirs and compose files"/]
+  PF -->|"read + watch dir"| YAML[/"~/.config/dock-n-roll/services.yaml"/]
   SC -->|"shell.openExternal http or https"| Browser[["default browser"]]
   Tray -->|"StatusNotifierItem"| GNOME[["GNOME top bar"]]
   Autostart[/"~/.config/autostart/dock-n-roll.desktop"/] -.->|"launches at login"| Main
@@ -59,9 +64,19 @@ flowchart LR
 
 ## Notes
 
-- Dependency rule: `domain` imports nothing from Electron, dockerode or Node IO — it is the
-  unit-tested core (status precedence of spec §4, conflict rule of ADR-0003, pin validation
-  of R4/R6, port join of R3).
+- Dependency rule: `domain` imports nothing from Electron, Node IO or adapters — it is the
+  unit-tested core. Adapters import domain **types** and pure mapping helpers only; the
+  domain never imports an adapter (enforced by lint).
+- Each adapter is a few functions over one OS boundary, written against its real interface
+  (socket, child process, file system, HTTP). Their pure parts — mapping a Docker inspect to a
+  `ContainerSnapshot`, parsing `ss` output, removing `COMPOSE_*` variables — live beside them
+  and are unit-tested; the IO parts are integration-tested against stand-ins of the
+  boundary (a fake Docker HTTP server on a temporary socket, a fake `docker` executable,
+  temporary directories, a local HTTP server).
+- `ComposeRunner` also resolves the real project name of a never-started pin with
+  `docker compose --project-directory=<dir> config --format json` (spec §10 P1).
+- `PinFileStore` watches the **directory**, not the file: editors save by writing a new file
+  and renaming it, which a file watch misses.
 - The preload script runs in the renderer process, in an isolated context
   (`contextIsolation`, `sandbox`, no Node in the page). It exposes a narrow API:
   `listServices`, `start`, `stop`, `openUrl`, `listBackground`, `onStatusChanged`.

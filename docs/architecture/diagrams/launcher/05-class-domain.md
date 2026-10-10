@@ -6,7 +6,7 @@
 ## Context
 
 Types and pure functions of `src/main/domain` (component `domain` in `03-component.md`).
-Everything here is data in, data out: no Electron, no dockerode, no Node IO. Adapters
+Everything here is data in, data out: no Electron, no Docker client, no Node IO. Adapters
 (next PR) translate Docker / `ss` / YAML into these input types; ServiceController feeds
 them back in on every change. Does not cover adapters, IPC or UI.
 
@@ -53,12 +53,14 @@ classDiagram
     +PinEntry|undefined pin
     +string displayName
     +string[] conflictingDirs
+    +string|null invalidReason
   }
   class StatusInputs {
     +ContainerSnapshot[] containers
     +PendingOperation|null pending
     +boolean filesExist
     +boolean conflict
+    +boolean invalid
     +HealthGate healthGate
   }
   class PinFileResult {
@@ -74,6 +76,7 @@ classDiagram
   }
   class ServiceStatus {
     <<enumeration>>
+    invalid
     conflict
     missing
     stopping
@@ -94,13 +97,13 @@ classDiagram
   }
   class domain {
     <<functions>>
-    +composeProjectOf(ContainerSnapshot) ComposeProjectRef|null
+    +composeLabelsOf(ContainerSnapshot) ComposeLabels
     +isRelevant(ContainerSnapshot) boolean
     +isValidProjectName(string) boolean
     +defaultProjectName(string) string|null
     +normalizeAbsolutePath(string) string|null
     +validatePinFile(unknown) PinFileResult
-    +buildServices(ContainerSnapshot[], PinEntry[]) Service[]
+    +buildServices(ContainerSnapshot[], PinEntry[], ResolvedNames) Service[]
     +deriveStatus(StatusInputs) ServiceStatus
     +allowedControls(ServiceStatus, StatusInputs) Controls
     +buildUpArgs(Service) string[]
@@ -138,9 +141,16 @@ classDiagram
   already uses the name it would start with — its `project`, or the name Compose derives from
   its dir (`defaultProjectName`). Only the pin is flagged: it never blocks the running
   project, and two never-started pins never flag each other.
+- **`ComposeLabels`** = `none` (not a Compose container) | `valid(ComposeProjectRef)` |
+  `invalid(rawProject, rawWorkingDir, reason)` (spec §10 P2). Invalid containers are grouped
+  by their raw labels like valid ones; a project with ≥ 1 invalid container gets a non-null
+  `invalidReason` and status `invalid` — it never disappears.
+- **`ResolvedNames`** = map `workingDir → project name` produced by the adapter from
+  `docker compose config` for never-started pins without `project` (spec §10 P1); the conflict
+  check uses `pin.project ?? resolvedNames.get(dir) ?? defaultProjectName(dir)`.
 - **Validation (spec R4)**: project names follow Compose's rule `^[a-z0-9][a-z0-9_-]*$`;
   paths are absolute, NUL-free and normalized (`/home/x/` matches the label `/home/x`). Labels
-  failing these checks make `composeProjectOf` return `null`; an invalid pin `project` drops
+  failing these checks make the container `invalid` (see `ComposeLabels`); an invalid pin `project` drops
   the whole entry rather than widening it to the dir; duplicate pins are rejected.
 - **`deriveStatus`** implements the spec §4 precedence, `on` requiring ≥ 1 relevant
   container; health is read on running containers only; the `healthUrl` gate holds a stack
