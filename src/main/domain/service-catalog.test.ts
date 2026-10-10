@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { buildServices } from './service-catalog'
+import { buildServices as buildWithNames } from './service-catalog'
 import { composeLabels, container } from './test-fixtures'
-import type { PinEntry } from './types'
+import type { ContainerSnapshot, PinEntry, ResolvedNames } from './types'
 
 const STACK = '/home/u/02_personal/sonarqube-stack'
 const DEV_INFRA = '/home/u/02_personal/dev-infra/sonarqube'
+
+function buildServices(containers: readonly ContainerSnapshot[], pins: readonly PinEntry[], resolvedNames: ResolvedNames = new Map()) {
+  return buildWithNames(containers, pins, resolvedNames)
+}
 
 function pin(overrides: Partial<PinEntry> & { workingDir: string }): PinEntry {
   return { pinned: false, hidden: false, ...overrides }
@@ -109,6 +113,19 @@ describe('buildServices — containers with invalid labels (spec §10 P2)', () =
       displayName: 'app',
       invalidReason: 'working dir is not an absolute path: "srv/app"'
     })
+  })
+
+  it('still reserves the project name of an invalid project, so a pin elsewhere cannot take it over', () => {
+    const services = buildServices(
+      [
+        container({ id: 'a', labels: composeLabels('app', '/srv/app') }),
+        container({ id: 'b', labels: composeLabels('app', '/srv/app', 'x.yml') })
+      ],
+      [pin({ workingDir: '/other/app', project: 'app' })]
+    )
+
+    expect(services.find((s) => s.workingDir === '/other/app')?.conflictingDirs).toEqual(['/srv/app'])
+    expect(services.find((s) => s.workingDir === '/srv/app')).toMatchObject({ invalidReason: expect.any(String) as string, conflictingDirs: [] })
   })
 
   it('marks valid services with no invalid reason', () => {

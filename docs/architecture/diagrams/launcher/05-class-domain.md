@@ -7,7 +7,7 @@
 
 Types and pure functions of `src/main/domain` (component `domain` in `03-component.md`).
 Everything here is data in, data out: no Electron, no Docker client, no Node IO. Adapters
-(next PR) translate Docker / `ss` / YAML into these input types; ServiceController feeds
+(`src/main/adapters`) translate Docker / `ss` / YAML into these input types; ServiceController feeds
 them back in on every change. Does not cover adapters, IPC or UI.
 
 ## Diagram
@@ -29,6 +29,15 @@ classDiagram
     +number hostPort
     +number containerPort
     +string protocol
+  }
+  class ComposeLabels {
+    <<union>>
+    none
+    valid(ComposeProjectRef)
+    invalid(rawProject, rawWorkingDir, reason)
+  }
+  class ResolvedNames {
+    <<Map workingDir to name>>
   }
   class ComposeProjectRef {
     +string name
@@ -114,7 +123,9 @@ classDiagram
   ContainerSnapshot "1" *-- "0..*" PortBinding
   Service "1" o-- "0..*" ContainerSnapshot : relevant containers
   Service "1" o-- "0..1" PinEntry
-  domain ..> ComposeProjectRef : reads labels into
+  domain ..> ComposeLabels : reads labels into
+  ComposeLabels ..> ComposeProjectRef : valid
+  domain ..> ResolvedNames : reads
   domain ..> Service : builds
   domain ..> StatusInputs : derives from
   domain ..> ServiceStatus : returns
@@ -137,7 +148,8 @@ classDiagram
   never-started pin with no `project` key (spec §3). That id changes when the first container
   appears, so pending operations are keyed by `workingDir` + project name, not by id.
 - **`conflictingDirs`** is non-empty iff the project name is used by ≥ 2 discovered working
-  dirs (ADR-0003). A never-started pin is flagged when a discovered project in another dir
+  dirs (ADR-0003); an `invalid` project with a valid name still holds that name, but its own
+  row shows `invalid`, never `conflict`. A never-started pin is flagged when a discovered project in another dir
   already uses the name it would start with — its `project`, or the name Compose derives from
   its dir (`defaultProjectName`). Only the pin is flagged: it never blocks the running
   project, and two never-started pins never flag each other.

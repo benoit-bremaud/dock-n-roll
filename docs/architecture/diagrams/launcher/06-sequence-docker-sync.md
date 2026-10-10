@@ -18,7 +18,7 @@ sequenceDiagram
   participant DO as DockerObserver
   participant API as Docker Engine API (unix socket)
 
-  SC->>DO: start()
+  SC->>DO: observeDocker(options, listener)
   loop sync — at startup, then after every stream loss
     DO->>API: GET /events filters type=container (stream)
     Note over DO: events are buffered, not applied yet
@@ -29,19 +29,19 @@ sequenceDiagram
       API-->>DO: State, ExitCode, Health, Labels, Ports
     end
     DO->>DO: snapshot = inspected containers, then apply buffered events
-    DO-->>SC: snapshotChanged(all containers)
+    DO-->>SC: onSnapshot(all containers)
     loop while the stream is open
-      API-->>DO: event create, start, die, stop, destroy or health_status
+      API-->>DO: a container event that can change a status
       alt destroy
         DO->>DO: remove the container from the snapshot
       else other
         DO->>API: GET /containers/{id}/json
         API-->>DO: fresh state
       end
-      DO-->>SC: snapshotChanged(all containers)
+      DO-->>SC: onSnapshot(all containers)
     end
     API--xDO: stream ends or socket error
-    DO-->>SC: dockerUnavailable (banner, rows greyed)
+    DO-->>SC: onUnavailable(reason) — banner, rows greyed
     DO->>DO: wait 1 s doubling up to 30 s
   end
 ```
@@ -53,6 +53,6 @@ sequenceDiagram
   as the initial list. Simpler and impossible to drift.
 - **Buffered events applied after the list** are each turned into a re-inspect too, so their
   order versus the list does not matter.
-- `snapshotChanged` always carries the whole snapshot (a few dozen containers): the domain
+- `onSnapshot` always carries the whole snapshot (a few dozen containers): the domain
   derives everything from it (`buildServices`), no incremental bookkeeping.
 - Backoff resets to 1 s after a successful sync.

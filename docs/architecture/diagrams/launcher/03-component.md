@@ -52,7 +52,7 @@ flowchart LR
   BM --> PS
   BM --> DO
   DO -->|"/var/run/docker.sock"| Docker[("Docker Engine API")]
-  CR -->|"spawn, no shell, COMPOSE_* removed"| CLI[["docker compose CLI"]]
+  CR -->|"spawn, no shell, COMPOSE_* removed, DOCKER_HOST pinned"| CLI[["docker compose CLI"]]
   PS -->|"spawn, no shell"| SS[["ss -ltnpH"]]
   HP -->|"HTTP GET"| Local[["service healthUrl"]]
   FP -->|"stat"| Disk[/"working dirs and compose files"/]
@@ -74,7 +74,8 @@ flowchart LR
   boundary (a fake Docker HTTP server on a temporary socket, a fake `docker` executable,
   temporary directories, a local HTTP server).
 - `ComposeRunner` also resolves the real project name of a never-started pin with
-  `docker compose --project-directory=<dir> config --format json` (spec §10 P1).
+  `docker compose --project-directory=<dir> config --format=json`, run in the project dir with
+  remote includes disabled (spec §10 P1, ADR-0002).
 - `PinFileStore` watches the **directory**, not the file: editors save by writing a new file
   and renaming it, which a file watch misses.
 - The preload script runs in the renderer process, in an isolated context

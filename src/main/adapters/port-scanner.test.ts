@@ -1,3 +1,4 @@
+import { createServer, type AddressInfo } from 'node:net'
 import { describe, expect, it } from 'vitest'
 import { parseSsListening, scanListeningPorts } from './port-scanner'
 
@@ -31,6 +32,13 @@ describe('parseSsListening', () => {
     expect(parseSsListening(line)).toEqual([{ address: '0.0.0.0', port: 22, process: { name: 'sshd', pid: 900 } }])
   })
 
+  it('is not fooled by a process name crafted to look like another owner', () => {
+    // ss does not escape quotes: a process named `x",pid=1,fd=9))` prints like this.
+    const line = 'LISTEN 0 511 127.0.0.1:7000 0.0.0.0:* users:(("x",pid=1,fd=9",pid=4242,fd=3))'
+
+    expect(parseSsListening(line)).toEqual([{ address: '127.0.0.1', port: 7000, process: { name: 'x",pid=1,fd=9', pid: 4242 } }])
+  })
+
   it('reads a wildcard written as *', () => {
     expect(parseSsListening('LISTEN 0 4096 *:8080 *:*')).toEqual([{ address: '*', port: 8080 }])
   })
@@ -41,12 +49,18 @@ describe('parseSsListening', () => {
 })
 
 describe('scanListeningPorts', () => {
-  it('runs the real ss and returns typed sockets', async () => {
-    const sockets = await scanListeningPorts()
+  it('finds a port this test process listens on, with its pid', async () => {
+    const server = createServer()
+    await new Promise<void>((resolve) => {
+      server.listen(0, '127.0.0.1', resolve)
+    })
+    const { port } = server.address() as AddressInfo
+    try {
+      const sockets = await scanListeningPorts()
 
-    expect(Array.isArray(sockets)).toBe(true)
-    for (const socket of sockets) {
-      expect(Number.isInteger(socket.port)).toBe(true)
+      expect(sockets).toContainEqual({ address: '127.0.0.1', port, process: { name: expect.any(String) as string, pid: process.pid } })
+    } finally {
+      server.close()
     }
   })
 })

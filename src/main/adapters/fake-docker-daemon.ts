@@ -19,6 +19,13 @@ export class FakeDockerDaemon {
   readonly requests: string[] = []
   /** Runs once, when the next container list is requested — before it is answered. */
   beforeNextList: (() => void) | undefined
+  /** Next list / inspect answered with this HTTP status and an HTML body, as a broken proxy would. */
+  nextListStatus: number | undefined
+  nextInspectStatus: number | undefined
+  /** Next inspect sends its headers and half a body, then drops the connection. */
+  cutNextInspect = false
+  /** Delay before answering every inspect. */
+  inspectDelayMs = 0
   private server: Server | undefined
   private readonly streams = new Set<ServerResponse>()
 
@@ -32,6 +39,11 @@ export class FakeDockerDaemon {
   emit(action: string, id: string): void {
     const line = `${JSON.stringify({ Type: 'container', Action: action, Actor: { ID: id, Attributes: {} } })}\n`
     for (const stream of this.streams) stream.write(line)
+  }
+
+  /** Writes raw bytes on every open event stream (split or malformed lines). */
+  emitRaw(text: string): void {
+    for (const stream of this.streams) stream.write(text)
   }
 
   get openStreams(): number {
@@ -84,14 +96,41 @@ export class FakeDockerDaemon {
       const hook = this.beforeNextList
       this.beforeNextList = undefined
       hook?.()
+      const status = this.nextListStatus
+      this.nextListStatus = undefined
+      if (status !== undefined) {
+        response.writeHead(status, { 'content-type': 'text/html' }).end('<html>error</html>')
+        return
+      }
       json(200, [...this.containers.keys()].map((id) => ({ Id: id })))
       return
     }
-    const inspect = /^\/v1\.47\/containers\/([^/]+)\/json$/.exec(url.pathname)
+    // The answer is decided now and sent after the delay: a slow response carries the state
+    // of the moment it was asked, like a real one.
+    const reply = this.prepareInspect(url.pathname, response, json)
+    setTimeout(reply, this.inspectDelayMs)
+  }
+
+  private prepareInspect(pathname: string, response: ServerResponse, json: (status: number, body: unknown) => void): () => void {
+    const status = this.nextInspectStatus
+    this.nextInspectStatus = undefined
+    if (status !== undefined) {
+      return () => response.writeHead(status, { 'content-type': 'text/html' }).end('<html>error</html>')
+    }
+    if (this.cutNextInspect) {
+      this.cutNextInspect = false
+      return () => {
+        response.writeHead(200, { 'content-type': 'application/json' })
+        response.write('{"Id": "trunc')
+        response.socket?.destroy()
+      }
+    }
+    const inspect = /^\/v1\.47\/containers\/([^/]+)\/json$/.exec(pathname)
     const container = inspect?.[1] === undefined ? undefined : this.containers.get(inspect[1])
     if (container === undefined) {
-      json(404, { message: 'No such container' })
-      return
+      return () => {
+        json(404, { message: 'No such container' })
+      }
     }
     const body = {
       Id: container.id,
@@ -108,6 +147,8 @@ export class FakeDockerDaemon {
       container.status = container.statusAfterInspect
       delete container.statusAfterInspect
     }
-    json(200, body)
+    return () => {
+      json(200, body)
+    }
   }
 }

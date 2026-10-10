@@ -19,16 +19,19 @@ Electron means its CLI. Starting containers one by one through the Engine API wo
   Compose `cmd/compose/up.go`, checked via Context7 on 2026-10-09), so exit code 0 means ready
   and the app needs no readiness loop of its own. A pinned project with no container yet runs
   the same command without `--project-name` / `--file` (Compose resolves them from the dir).
-- **Stop**: `docker compose --project-name=<name> stop`, no `--file`, neutral cwd (`$HOME`):
-  Compose stops by project label, so stop still works when the folder is gone.
+- **Stop**: `docker compose --project-name=<name> stop`, no `--file`, cwd `/`: Compose stops
+  by project label, so stop still works when the folder is gone, and no compose file or
+  `.env` of an unrelated cwd can change which services it loads.
+- **Working directory**: `up` and the name resolution (`config`, spec §10 P1) run in the
+  project dir, so both read the same project `.env` (which can set `COMPOSE_PROJECT_NAME` /
+  `COMPOSE_FILE` when no flag is given): the name checked for conflicts is the name `up` uses.
 - **Stop, never down**: `down` removes containers and therefore the labels that
   auto-discovery depends on (ADR-0003).
 - **Concurrency**: at most one pending operation per service, owned by ServiceController;
   the guard is on the pending operation, not on the displayed status. No stop during a
   pending start in V1.
 - **Observe**: Docker Engine API, called directly over its Unix socket (ADR-0005):
-  - subscribe to container events `create`, `start`, `die`, `stop`, `destroy`,
-    `health_status` **before** the initial list, then apply buffered events;
+  - subscribe to every container event that can change a status (`create`, `start`, `restart`, `die`, `stop`, `kill`, `pause`, `unpause`, `rename`, `update`, `health_status`; `destroy` removes the container) **before** the initial list, then apply buffered events;
   - on stream end or error: app banner, reconnect with backoff (1 s doubling to 30 s), then
     the startup sequence again: resubscribe with buffering, full re-list, apply the buffer.
 - **Argument hardening**: `--flag=<value>` forms only; the comma-separated
@@ -36,9 +39,14 @@ Electron means its CLI. Starting containers one by one through the Engine API wo
   Compose's rule `^[a-z0-9][a-z0-9_-]*$`; paths must be absolute and NUL-free. The domain
   builds the argument arrays and re-checks these rules (`InvalidServiceError`).
 - **Environment**: the runner removes every inherited `COMPOSE_*` variable (files, profiles,
-  env files, project name…) and `DOCKER_HOST` / `DOCKER_CONTEXT` from the child environment:
-  the arguments alone decide the target, and the CLI talks to the same daemon the app observes
-  on `/var/run/docker.sock`.
+  env files, project name…) and `DOCKER_CONTEXT`, then sets `DOCKER_HOST=unix://<observed
+  socket>`: the arguments alone decide the target, and `DOCKER_HOST` also overrides a context
+  chosen with `docker context use` (`~/.docker/config.json`), so the CLI acts on the daemon the
+  app displays. The name resolution additionally sets `COMPOSE_EXPERIMENTAL_GIT_REMOTE=0` and
+  `COMPOSE_EXPERIMENTAL_OCI_REMOTE=0`: resolving a name must never clone or pull a remote
+  `include:`.
+- **Timeout**: a run is stopped with SIGTERM after its timeout, then SIGKILL after a grace
+  period; the result names the timeout as the cause ahead of the CLI output.
 
 ### Consequences
 

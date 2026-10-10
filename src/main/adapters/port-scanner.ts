@@ -4,8 +4,10 @@ import type { ListeningSocket } from '../domain/types'
 
 const run = promisify(execFile)
 
-// users:(("name",pid=123,fd=4),...) — names are quoted and may contain spaces or commas.
-const FIRST_PROCESS = /users:\(\("((?:[^"\\]|\\.)*)",pid=(\d+)/
+// users:(("name",pid=123,fd=4),...) — names are quoted, may contain spaces, and ss does not
+// escape quotes in them. Requiring `,fd=N)` right after the pid makes the match end at the real
+// owner: a crafted name such as `x",pid=1,fd=9` cannot fake that suffix (spec R3, display only).
+const FIRST_PROCESS = /users:\(\("(.*?)",pid=(\d+),fd=\d+\)/
 
 /** Splits `addr:port` on the last colon: IPv6 addresses (`[::1]:631`) contain colons too. */
 function splitAddress(local: string): { address: string; port: number } | null {
@@ -37,7 +39,7 @@ export function parseSsListening(output: string): ListeningSocket[] {
   return sockets
 }
 
-/** Runs `ss` (no shell) and parses its output. */
+/** Current TCP listening sockets via `ss -ltnpH` (no shell). Rejects if `ss` is missing, fails or takes over 5 s. */
 export async function scanListeningPorts(): Promise<ListeningSocket[]> {
   const { stdout } = await run('ss', ['-ltnpH'], { timeout: 5000 })
   return parseSsListening(stdout)

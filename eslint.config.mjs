@@ -31,7 +31,7 @@ export default tseslint.config(
     // Adapters are plain Node over one OS boundary each: no Electron, so they run under Vitest.
     files: ['src/main/adapters/**/*.ts'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: ['electron', '../renderer/*', '../preload/*'] }]
+      'no-restricted-imports': ['error', { patterns: ['electron', '**/renderer/**', '**/preload/**'] }]
     }
   },
   {

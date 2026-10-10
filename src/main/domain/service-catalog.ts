@@ -1,5 +1,5 @@
 import { composeLabelsOf, isRelevant } from './compose-labels'
-import { defaultProjectName, normalizeAbsolutePath } from './names'
+import { defaultProjectName, isValidProjectName, normalizeAbsolutePath } from './names'
 import type { ContainerSnapshot, PinEntry, ResolvedNames, Service } from './types'
 
 const ID_SEPARATOR = '\0'
@@ -57,6 +57,11 @@ function byNameThenId(a: Service, b: Service): number {
 }
 
 /**
+ * `resolvedNames` (spec §10 P1) is required so the conflict check is never silently weakened:
+ * the caller resolves every pin without `project` (`resolveProjectName`), again whenever the
+ * pin file changes. A name cached that way goes stale if someone edits `name:` in a compose
+ * file without touching the pin file — the next pin-file change or app start refreshes it.
+ *
  * Services shown to the developer: discovered Compose projects merged with the pin file,
  * conflicts flagged, hidden ones removed. Order: pinned services in pin-file order, then the
  * others by display name; ties broken by id so rows never swap between refreshes.
@@ -64,7 +69,7 @@ function byNameThenId(a: Service, b: Service): number {
 export function buildServices(
   containers: readonly ContainerSnapshot[],
   pins: readonly PinEntry[],
-  resolvedNames: ResolvedNames = new Map()
+  resolvedNames: ResolvedNames
 ): Service[] {
   const projects = discoverProjects(containers)
   const neverStartedPins = pins.filter(
@@ -72,10 +77,11 @@ export function buildServices(
       !projects.some((project) => project.workingDir === pin.workingDir && (pin.project === undefined || pin.project === project.name))
   )
 
-  // Only discovered, valid projects own containers that a command could act on: they define
-  // which dirs use which project name.
+  // Name ownership is what Docker sees: every discovered project whose name Compose would
+  // accept holds it — an `invalid` one too (a bad config_files label does not free the name;
+  // `--project-name` would still act on its containers).
   const dirsByName = new Map<string, string[]>()
-  for (const project of projects.filter((candidate) => candidate.invalidReason === null)) {
+  for (const project of projects.filter((candidate) => isValidProjectName(candidate.name))) {
     dirsByName.set(project.name, [...(dirsByName.get(project.name) ?? []), project.workingDir])
   }
   const otherDirs = (name: string | null, dir: string): string[] =>

@@ -1,6 +1,6 @@
-import { mkdtempSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { PinFileResult } from '../domain/types'
 import { openPinFileStore, parsePinFileText, type PinFileStore } from './pin-file-store'
@@ -66,6 +66,70 @@ describe('openPinFileStore — spec §9 Q1 (watched file)', () => {
     store = await openPinFileStore(path, (result) => seen.push(result))
 
     expect(store.current()).toEqual({ entries: [], errors: [] })
+    expect(existsSync(dirname(path))).toBe(true)
+  })
+
+  it('loads an existing file at open, without waiting for a change', async () => {
+    mkdirSync(dirname(path), { recursive: true })
+    writeFileSync(path, VALID)
+
+    store = await openPinFileStore(path, (result) => seen.push(result))
+
+    expect(store.current()).toEqual({ entries: [VALID_ENTRY], errors: [] })
+    expect(seen).toEqual([])
+  })
+
+  it('coalesces a burst of writes into one notification', async () => {
+    store = await openPinFileStore(path, (result) => seen.push(result))
+    writeFileSync(path, VALID)
+    writeFileSync(path, VALID)
+    writeFileSync(path, VALID)
+
+    await waitFor(() => seen.length > 0)
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    expect(seen).toHaveLength(1)
+  })
+
+  it('does not notify after close(), even with a reload already pending', async () => {
+    store = await openPinFileStore(path, (result) => seen.push(result))
+    writeFileSync(path, VALID)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    store.close()
+
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(seen).toEqual([])
+  })
+
+  it('ignores other files of the directory', async () => {
+    store = await openPinFileStore(path, (result) => seen.push(result))
+    writeFileSync(join(dirname(path), 'other.yaml'), VALID)
+
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(seen).toEqual([])
+  })
+
+  it('keeps watching when the listener throws', async () => {
+    let calls = 0
+    store = await openPinFileStore(path, () => {
+      calls += 1
+      throw new Error('bug in the controller')
+    })
+    writeFileSync(path, VALID)
+    await waitFor(() => calls === 1)
+    writeFileSync(path, 'services: []\n')
+
+    await waitFor(() => calls === 2)
+    expect(store.current()).toEqual({ entries: [], errors: [] })
+  })
+
+  it('re-arms the watch when its directory is removed and recreated', async () => {
+    store = await openPinFileStore(path, (result) => seen.push(result))
+    rmSync(dirname(path), { recursive: true, force: true })
+    await waitFor(() => existsSync(dirname(path)))
+
+    writeFileSync(path, VALID)
+
+    await waitFor(() => store?.current().entries.length === 1)
   })
 
   it('loads the file and reports changes after an editor-style atomic save', async () => {

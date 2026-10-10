@@ -98,8 +98,8 @@ Primary actor for all: **Developer**. Supporting actor: **Docker Engine**.
 - **Main success scenario**:
   1. Developer clicks the green button (dashboard) or the menu item (tray).
   2. System sets pending `stop` → status `stopping`.
-  3. System runs `docker compose --project-name=<name> stop` from a neutral cwd (`$HOME`),
-     without `--file`: Compose stops by project label, so it works even if the folder is gone.
+  3. System runs `docker compose --project-name=<name> stop` from cwd `/`, without
+     `--file`: Compose stops by project label, so it works even if the folder is gone.
   4. Command exits 0 → pending cleared, status derived (`off`).
 - **Extensions**:
   - 3a. Command exits non-zero → pending cleared, status derived from real state
@@ -114,8 +114,7 @@ Primary actor for all: **Developer**. Supporting actor: **Docker Engine**.
   discovered, hidden excluded) with their live status. Status refreshes on Docker events,
   no polling of the Docker API; the main process pushes every change to the dashboard and
   the tray menu.
-- **Event stream contract**: subscribe to container events (`create`, `start`, `die`, `stop`,
-  `destroy`, `health_status`) **before** the initial container list, then apply buffered
+- **Event stream contract**: subscribe to every container event that can change a status (`create`, `start`, `restart`, `die`, `stop`, `kill`, `pause`, `unpause`, `rename`, `update`, `health_status`; `destroy` removes the container) **before** the initial container list, then apply buffered
   events. On stream end or error: banner, reconnect with backoff (1 s doubling up to 30 s),
   then the same sequence as at startup — resubscribe with buffering, full re-list (resync),
   apply the buffered events — so no change is lost between the list and the subscription.
@@ -207,12 +206,14 @@ services:
   name from the compose file's top-level `name:` (or `COMPOSE_PROJECT_NAME`) before the dir
   basename; the domain only knows the basename (`defaultProjectName`), so a conflict can be
   missed. **Design**: ComposeRunner resolves the real name with
-  `docker compose --project-directory=<dir> config --format json` (field `name`, checked
-  against the Compose name rule) for each never-started pin without `project`, and passes the
-  results to `buildServices`. Observed on the workstation: dir `sonarqube-stack`, real name
+  `docker compose --project-directory=<dir> config --format=json`, run in the project dir with
+  remote includes disabled (field `name`, checked against the Compose name rule), for each pin
+  without `project` — again whenever the pin file changes — and passes the results to
+  `buildServices`, where they are a required input. Observed on the workstation: dir `sonarqube-stack`, real name
   `sonarqube`. If resolution fails, the basename rule stays the fallback.
 - **P2 — Containers with invalid labels.** A container whose Compose labels fail the R4 checks
-  is dropped from discovery, which can hide a whole project or one of its containers.
+  was dropped from discovery, which could hide a whole project or one of its containers.
   **Design**: such containers are grouped by their raw project / working-dir labels like any
   other; a project with at least one invalid container gets status `invalid` (§4: grey,
   controls disabled, reason shown) instead of disappearing or showing a misleading status.
+  Its project name, when valid, still counts as used by its dir for conflict detection.
