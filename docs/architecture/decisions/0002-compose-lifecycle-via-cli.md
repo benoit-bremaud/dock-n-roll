@@ -35,8 +35,10 @@ Electron means its CLI. Starting containers one by one through the Engine API wo
   `config_files` label is split into one `--file=` per path; project names must match
   Compose's rule `^[a-z0-9][a-z0-9_-]*$`; paths must be absolute and NUL-free. The domain
   builds the argument arrays and re-checks these rules (`InvalidServiceError`).
-- **Environment**: the runner removes inherited `COMPOSE_FILE`, `COMPOSE_PROFILES` and
-  `COMPOSE_PROJECT_NAME` from the child environment, so the arguments alone decide the target.
+- **Environment**: the runner removes every inherited `COMPOSE_*` variable (files, profiles,
+  env files, project name…) and `DOCKER_HOST` / `DOCKER_CONTEXT` from the child environment:
+  the arguments alone decide the target, and the CLI talks to the same daemon the app observes
+  on `/var/run/docker.sock`.
 
 ### Consequences
 
