@@ -5,7 +5,7 @@ A tiny GNOME top-bar launcher for local dev services: one button per Docker Comp
 (containers, listening ports).
 
 > **Status**: domain, OS adapters, controller, IPC and tray menu in place — services can be started and
-> stopped from the top-bar menu; dashboard and packaging to come.
+> stopped from the top-bar menu or the dashboard window; packaging and autostart to come.
 
 ## Development
 

@@ -22,7 +22,8 @@ export async function listBackground(
         name: container.name,
         image: container.image,
         state: container.state,
-        health: container.health,
+        // Docker keeps the last health of a stopped container: it says nothing any more (spec §3).
+        health: container.state === 'running' ? container.health : null,
         project: labels.kind === 'valid' ? labels.ref.name : labels.kind === 'invalid' ? labels.rawProject : null
       }
     }),

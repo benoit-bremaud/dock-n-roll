@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { App } from './App'
+import { Root } from './App'
 import './styles/tokens.css'
 import './styles/global.css'
 
@@ -11,6 +11,6 @@ if (rootElement === null) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App />
+    <Root api={window.dockNRoll} />
   </StrictMode>
 )
