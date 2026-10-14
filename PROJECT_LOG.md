@@ -116,3 +116,29 @@ Chronological operational logbook. Complements `git log` with the human context.
     `docs/architecture/review-local.md`. 222 tests.
   - Read-only smoke run against the workstation Docker: statuses and port owners as designed;
     two real name collisions shown as `conflict` (`sonarqube`, `bulle-de-je`).
+- **PR #5 merged** (`a2e58c6`) — `feat(adapters): add OS adapters for Docker, Compose, ss and the pin file`.
+  The automated reviewer had reached its usage limit and the second bot reviewer returned 422,
+  so no bot review was posted; merged on the owner's explicit instruction after the local review
+  and its verification pass. An empty stray file (`ss.out`) had been swept into commit `67e68a4`;
+  removed in the next branch (`5f5e73b`).
+
+## 2026-10-14
+
+- **Controller** (branch `feat/controller`, class diagram 07, sequence diagram 08), test-first
+  (owner decision: factory function with injected adapters, real domain in the tests):
+  - `ServiceController` orchestrates domain and adapters; every input triggers one serialized
+    recomputation; `shared/ipc.ts` carries `ControllerState` / `ServiceView`; the tray menu is
+    a pure `buildTrayMenu`; `index.ts` is the composition root.
+  - **Decisions**:
+    - `Commands re-checked in the main process` — the renderer only sends ids; controls, Docker
+      availability and pending operations are checked before any command (spec §4, R6).
+    - `Pending keyed by dir + project name` — survives the id change of a never-started pin;
+      other projects of the same dir stay independent.
+    - `Unresolved never-started pins cannot start` — resolved ones always start under
+      `--project-name=<resolved>`; failed resolutions retried after 30 s.
+    - `Publish only on change` — each push rebuilds the tray menu over D-Bus.
+  - Pre-push review (design, tests, security, docs): 5 Must, 11 Should resolved (two clicks
+    running two `up`, a stuck pending operation, a silent startup failure…); 20 of 27 test
+    mutants had survived, now covered. Verification pass: 2 more Should resolved. 276 tests.
+  - Smoke run on the workstation (AppIndicator extension now active): the live tray menu lists
+    the real projects with statuses, controls and conflict reasons.
