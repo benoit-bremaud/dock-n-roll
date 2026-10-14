@@ -80,7 +80,8 @@ flowchart LR
   and renaming it, which a file watch misses.
 - The preload script runs in the renderer process, in an isolated context
   (`contextIsolation`, `sandbox`, no Node in the page). It exposes a narrow API:
-  `listServices`, `start`, `stop`, `openUrl`, `listBackground`, `onStatusChanged`.
+  `getState`, `start`, `stop`, `openUrl`, `listBackground`, `onStateChanged`
+  (see `07-class-controller.md`). IPC calls from any frame other than the dashboard page are ignored.
 - ServiceController owns the pending operations and guards only. UC4 (background activity)
   goes through BackgroundMonitor, not through ServiceController.
 - The Docker socket is the only root-equivalent egress (spec R4); nothing listens on the network.
