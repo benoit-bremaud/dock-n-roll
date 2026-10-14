@@ -7,5 +7,5 @@
     "outDir": "./node_modules/.cache/tsc/web",
     "tsBuildInfoFile": "./node_modules/.cache/tsc/web.tsbuildinfo"
   },
-  "include": ["src/renderer/src/**/*"]
+  "include": ["src/renderer/src/**/*", "src/shared/**/*", "src/main/domain/types.ts"]
 }
