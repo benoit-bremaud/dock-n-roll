@@ -38,3 +38,15 @@ Error messages of main-process handlers reaching the renderer; `dockerSocketPath
 - Tests: 248 → 274; key rules mutation-checked.
 - Security: no double command, no takeover through an unresolved pin, IPC origin checked, menu labels sanitized.
 - Correctness: the live tray menu on the workstation matches the real projects and statuses.
+
+## Verification pass (security reviewer, on b609c99)
+
+Findings 1–11: 9 resolved, 1 partially (#4, completed by A below), 1 not resolved (#10 socket path normalization, nice — deferred).
+
+| New finding | Severity | Response |
+|---|---|---|
+| A — a temporary name-resolution failure refused Start until restart | 🟡 Should | done — failed dirs retried after 30 s, before each recomputation (red test first) |
+| B — a pending command on one project marked every project of the dir as pending (Stop disabled for minutes) | 🟡 Should | done — pending keyed by dir + project name; only a row with no name yet matches the whole dir (red test first) |
+| C — "Docker unavailable" flashes in the tray before the first snapshot | 🔵 Nice | deferred |
+| D — dev-server origin compared as a string prefix | 🔵 Nice | deferred (unpackaged builds only) |
+| E — label truncation can split an emoji | 🔵 Nice | deferred |

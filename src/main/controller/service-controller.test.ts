@@ -31,6 +31,7 @@ function fakes() {
   const heldFiles: { release: () => void }[] = []
   let holdFiles = false
   let rejectNextRun: Error | undefined
+  const clock = { now: 0 }
 
   const deps: ControllerDeps = {
     socketPath: SOCKET,
@@ -81,6 +82,7 @@ function fakes() {
       })
     },
     probeHealth: (url) => Promise.resolve(healthy.has(url)),
+    now: () => clock.now,
     schedule: (retry, delayMs) => {
       scheduled.push(retry)
       delays.push(delayMs)
@@ -101,6 +103,7 @@ function fakes() {
     scheduled,
     delays,
     counters,
+    clock,
     heldFiles,
     holdFiles: (on: boolean) => {
       holdFiles = on
@@ -355,19 +358,56 @@ describe('review fixes — races and failures', () => {
     expect(f.runs).toHaveLength(1)
   })
 
-  it('treats the whole dir as busy while an operation runs, even if the pin file renames the project', async () => {
-    const { f, controller } = await controllerWith()
+  it('keeps the running project busy when the pin file is edited during its `up`', async () => {
+    const { f, controller, row } = await controllerWith()
     f.snapshot([webStopped])
     await settle()
     void controller.start(BLOG)
     await settle()
 
-    f.changePins({ entries: [pin({ workingDir: '/srv/blog', project: 'blog-renamed' })], errors: [] })
+    f.changePins({ entries: [pin({ workingDir: '/srv/blog', name: 'Renamed' })], errors: [] })
     await settle()
-    for (const service of controller.state().services) await controller.start(service.id)
+    await controller.start(BLOG)
 
     expect(f.runs).toHaveLength(1)
-    expect(controller.state().services.every((service) => !service.controls.start)).toBe(true)
+    expect(row(BLOG)).toMatchObject({ displayName: 'Renamed', status: 'starting', controls: { start: false, stop: false } })
+  })
+
+  it('does not block another project of the same dir while one project runs a command', async () => {
+    const qa1 = container({ id: '1', state: 'exited', exitCode: 0, labels: composeLabels('qa1', '/srv/app') })
+    const qa2 = container({ id: '2', state: 'running', labels: composeLabels('qa2', '/srv/app') })
+    const { f, controller, row } = await controllerWith()
+    f.snapshot([qa1, qa2])
+    await settle()
+
+    void controller.start('/srv/app\0qa1')
+    await settle()
+
+    expect(row('/srv/app\0qa2')).toMatchObject({ status: 'on', controls: { stop: true } })
+    void controller.stop('/srv/app\0qa2')
+    await settle()
+    expect(f.runs.map((run) => run.args.at(-1))).toEqual(['--wait-timeout=180', 'stop'])
+  })
+
+  it('retries a failed name resolution after 30 s instead of refusing until restart', async () => {
+    const { f, controller } = await controllerWith((setup) => {
+      setup.setInitialPins([pin({ workingDir: '/srv/blog' })])
+    })
+    f.snapshot([])
+    await settle()
+    expect(controller.state().services[0]?.controls.start).toBe(false)
+
+    f.resolved.set('/srv/blog', 'blog')
+    f.clock.now = 10_000
+    f.snapshot([])
+    await settle()
+    expect(controller.state().services[0]?.controls.start).toBe(false)
+
+    f.clock.now = 30_000
+    f.snapshot([])
+    await settle()
+    expect(controller.state().services[0]?.controls.start).toBe(true)
+    expect(f.resolveCalls).toEqual(['/srv/blog', '/srv/blog'])
   })
 
   it('clears the pending operation and shows the error when the runner itself throws', async () => {

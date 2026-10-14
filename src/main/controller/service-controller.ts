@@ -14,6 +14,8 @@ import type { ControllerState, ServiceView } from '../../shared/ipc'
 const HEALTH_POLL_MS = 2000
 const HEALTH_TIMEOUT_MS = 1500
 const MAX_REASON_CHARS = 500
+/** A failed `docker compose config` (slow daemon at boot, file mid-edit) is retried after this. */
+const NAME_RETRY_MS = 30_000
 
 /** The adapters, injected so the controller is tested with in-memory stand-ins. */
 export interface ControllerDeps {
@@ -26,6 +28,8 @@ export interface ControllerDeps {
   resolveProjectName(workingDir: string, options: Omit<RunOptions, 'cwd'>): Promise<string | null>
   filesExist(workingDir: string, configFiles: readonly string[]): Promise<boolean>
   probeHealth(url: string, options: ProbeOptions): Promise<boolean>
+  /** Clock for retrying failed name resolutions; overridable for tests. */
+  readonly now?: () => number
   /** Schedules a health probe and returns its cancel function. */
   schedule(run: () => void, delayMs: number): () => void
 }
@@ -51,17 +55,22 @@ export interface ServiceController {
 }
 
 /**
- * A pending start or stop. It makes the whole working dir busy, whatever the project name:
- * the name (and so `Service.id`) can change while `up --wait` runs — first container of a
- * never-started pin, or a pin-file edit — and a second command on the same dir must never start.
+ * A pending start or stop, keyed by working dir and the project name the command runs under —
+ * not by `Service.id`, which changes when a never-started pin gets its first container. A row
+ * with no project name yet (never-started pin) matches any pending entry of its dir. Other
+ * projects of the same dir stay independent (`-p qa1` / `-p qa2`).
  */
 interface Pending {
   readonly workingDir: string
+  readonly projectName: string
   readonly operation: PendingOperation
 }
 
 function pendingFor(pending: readonly Pending[], service: Service): PendingOperation | null {
-  return pending.find((entry) => entry.workingDir === service.workingDir)?.operation ?? null
+  const match = pending.find(
+    (entry) => entry.workingDir === service.workingDir && (service.projectName === null || entry.projectName === service.projectName)
+  )
+  return match?.operation ?? null
 }
 
 function isHttpUrl(url: string): boolean {
@@ -99,8 +108,11 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   let dockerReason: string | null = null
   let pins: readonly PinEntry[] = []
   let pinErrors: readonly string[] = []
-  /** Compose names of pin dirs, resolved once per dir (spec §10 P1); `null` = could not resolve. */
-  const nameCache = new Map<string, string | null>()
+  /** Compose names of pin dirs, resolved once per dir (spec §10 P1). */
+  const nameCache = new Map<string, string>()
+  /** When each failed resolution was last tried, to retry it after `NAME_RETRY_MS`. */
+  const failedAt = new Map<string, number>()
+  const now = deps.now ?? Date.now
   let resolvedNames: ReadonlyMap<string, string> = new Map()
   let services: Service[] = []
   let pending: Pending[] = []
@@ -228,6 +240,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
       .then(async () => {
         if (disposed) return
         await before?.()
+        await resolveNames()
         await rebuild()
       })
       .catch((error: unknown) => {
@@ -235,22 +248,32 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
       })
   }
 
-  /** Resolves only pin dirs not seen yet: a slow `docker compose config` would otherwise hold every input. */
+  /**
+   * Resolves pin dirs not resolved yet — failures again after `NAME_RETRY_MS` — so a slow
+   * `docker compose config` does not hold every input, and a temporary failure does not refuse
+   * Start until the app restarts. Runs before every recomputation; usually a no-op.
+   */
   const resolveNames = async (): Promise<void> => {
     const dirs = [...new Set(pins.filter((entry) => entry.project === undefined).map((entry) => entry.workingDir))]
-    const fresh = dirs.filter((dir) => !nameCache.has(dir))
-    const names = await Promise.all(fresh.map((dir) => deps.resolveProjectName(dir, { socketPath: deps.socketPath })))
-    fresh.forEach((dir, index) => nameCache.set(dir, names[index] ?? null))
-    for (const dir of nameCache.keys()) if (!dirs.includes(dir)) nameCache.delete(dir)
-    const next = new Map<string, string>()
-    for (const [dir, name] of nameCache) if (name !== null) next.set(dir, name)
-    resolvedNames = next
+    const due = dirs.filter((dir) => !nameCache.has(dir) && now() - (failedAt.get(dir) ?? -Infinity) >= NAME_RETRY_MS)
+    const names = await Promise.all(due.map((dir) => deps.resolveProjectName(dir, { socketPath: deps.socketPath })))
+    due.forEach((dir, index) => {
+      const name = names[index] ?? null
+      if (name === null) {
+        failedAt.set(dir, now())
+      } else {
+        nameCache.set(dir, name)
+        failedAt.delete(dir)
+      }
+    })
+    for (const map of [nameCache, failedAt]) for (const dir of map.keys()) if (!dirs.includes(dir)) map.delete(dir)
+    resolvedNames = new Map(nameCache)
   }
 
   const applyPins = (result: PinFileResult): void => {
     pins = result.entries
     pinErrors = result.errors
-    recompute(resolveNames)
+    recompute()
   }
 
   const run = async (id: string, operation: PendingOperation): Promise<void> => {
@@ -263,7 +286,8 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     if (pendingFor(pending, found) !== null) return
     const name = found.projectName ?? resolvedNames.get(found.workingDir) ?? null
     const service: Service = { ...found, projectName: name }
-    const entry: Pending = { workingDir: service.workingDir, operation }
+    if (name === null) return
+    const entry: Pending = { workingDir: service.workingDir, projectName: name, operation }
     pending = [...pending, entry]
     lastError.delete(service.id)
     recompute()
@@ -279,8 +303,8 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     }
     if (failure !== null) {
       // Keyed by the row the developer now sees: the id may have changed during the run.
-      const now = services.find((candidate) => candidate.workingDir === service.workingDir && (name === null || candidate.projectName === name))
-      lastError.set(now?.id ?? service.id, failure)
+      const row = services.find((candidate) => candidate.workingDir === service.workingDir && candidate.projectName === name)
+      lastError.set(row?.id ?? service.id, failure)
     }
     recompute()
     await chain

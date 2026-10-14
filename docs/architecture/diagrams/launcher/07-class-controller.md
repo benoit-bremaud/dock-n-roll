@@ -98,11 +98,13 @@ classDiagram
   pure recomputation: `buildServices` → `deriveStatus` → `allowedControls` → `ServiceView[]`,
   then `onChange` listeners (IPC push `dock-n-roll:state-changed`, tray menu rebuild).
   `ControllerState` also carries Docker availability and pin-file errors (spec §4 banner).
-- **A pending operation makes its whole working dir busy**, not just one `Service.id`: the id
-  (and the project name) can change while `up --wait` runs — first container of a
-  never-started pin, or a pin-file edit — and a second command on that dir must never start.
-  The check runs synchronously right before the entry is added, so two clicks in one tick run
-  one command.
+- **A pending operation is keyed by working dir + the project name it runs under**, not by
+  `Service.id` (which changes when a never-started pin gets its first container). A row with no
+  project name yet matches any pending entry of its dir; other projects of the same dir stay
+  independent. The check runs synchronously right before the entry is added, so two clicks in
+  one tick run one command.
+- **Name resolution failures are retried after 30 s** (checked before each recomputation), so a
+  slow daemon at boot does not refuse Start until the app restarts.
 - **Controls are off while Docker is unavailable** (and before the first snapshot), and Start
   is off for a never-started pin whose Compose name could not be resolved; a resolved one is
   always started under `--project-name=<resolved>`.
