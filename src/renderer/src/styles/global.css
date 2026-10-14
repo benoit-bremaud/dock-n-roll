@@ -19,3 +19,107 @@ body {
   margin: 0;
   color: var(--color-muted);
 }
+
+.tabs {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.tabs [aria-selected='true'] {
+  font-weight: 600;
+  border-bottom: 2px solid var(--color-fg);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--color-muted);
+  border-radius: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.banner {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-left: 4px solid var(--status-off);
+  background: color-mix(in srgb, var(--status-off) 10%, transparent);
+}
+
+.services {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.service {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-muted) 30%, transparent);
+}
+
+.service__badge {
+  flex: none;
+  width: var(--space-3);
+  height: var(--space-3);
+  border-radius: 50%;
+}
+
+/* spec §4: on → green, off → red, transitional → orange, unavailable → grey. */
+.service__badge[data-status='on'] { background: var(--status-on); }
+.service__badge[data-status='off'] { background: var(--status-off); }
+.service__badge[data-status='starting'],
+.service__badge[data-status='stopping'],
+.service__badge[data-status='partial'] { background: var(--status-transitional); }
+.service__badge[data-status='missing'],
+.service__badge[data-status='conflict'],
+.service__badge[data-status='invalid'] { background: var(--status-unavailable); }
+
+.service__main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--space-2);
+  min-width: 0;
+}
+
+.service__name { font-weight: 600; }
+
+.service__status,
+.service__dir,
+.service__reason {
+  color: var(--color-muted);
+}
+
+.service__dir,
+.service__reason {
+  grid-column: 1 / -1;
+  overflow-wrap: anywhere;
+}
+
+.service__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.running table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--space-3);
+}
+
+.running th,
+.running td {
+  text-align: left;
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-muted) 30%, transparent);
+}
