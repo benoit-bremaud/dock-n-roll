@@ -41,7 +41,7 @@
 
 ## Verification pass (security reviewer, probes re-run on 810e520)
 
-Findings 1–11: 9 resolved, 1 partially (#8 missing-cwd message, nice), 1 not resolved by design (#9 binaries from `PATH`, nice — deferred).
+Findings 1–11: 8 resolved; 2 partially — #5 (timeout, completed by N1 below) and #8 (missing-cwd message, nice, deferred); 1 not resolved by design — #9 (binaries from `PATH`, nice, deferred).
 
 | New finding | Severity | Response |
 |---|---|---|
