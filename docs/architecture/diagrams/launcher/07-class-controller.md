@@ -37,11 +37,11 @@ classDiagram
   }
   class DockNRollApi {
     <<shared/ipc.ts, exposed by preload>>
-    +getState() ControllerState
-    +start(id) void
-    +stop(id) void
-    +openUrl(id) void
-    +listBackground() BackgroundView
+    +getState() Promise~ControllerState~
+    +start(id) Promise~void~
+    +stop(id) Promise~void~
+    +openUrl(id) Promise~void~
+    +listBackground() Promise~BackgroundView~
     +onStateChanged(callback) unsubscribe
   }
   class ServiceController {
@@ -50,10 +50,12 @@ classDiagram
     -pins PinEntry[]
     -resolvedNames ResolvedNames
     -pending Pending[]
-    -healthGates Map~serviceId, HealthGate~
-    -filesExist Map~serviceId, boolean~
+    -gates Map~serviceId, HealthGate~
+    -filesOk Map~serviceId, boolean~
     -lastError Map~serviceId, string~
+    -nameCache Map~workingDir, name~
     +state() ControllerState
+    +containers() ContainerSnapshot[]
     +start(id) Promise~void~
     +stop(id) Promise~void~
     +urlOf(id) string|null
@@ -69,6 +71,7 @@ classDiagram
     +probeHealth
     +openPinFileStore
     +socketPath
+    +pinFilePath
     +schedule
   }
   class BackgroundMonitor {
@@ -95,18 +98,27 @@ classDiagram
   pure recomputation: `buildServices` → `deriveStatus` → `allowedControls` → `ServiceView[]`,
   then `onChange` listeners (IPC push `dock-n-roll:state-changed`, tray menu rebuild).
   `ControllerState` also carries Docker availability and pin-file errors (spec §4 banner).
-- **A pending operation is keyed by `workingDir` + `projectName`, not by `Service.id`.** For a
-  never-started pin without `project`, `projectName` is null and matches every project of that
-  dir: the project name (and the id) only appear with the first container, while `up --wait`
-  is still running — so Start stays disabled across that change.
+- **A pending operation makes its whole working dir busy**, not just one `Service.id`: the id
+  (and the project name) can change while `up --wait` runs — first container of a
+  never-started pin, or a pin-file edit — and a second command on that dir must never start.
+  The check runs synchronously right before the entry is added, so two clicks in one tick run
+  one command.
+- **Controls are off while Docker is unavailable** (and before the first snapshot), and Start
+  is off for a never-started pin whose Compose name could not be resolved; a resolved one is
+  always started under `--project-name=<resolved>`.
+- **State is published only when it changes**: each push rebuilds the tray menu over D-Bus,
+  which would otherwise close an open menu every 2 s during a health wait.
+- Labels from Docker, pins and stderr are made menu-safe (`menuLabel`: `&` doubled, newlines
+  flattened, 80 chars). `listBackground` shares one `ss` scan and caches it for 1 s.
 - **The renderer only sends ids.** `start` / `stop` / `openUrl` look the id up in the current
   views; an unknown id, or a control the derived status forbids, is refused in the main
   process (spec §4 columns enforced on both sides). URLs never come from the renderer
   (spec R6): `openUrl(id)` opens the pin's validated `http`/`https` URL.
 - **`reason`** carries what the row must explain: `invalidReason`, the conflicting dirs, a
   missing folder, or the stderr excerpt of the last failed command (spec UC1-4a, UC2-3a).
-- **Name resolution (spec §10 P1)**: on every pin-file change, `resolveProjectName` runs for
-  each pin without `project`; results replace `resolvedNames`.
+- **Name resolution (spec §10 P1)**: on a pin-file change, `resolveProjectName` runs only for
+  pin dirs (without `project`) not resolved yet, so a slow `docker compose config` does not
+  hold every input; names of removed pins are dropped.
 - **Health gate (spec §3)**: while a service's containers all run or are done and its pin has a
   `healthUrl` with no container HEALTHCHECK, the controller probes it every 2 s
   (`schedule`); the gate becomes `passed` on the first 2xx/3xx and resets when the service

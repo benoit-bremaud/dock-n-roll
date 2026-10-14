@@ -1,12 +1,13 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, Menu, nativeImage, session, shell, Tray, type MenuItemConstructorOptions } from 'electron'
+import { pathToFileURL } from 'node:url'
+import { app, BrowserWindow, dialog, Menu, nativeImage, session, shell, Tray, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
 import { resolveProjectName, runCompose } from './adapters/compose-runner'
 import { observeDocker } from './adapters/docker-observer'
 import { filesExist } from './adapters/file-probe'
 import { probeHealth } from './adapters/health-probe'
 import { openPinFileStore } from './adapters/pin-file-store'
 import { scanListeningPorts } from './adapters/port-scanner'
-import { listBackground } from './controller/background-monitor'
+import { createBackgroundSource } from './controller/background-monitor'
 import { dockerSocketPath } from './controller/docker-socket'
 import { createServiceController, type ServiceController } from './controller/service-controller'
 import { buildTrayMenu, type MenuEntry } from './controller/tray-menu'
@@ -14,6 +15,16 @@ import { pushStateTo, registerIpc } from './ipc'
 import type { ControllerState } from '../shared/ipc'
 
 const TRAY_ICON_PATH = join(__dirname, '../../resources/tray-icon.png')
+const RENDERER_FILE = join(__dirname, '../renderer/index.html')
+const DEV_SERVER_URL = !app.isPackaged ? process.env['ELECTRON_RENDERER_URL'] : undefined
+
+/** IPC calls are accepted only from the dashboard page itself (top frame of our window). */
+function isTrustedSender(event: IpcMainInvokeEvent): boolean {
+  const frame = event.senderFrame
+  if (frame === null || frame.parent !== null || dashboard === null || event.sender !== dashboard.webContents) return false
+  const url = frame.url
+  return DEV_SERVER_URL !== undefined ? url.startsWith(DEV_SERVER_URL) : url === pathToFileURL(RENDERER_FILE).href
+}
 
 let dashboard: BrowserWindow | null = null
 // Kept at module level: a garbage-collected Tray disappears from the top bar.
@@ -49,11 +60,10 @@ function createDashboard(): BrowserWindow {
     }
   })
 
-  const devServerUrl = process.env['ELECTRON_RENDERER_URL']
-  if (!app.isPackaged && devServerUrl !== undefined) {
-    void window.loadURL(devServerUrl)
+  if (DEV_SERVER_URL !== undefined) {
+    void window.loadURL(DEV_SERVER_URL)
   } else {
-    void window.loadFile(join(__dirname, '../renderer/index.html'))
+    void window.loadFile(RENDERER_FILE)
   }
   return window
 }
@@ -75,6 +85,7 @@ function renderTray(trayIcon: Tray, controller: ServiceController, state: Contro
     start: (id) => void controller.start(id),
     stop: (id) => void controller.stop(id),
     openUrl: (id) => {
+      // `urlOf` only returns the pin's http/https URL (spec R6).
       const url = controller.urlOf(id)
       if (url !== null) void shell.openExternal(url)
     },
@@ -105,7 +116,7 @@ async function start(): Promise<void> {
       }
     }
   })
-  registerIpc(controller, () => listBackground(controller.containers(), scanListeningPorts))
+  registerIpc(controller, createBackgroundSource(() => controller.containers(), scanListeningPorts), isTrustedSender)
   const trayIcon = new Tray(nativeImage.createFromPath(TRAY_ICON_PATH))
   trayIcon.setToolTip('dock-n-roll')
   tray = trayIcon
@@ -141,6 +152,12 @@ if (!app.requestSingleInstanceLock()) {
     if (app.isPackaged) {
       Menu.setApplicationMenu(null)
     }
-    void start()
+    start().catch((error: unknown) => {
+      // Without this the app would run with no tray and no window, and the single-instance
+      // lock would block every relaunch.
+      console.error('dock-n-roll: startup failed', error)
+      dialog.showErrorBox('dock-n-roll could not start', error instanceof Error ? error.message : String(error))
+      app.quit()
+    })
   })
 }

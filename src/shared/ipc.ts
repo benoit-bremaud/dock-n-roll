@@ -1,5 +1,6 @@
-// Contract between the main process and the renderer (class diagram 07). Types only: imported
-// with `import type` from both sides, so no main-process code ever reaches the renderer bundle.
+// Contract between the main process and the preload / renderer (class diagram 07): types plus
+// the `IPC` channel names. Main-process code is only reached through `import type`, so none of
+// it ends up in the preload or renderer bundles.
 import type { BackgroundPort, Controls, ServiceStatus } from '../main/domain/types'
 
 /** One dashboard / tray row. The renderer only ever sends `id` back. */
@@ -16,8 +17,9 @@ export interface ServiceView {
 }
 
 export interface ControllerState {
-  /** `false` while Docker cannot be reached: rows are greyed without badge (spec §4). */
+  /** `false` while Docker cannot be reached (and before the first snapshot): every control is off (spec §4). */
   readonly dockerAvailable: boolean
+  /** The observer's message while unavailable, `null` otherwise. */
   readonly dockerReason: string | null
   /** Pin-file problems, shown as a banner; the last valid pins stay in use. */
   readonly pinErrors: readonly string[]
@@ -38,7 +40,11 @@ export interface BackgroundView {
   readonly ports: readonly BackgroundPort[]
 }
 
-/** What the preload script exposes on `window.dockNRoll`. */
+/**
+ * What the preload script exposes on `window.dockNRoll`. Subscribe with `onStateChanged`
+ * before calling `getState`, or a push in between is missed. `start` / `stop` resolve once the
+ * command ends, also when refused: the outcome is only in the next pushed state.
+ */
 export interface DockNRollApi {
   getState(): Promise<ControllerState>
   start(id: string): Promise<void>

@@ -1,4 +1,4 @@
-import { ipcMain, shell, type BrowserWindow } from 'electron'
+import { ipcMain, shell, type BrowserWindow, type IpcMainInvokeEvent } from 'electron'
 import { IPC, type BackgroundView, type ControllerState } from '../shared/ipc'
 import type { ServiceController } from './controller/service-controller'
 
@@ -9,32 +9,33 @@ function asId(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 && value.length < 4096 ? value : null
 }
 
-function isHttpUrl(url: string): boolean {
-  try {
-    const { protocol } = new URL(url)
-    return protocol === 'http:' || protocol === 'https:'
-  } catch {
-    return false
-  }
-}
-
-export function registerIpc(controller: ServiceController, listBackground: () => Promise<BackgroundView>): void {
-  ipcMain.handle(IPC.getState, (): ControllerState => controller.state())
-  ipcMain.handle(IPC.start, async (_event, id: unknown) => {
+/**
+ * Registers the handlers of the channels in `IPC` (class diagram 07), once, at startup. Calls
+ * from any frame other than the dashboard page are ignored (`isTrusted`), and so are invalid
+ * ids: a refusal is silent, never an error sent back. `start` / `stop` resolve once the
+ * command ends; the outcome is only visible in the next pushed state.
+ */
+export function registerIpc(
+  controller: ServiceController,
+  listBackground: () => Promise<BackgroundView>,
+  isTrusted: (event: IpcMainInvokeEvent) => boolean
+): void {
+  ipcMain.handle(IPC.getState, (event): ControllerState | null => (isTrusted(event) ? controller.state() : null))
+  ipcMain.handle(IPC.start, async (event, id: unknown) => {
     const valid = asId(id)
-    if (valid !== null) await controller.start(valid)
+    if (isTrusted(event) && valid !== null) await controller.start(valid)
   })
-  ipcMain.handle(IPC.stop, async (_event, id: unknown) => {
+  ipcMain.handle(IPC.stop, async (event, id: unknown) => {
     const valid = asId(id)
-    if (valid !== null) await controller.stop(valid)
+    if (isTrusted(event) && valid !== null) await controller.stop(valid)
   })
-  ipcMain.handle(IPC.openUrl, async (_event, id: unknown) => {
+  ipcMain.handle(IPC.openUrl, async (event, id: unknown) => {
     const valid = asId(id)
-    const url = valid === null ? null : controller.urlOf(valid)
-    // Already validated by the pin file (spec R6); checked again right before leaving the app.
-    if (url !== null && isHttpUrl(url)) await shell.openExternal(url)
+    // `urlOf` only returns the pin's http/https URL (spec R6), never one from the renderer.
+    const url = isTrusted(event) && valid !== null ? controller.urlOf(valid) : null
+    if (url !== null) await shell.openExternal(url)
   })
-  ipcMain.handle(IPC.listBackground, () => listBackground())
+  ipcMain.handle(IPC.listBackground, (event) => (isTrusted(event) ? listBackground() : null))
 }
 
 /** Pushes every new state to the dashboard window, when it exists. */

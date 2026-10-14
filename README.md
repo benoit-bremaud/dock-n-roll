@@ -4,8 +4,8 @@ A tiny GNOME top-bar launcher for local dev services: one button per Docker Comp
 **green = ON, red = OFF** — plus a view of everything running in the background
 (containers, listening ports).
 
-> **Status**: Electron skeleton, pure domain and OS adapters (Docker, Compose, `ss`, pin file) in place;
-> controller, dashboard and packaging to come.
+> **Status**: domain, OS adapters, controller, IPC and tray menu in place — services can be started and
+> stopped from the top-bar menu; dashboard and packaging to come.
 
 ## Development
 

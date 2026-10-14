@@ -29,3 +29,23 @@ export async function listBackground(
     ports: joinPorts(sockets, containers)
   }
 }
+
+const CACHE_MS = 1000
+
+/**
+ * `listBackground` behind the IPC: each call would spawn `ss`, and the renderer is untrusted.
+ * Concurrent calls share one scan, and a result is reused for a second.
+ */
+export function createBackgroundSource(
+  containers: () => readonly ContainerSnapshot[],
+  scanPorts: () => Promise<ListeningSocket[]>,
+  now: () => number = Date.now
+): () => Promise<BackgroundView> {
+  let last: { at: number; view: Promise<BackgroundView> } | undefined
+  return () => {
+    if (last === undefined || now() - last.at >= CACHE_MS) {
+      last = { at: now(), view: listBackground(containers(), scanPorts) }
+    }
+    return last.view
+  }
+}

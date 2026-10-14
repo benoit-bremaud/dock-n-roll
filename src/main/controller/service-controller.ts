@@ -2,7 +2,7 @@ import type { ComposeResult, RunOptions } from '../adapters/compose-runner'
 import type { DockerListener, DockerObserver, DockerObserverOptions } from '../adapters/docker-observer'
 import type { ProbeOptions } from '../adapters/health-probe'
 import type { PinFileStore } from '../adapters/pin-file-store'
-import { buildStopArgs, buildUpArgs, InvalidServiceError } from '../domain/compose-args'
+import { buildStopArgs, buildUpArgs } from '../domain/compose-args'
 import { allowedControls, deriveStatus } from '../domain/derive-status'
 import { buildServices } from '../domain/service-catalog'
 import type { ContainerSnapshot, HealthGate, PendingOperation, PinEntry, PinFileResult, Service, StatusInputs } from '../domain/types'
@@ -32,8 +32,13 @@ export interface ControllerDeps {
 
 export interface ServiceController {
   state(): ControllerState
-  /** Refused (no-op) when the id is unknown or the derived status forbids it. */
+  /**
+   * Refused (no-op) when the id is unknown, Docker is unavailable, the dir is busy or the
+   * derived status forbids it. Resolves once the command ends; a failure lands in the row's
+   * `reason`, it never rejects.
+   */
   start(id: string): Promise<void>
+  /** Same contract as `start`. */
   stop(id: string): Promise<void>
   /** The pin's validated URL (spec R6), never a URL from the caller. */
   urlOf(id: string): string | null
@@ -41,26 +46,34 @@ export interface ServiceController {
   containers(): readonly ContainerSnapshot[]
   /** Returns the unsubscribe function. */
   onChange(listener: (state: ControllerState) => void): () => void
+  /** Stops observing, closes the pin file, cancels probes and drops listeners. Final. */
   dispose(): void
 }
 
 /**
- * A pending start or stop. `projectName` is null for a never-started pin without `project`:
- * it then covers every project of that dir, because the project name (and so `Service.id`)
- * only appears with the first container, while `up --wait` is still running.
+ * A pending start or stop. It makes the whole working dir busy, whatever the project name:
+ * the name (and so `Service.id`) can change while `up --wait` runs — first container of a
+ * never-started pin, or a pin-file edit — and a second command on the same dir must never start.
  */
 interface Pending {
   readonly workingDir: string
-  readonly projectName: string | null
   readonly operation: PendingOperation
 }
 
 function pendingFor(pending: readonly Pending[], service: Service): PendingOperation | null {
-  const match = pending.find(
-    (entry) => entry.workingDir === service.workingDir && (entry.projectName === null || entry.projectName === service.projectName)
-  )
-  return match?.operation ?? null
+  return pending.find((entry) => entry.workingDir === service.workingDir)?.operation ?? null
 }
+
+function isHttpUrl(url: string): boolean {
+  try {
+    const { protocol } = new URL(url)
+    return protocol === 'http:' || protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+const NO_CONTROLS = { start: false, stop: false } as const
 
 function excerpt(text: string): string {
   const trimmed = text.trim()
@@ -75,12 +88,19 @@ function allUp(containers: readonly ContainerSnapshot[]): boolean {
   )
 }
 
+/**
+ * Wires the adapters to the domain (class diagram 07). Resolves once the pin file is loaded and
+ * the first state is computed; rejects only if `openPinFileStore` rejects. Later adapter
+ * failures are logged or shown on the rows, never thrown. Call `dispose()` on quit.
+ */
 export async function createServiceController(deps: ControllerDeps): Promise<ServiceController> {
   let containers: readonly ContainerSnapshot[] = []
   let dockerAvailable = false
   let dockerReason: string | null = null
   let pins: readonly PinEntry[] = []
   let pinErrors: readonly string[] = []
+  /** Compose names of pin dirs, resolved once per dir (spec §10 P1); `null` = could not resolve. */
+  const nameCache = new Map<string, string | null>()
   let resolvedNames: ReadonlyMap<string, string> = new Map()
   let services: Service[] = []
   let pending: Pending[] = []
@@ -90,8 +110,13 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   const lastError = new Map<string, string>()
   const listeners = new Set<(state: ControllerState) => void>()
   let current: ControllerState = { dockerAvailable, dockerReason, pinErrors, services: [] }
+  let currentJson = JSON.stringify(current)
   let chain = Promise.resolve()
   let disposed = false
+
+  /** A never-started pin without `project` whose Compose name is unknown: `up` could take over another dir. */
+  const unresolved = (service: Service): boolean =>
+    service.containers.length === 0 && service.projectName === null && !resolvedNames.has(service.workingDir)
 
   const inputsOf = (service: Service): StatusInputs => {
     const gate: HealthGate = service.pin?.healthUrl === undefined ? 'none' : (gates.get(service.id) ?? 'waiting')
@@ -109,21 +134,30 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     if (service.invalidReason !== null) return service.invalidReason
     if (inputs.conflict) return `project name also used by ${service.conflictingDirs.join(', ')}`
     if (!inputs.filesExist) return 'folder or compose file is missing'
+    if (unresolved(service)) return 'Compose project name could not be resolved'
     return lastError.get(service.id) ?? null
   }
 
   const viewOf = (service: Service): ServiceView => {
     const inputs = inputsOf(service)
     const status = deriveStatus(inputs)
+    const derived = allowedControls(status, inputs)
+    // No command without the daemon it would act on, nor under a name that was not checked.
+    const controls = !dockerAvailable ? NO_CONTROLS : unresolved(service) ? { start: false, stop: derived.stop } : derived
     return {
       id: service.id,
       displayName: service.displayName,
       workingDir: service.workingDir,
       status,
-      controls: allowedControls(status, inputs),
+      controls,
       hasUrl: service.pin?.url !== undefined,
       reason: reasonOf(service, inputs)
     }
+  }
+
+  const cancelProbe = (id: string): void => {
+    probing.get(id)?.()
+    probing.delete(id)
   }
 
   const probeLater = (service: Service, url: string): void => {
@@ -146,16 +180,29 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
       const ownCheck = service.containers.some((c) => c.state === 'running' && c.health !== null)
       if (!allUp(service.containers)) {
         gates.delete(service.id)
-        probing.get(service.id)?.()
-        probing.delete(service.id)
+        cancelProbe(service.id)
       } else if (!ownCheck && gates.get(service.id) !== 'passed') {
         probeLater(service, url)
       }
     }
   }
 
+  /** Per-service state of services that no longer exist would leak, or resurface on an id change. */
+  const prune = (): void => {
+    const ids = new Set(services.map((service) => service.id))
+    for (const map of [filesOk, gates, lastError]) {
+      for (const id of map.keys()) if (!ids.has(id)) map.delete(id)
+    }
+    for (const id of [...probing.keys()]) if (!ids.has(id)) cancelProbe(id)
+  }
+
   const publish = (): void => {
-    current = { dockerAvailable, dockerReason, pinErrors, services: services.map(viewOf) }
+    const next: ControllerState = { dockerAvailable, dockerReason, pinErrors, services: services.map(viewOf) }
+    const nextJson = JSON.stringify(next)
+    // Each push rebuilds the tray menu over D-Bus: an unchanged state must not close it under the pointer.
+    if (nextJson === currentJson) return
+    current = next
+    currentJson = nextJson
     for (const listener of listeners) {
       try {
         listener(current)
@@ -166,14 +213,16 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   }
 
   const rebuild = async (): Promise<void> => {
-    services = buildServices(containers, pins, resolvedNames)
-    const checks = await Promise.all(services.map((service) => deps.filesExist(service.workingDir, service.configFiles)))
+    const next = buildServices(containers, pins, resolvedNames)
+    const checks = await Promise.all(next.map((service) => deps.filesExist(service.workingDir, service.configFiles)))
+    services = next
     services.forEach((service, index) => filesOk.set(service.id, checks[index] ?? true))
+    prune()
     driveHealthGates()
     publish()
   }
 
-  /** Serialized: a newer input waits for the running recomputation (diagram 08). */
+  /** Serialized: a newer input waits for the running recomputation, so results publish in order (diagram 08). */
   const recompute = (before?: () => Promise<void>): void => {
     chain = chain
       .then(async () => {
@@ -186,14 +235,15 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
       })
   }
 
+  /** Resolves only pin dirs not seen yet: a slow `docker compose config` would otherwise hold every input. */
   const resolveNames = async (): Promise<void> => {
-    const unnamed = pins.filter((entry) => entry.project === undefined)
-    const names = await Promise.all(unnamed.map((entry) => deps.resolveProjectName(entry.workingDir, { socketPath: deps.socketPath })))
+    const dirs = [...new Set(pins.filter((entry) => entry.project === undefined).map((entry) => entry.workingDir))]
+    const fresh = dirs.filter((dir) => !nameCache.has(dir))
+    const names = await Promise.all(fresh.map((dir) => deps.resolveProjectName(dir, { socketPath: deps.socketPath })))
+    fresh.forEach((dir, index) => nameCache.set(dir, names[index] ?? null))
+    for (const dir of nameCache.keys()) if (!dirs.includes(dir)) nameCache.delete(dir)
     const next = new Map<string, string>()
-    unnamed.forEach((entry, index) => {
-      const name = names[index]
-      if (name !== null && name !== undefined) next.set(entry.workingDir, name)
-    })
+    for (const [dir, name] of nameCache) if (name !== null) next.set(dir, name)
     resolvedNames = next
   }
 
@@ -205,28 +255,32 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
 
   const run = async (id: string, operation: PendingOperation): Promise<void> => {
     await chain
-    const service = services.find((candidate) => candidate.id === id)
+    const found = services.find((candidate) => candidate.id === id)
     const view = current.services.find((candidate) => candidate.id === id)
-    if (service === undefined || view === undefined || !view.controls[operation]) return
-    let args: string[]
-    try {
-      args = operation === 'start' ? buildUpArgs(service) : buildStopArgs(service)
-    } catch (error) {
-      if (!(error instanceof InvalidServiceError)) throw error
-      lastError.set(service.id, error.message)
-      recompute()
-      return
-    }
-    const entry: Pending = { workingDir: service.workingDir, projectName: service.projectName, operation }
+    // Checked synchronously before the pending entry is added: two clicks in the same tick
+    // resume one after the other, and the second sees the first one's entry.
+    if (disposed || !dockerAvailable || found === undefined || view === undefined || !view.controls[operation]) return
+    if (pendingFor(pending, found) !== null) return
+    const name = found.projectName ?? resolvedNames.get(found.workingDir) ?? null
+    const service: Service = { ...found, projectName: name }
+    const entry: Pending = { workingDir: service.workingDir, operation }
     pending = [...pending, entry]
     lastError.delete(service.id)
     recompute()
-    const result = await deps.runCompose(args, { cwd: operation === 'start' ? service.workingDir : '/', socketPath: deps.socketPath })
-    pending = pending.filter((candidate) => candidate !== entry)
-    if (result.exitCode !== 0) {
-      // Keyed by the id at the time of the result: the row the developer is looking at.
-      const now = services.find((candidate) => candidate.workingDir === service.workingDir && (service.projectName === null || candidate.projectName === service.projectName))
-      lastError.set(now?.id ?? service.id, excerpt(result.stderr) || `docker compose exited with ${String(result.exitCode)}`)
+    let failure: string | null = null
+    try {
+      const args = operation === 'start' ? buildUpArgs(service) : buildStopArgs(service)
+      const result = await deps.runCompose(args, { cwd: operation === 'start' ? service.workingDir : '/', socketPath: deps.socketPath })
+      if (result.exitCode !== 0) failure = excerpt(result.stderr) || `docker compose exited with ${String(result.exitCode)}`
+    } catch (error) {
+      failure = error instanceof Error ? error.message : String(error)
+    } finally {
+      pending = pending.filter((candidate) => candidate !== entry)
+    }
+    if (failure !== null) {
+      // Keyed by the row the developer now sees: the id may have changed during the run.
+      const now = services.find((candidate) => candidate.workingDir === service.workingDir && (name === null || candidate.projectName === name))
+      lastError.set(now?.id ?? service.id, failure)
     }
     recompute()
     await chain
@@ -256,7 +310,11 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     state: () => current,
     start: (id) => run(id, 'start'),
     stop: (id) => run(id, 'stop'),
-    urlOf: (id) => services.find((service) => service.id === id)?.pin?.url ?? null,
+    urlOf: (id) => {
+      const url = services.find((service) => service.id === id)?.pin?.url ?? null
+      // Validated by the pin file (spec R6) and checked again here, for every caller (tray and IPC).
+      return url !== null && isHttpUrl(url) ? url : null
+    },
     containers: () => containers,
     onChange: (listener) => {
       listeners.add(listener)
@@ -266,7 +324,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
       disposed = true
       observer.stop()
       store.close()
-      for (const cancel of probing.values()) cancel()
+      for (const id of [...probing.keys()]) cancelProbe(id)
       listeners.clear()
     }
   }

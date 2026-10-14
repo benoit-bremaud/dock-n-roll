@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { composeLabels, container } from '../domain/test-fixtures'
 import type { ControllerState, ServiceView } from '../../shared/ipc'
-import { listBackground } from './background-monitor'
-import { buildTrayMenu, type MenuEntry, type TrayActions } from './tray-menu'
+import { createBackgroundSource, listBackground } from './background-monitor'
+import { buildTrayMenu, menuLabel, type MenuEntry, type TrayActions } from './tray-menu'
 
 function view(overrides: Partial<ServiceView> = {}): ServiceView {
   return {
@@ -72,6 +72,50 @@ describe('buildTrayMenu — every action reachable from the menu (spec R5)', () 
 
   it('says so when there is no service yet', () => {
     expect(labels(buildTrayMenu(state({ services: [] }), recordingActions()))[0]).toBe('No Compose project found')
+  })
+})
+
+describe('menuLabel — text from Docker labels, pins and stderr is untrusted', () => {
+  it('doubles & so Electron does not read it as a mnemonic', () => {
+    expect(menuLabel('R&D')).toBe('R&&D')
+  })
+
+  it('flattens newlines and control characters, so a name cannot fake another menu entry', () => {
+    expect(menuLabel('blog\n🟢 Quit\u0007')).toBe('blog 🟢 Quit')
+  })
+
+  it('truncates long text with an ellipsis', () => {
+    expect(menuLabel('x'.repeat(200))).toBe(`${'x'.repeat(79)}…`)
+  })
+
+  it('is applied to names, reasons and the Docker outage', () => {
+    const menu = buildTrayMenu(
+      state({ services: [view({ displayName: 'R&D', reason: 'line 1\nline 2' })] }),
+      recordingActions()
+    )
+    expect(menu[0]?.label).toBe('🔴 R&&D')
+    expect(menu[0]?.submenu?.at(-1)?.label).toBe('line 1 line 2')
+    expect(buildTrayMenu(state({ dockerAvailable: false, dockerReason: 'a\nb' }), recordingActions())[0]?.label).toBe('Docker unavailable: a b')
+  })
+})
+
+describe('createBackgroundSource — one ss at a time, cached 1 s', () => {
+  it('shares one scan between concurrent calls and reuses it within a second', async () => {
+    let scans = 0
+    let now = 0
+    const source = createBackgroundSource(() => [], () => {
+      scans += 1
+      return Promise.resolve([])
+    }, () => now)
+
+    await Promise.all([source(), source(), source()])
+    now = 500
+    await source()
+    expect(scans).toBe(1)
+
+    now = 1500
+    await source()
+    expect(scans).toBe(2)
   })
 })
 

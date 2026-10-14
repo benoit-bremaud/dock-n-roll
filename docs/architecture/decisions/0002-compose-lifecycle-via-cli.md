@@ -45,6 +45,9 @@ Electron means its CLI. Starting containers one by one through the Engine API wo
   app displays. The name resolution additionally sets `COMPOSE_EXPERIMENTAL_GIT_REMOTE=0` and
   `COMPOSE_EXPERIMENTAL_OCI_REMOTE=0`: resolving a name must never clone or pull a remote
   `include:`.
+- **Socket**: one value for the observer and the runner, resolved once at startup — a unix
+  `DOCKER_HOST` (rootless Docker) wins, else `/var/run/docker.sock`; tcp / ssh / relative
+  values are ignored, since the observer only speaks to a Unix socket (`dockerSocketPath`).
 - **Timeout**: a run is stopped with SIGTERM after its timeout, then SIGKILL after a grace
   period; the result names the timeout as the cause ahead of the CLI output.
 

@@ -42,7 +42,8 @@ sequenceDiagram
 
 ## Notes
 
-- Recomputations are serialized: a newer input waits for the running one, and only the latest
-  views are pushed, so a slow `docker compose config` cannot publish stale results over newer ones.
+- Recomputations are serialized and each one reads the latest inputs when it starts: results
+  publish in order, so an older recomputation can never publish after a newer one. Only names
+  of pin dirs not resolved yet are fetched.
 - Pin-file errors are shown (dashboard banner) but never clear the last valid pins — that is
   `PinFileStore`'s contract.

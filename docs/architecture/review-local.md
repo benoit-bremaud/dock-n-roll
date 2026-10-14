@@ -1,51 +1,40 @@
-# Local review — dock-n-roll (branch feat/adapters)
+# Local review — dock-n-roll (branch feat/controller)
 
-- Date: 2026-10-11 (fixes), report written 2026-10-14
-- Commit: 7d971ad (reviewed), fixes in 810e520
-- Scope: branch diff `main...feat/adapters` — OS adapters, domain §10 P1/P2, ADR-0005, diagrams 03–06
+- Date: 2026-10-14
+- Commit: b4c9486 (reviewed), fixes in the following commit
+- Scope: branch diff `main...feat/controller` — controller, IPC contract, tray menu, background view, composition root
 - Checks run: design · tests · security · correctness · docs
-- Verdict: Must 5 · Should 11 · Nice ~8 — Must and Should resolved (owner decision: Nice deferred)
+- Verdict: Must 5 · Should 11 · Nice ~6 — Must and Should resolved (owner decision: Nice deferred)
 
-## 🔴 Must Have — all done, each reproduced by a failing test first
+## 🔴 Must Have — all done, test-first
 
-- `src/main/adapters/compose-runner.ts` `[security|docs]` · A context selected with `docker context use` sent Start / Stop to another daemon than the observed one · `DOCKER_HOST=unix://<observed socket>` set in the child environment.
-- `src/main/domain/service-catalog.ts` `[security|design]` · An invalid container dropped its project out of the name map, so a pin elsewhere could start under that name and take over its containers · every project with a valid name holds it, invalid ones included.
-- `src/main/adapters/docker-observer.ts` `[design|security]` · A slow answer of an abandoned connection could overwrite the new snapshot · fresh map per sync, generation check before every write.
-- `src/main/adapters/compose-runner.ts` · ADR-0002 `[security|docs]` · Inconsistent, undocumented cwd: name resolution and `up` could read different `.env` files · `up` and `config` run in the project dir, `stop` in `/`.
-- `src/main/adapters/*.test.ts` `[tests]` · An event line split across chunks and the initial load of an existing pin file were untested · both covered.
+- `src/main/controller/service-controller.ts` `[design|security]` · Two clicks in one tick ran two `docker compose up` · synchronous dir-busy check right before the pending entry is added.
+- `service-controller.ts` `[security|design]` · A runner that throws left the operation pending forever · `try / finally`, the error becomes the row reason.
+- `src/main/index.ts` `[design]` · A startup failure left an invisible app that the single-instance lock kept alive · error dialog, then quit.
+- `src/shared/ipc.ts` · `03-component.md` · controller contracts `[docs]` · Stale header and API names, undocumented contracts · fixed.
+- `service-controller.test.ts` `[tests]` · 20 of 27 mutants survived (failed stop, serialization, health reset, dispose…) · tests added; the serialization test now fails on its mutant.
 
 ## 🟡 Should Have — all done
 
-- `docker-observer.ts` · Non-200 list treated as an outage; only 404 removes a container; a response cut mid-body rejects instead of hanging; listener errors are logged, never reported as Docker outages; retry scheduler injectable.
-- `compose-runner.ts` · Remote git / OCI `include:` disabled for name resolution; timeout cause named ahead of the CLI output; SIGTERM then SIGKILL after a grace period; synchronous `execFile` errors reported as failed runs.
-- `service-catalog.ts` · `resolvedNames` is required, with its refresh policy documented.
-- `eslint.config.mjs` · Adapters import guard fixed (`**/renderer/**`, `**/preload/**`), proven with a probe file.
-- `pin-file-store.ts` · Sequential reloads, watcher error handler, re-arm after the directory is removed, listener errors caught.
-- `port-scanner.ts` · Crafted process names can no longer misattribute a port (match anchored on `,fd=N)`).
-- Tests · Exact backoff sequence and reset, 404 live and during a sync, abandoned-connection guard, live event during the buffered flush, debounce / close / filename filter, real `ss` scan of the test's own port.
-- Docs · Event list, diagram 06 message names, class diagram (`ComposeLabels`, `ResolvedNames`, conflict rule), ADR-0002, spec §10, README, contracts of exported functions.
+- Publish only on change (the tray menu was rebuilt over D-Bus every 2 s).
+- A never-started pin whose Compose name is unknown cannot start; a resolved one always starts under `--project-name=<resolved>`.
+- A pending operation makes the whole dir busy, so a pin-file edit during `up` cannot allow a second one.
+- Controls off while Docker is unavailable and before the first snapshot.
+- Names resolved once per pin dir (a slow `config` no longer holds every input).
+- Per-service state pruned when a service disappears; the error of a failed command follows the row across an id change.
+- `urlOf` re-checks http/https for both the tray and the IPC (spec R6).
+- `menuLabel`: `&` doubled, newlines and control characters removed, 80 characters max.
+- IPC accepted only from the dashboard page (top frame of our window).
+- `listBackground`: one shared `ss` scan, cached for 1 s.
+- Docs: diagrams 07 / 08, ADR-0002 (socket rule), README, contracts.
 
 ## 🔵 Nice to Have — deferred
 
-- Absolute paths for `docker` and `ss`; `DOCKER_CONFIG` / `DOCKER_API_VERSION` passthrough.
-- One publish per drained event queue instead of one per event.
-- Comment on grouping invalid containers that have no working-dir label.
+Error messages of main-process handlers reaching the renderer; `dockerSocketPath` normalization; the test helper `settle()`; `fs.stat` on every recomputation; typed `ContainerRow.state`.
 
 ## Per-dimension summary
 
-- Design: structure conformant to ADR-0005 and diagrams 03 / 06; one concurrency defect fixed.
-- Tests: 199 → 220; stable across repeated and loaded runs; mutation-checked race test.
-- Security: daemon pinned, takeover via invalid labels closed, no background remote fetch.
-- Correctness: HTTP errors, truncated responses and listener faults no longer corrupt or freeze state.
-- Docs: ADR-0002, spec and diagrams match the code.
-
-## Verification pass (security reviewer, probes re-run on 810e520)
-
-Findings 1–11: 8 resolved; 2 partially — #5 (timeout, completed by N1 below) and #8 (missing-cwd message, nice, deferred); 1 not resolved by design — #9 (binaries from `PATH`, nice, deferred).
-
-| New finding | Severity | Response |
-|---|---|---|
-| N1 — the timeout did not bound the wait when a grandchild (Compose plugin) held the pipes: 3 s instead of 0.6 s | 🟡 Should | done — `spawn` in its own process group, SIGTERM / SIGKILL sent to the group, result settled at the end of the grace period (red test first) |
-| N2 — one container with an unreadable inspect made the observer fail on every retry | 🟡 Should | done — that container is skipped and logged (red test first) |
-| N3 — `socketPath` defaulted to `/var/run/docker.sock`, wrong for rootless Docker | 🟡 Should | done — `socketPath` required in `RunOptions` and `composeEnv` |
-| N4 — re-arm can leak a watcher if triggered twice; no retry after a failed `mkdir` | 🔵 Nice | deferred — backlog |
+- Design: conformant to diagrams 07 / 08; no deadlock in the serialized chain (checked by the design reviewer).
+- Tests: 248 → 274; key rules mutation-checked.
+- Security: no double command, no takeover through an unresolved pin, IPC origin checked, menu labels sanitized.
+- Correctness: the live tray menu on the workstation matches the real projects and statuses.
