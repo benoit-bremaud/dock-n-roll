@@ -38,6 +38,18 @@ export interface ComposeProjectRef {
   readonly configFiles: readonly string[]
 }
 
+/**
+ * What a container's Compose labels say (spec §10 P2). `invalid` keeps the raw labels so the
+ * project stays visible, flagged, instead of disappearing.
+ */
+export type ComposeLabels =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'valid'; readonly ref: ComposeProjectRef }
+  | { readonly kind: 'invalid'; readonly rawProject: string; readonly rawWorkingDir: string; readonly reason: string }
+
+/** Project names resolved by Compose for never-started pins: `workingDir → name` (spec §10 P1). */
+export type ResolvedNames = ReadonlyMap<string, string>
+
 /** One validated entry of the pin file (spec §8); `workingDir` is normalized. */
 export interface PinEntry {
   readonly workingDir: string
@@ -77,6 +89,8 @@ export interface Service {
    * discovered dirs using the name it would start under. Non-empty means `conflict` (ADR-0003).
    */
   readonly conflictingDirs: readonly string[]
+  /** Why the project cannot be controlled safely; non-null means `invalid` (spec §10 P2). */
+  readonly invalidReason: string | null
 }
 
 export type PendingOperation = 'start' | 'stop'
@@ -94,10 +108,12 @@ export interface StatusInputs {
   readonly filesExist: boolean
   /** Same as `Service.conflictingDirs.length > 0`. */
   readonly conflict: boolean
+  /** Same as `Service.invalidReason !== null`. */
+  readonly invalid: boolean
   readonly healthGate: HealthGate
 }
 
-export type ServiceStatus = 'conflict' | 'missing' | 'stopping' | 'starting' | 'on' | 'off' | 'partial'
+export type ServiceStatus = 'invalid' | 'conflict' | 'missing' | 'stopping' | 'starting' | 'on' | 'off' | 'partial'
 
 export interface Controls {
   readonly start: boolean

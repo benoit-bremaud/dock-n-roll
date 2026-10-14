@@ -19,8 +19,8 @@ delivered fast. The owner's daily stack is TypeScript / React.
 ## Decision outcome
 
 **Chosen: Electron + TypeScript** — the owner's existing stack gives the shortest path to a
-usable V1; `Tray` maps to StatusNotifierItem/AppIndicator on Linux; Docker API access via
-`dockerode` from the main process.
+usable V1; `Tray` maps to StatusNotifierItem/AppIndicator on Linux; Docker Engine API access from the main process
+(directly over its socket, ADR-0005).
 
 ### Consequences
 

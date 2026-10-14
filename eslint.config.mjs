@@ -28,6 +28,13 @@ export default tseslint.config(
     }
   },
   {
+    // Adapters are plain Node over one OS boundary each: no Electron, so they run under Vitest.
+    files: ['src/main/adapters/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: ['electron', '**/renderer/**', '**/preload/**'] }]
+    }
+  },
+  {
     files: ['src/renderer/**/*.tsx'],
     plugins: { 'react-hooks': reactHooks },
     rules: reactHooks.configs.recommended.rules

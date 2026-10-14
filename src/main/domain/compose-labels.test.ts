@@ -1,51 +1,47 @@
 import { describe, expect, it } from 'vitest'
-import { composeProjectOf, isRelevant } from './compose-labels'
+import { composeLabelsOf, isRelevant } from './compose-labels'
 import { composeLabels, container } from './test-fixtures'
 
-describe('composeProjectOf', () => {
+describe('composeLabelsOf', () => {
   it('reads the project name, working dir and config file from Compose labels', () => {
     const snapshot = container({ labels: composeLabels('sonarqube', '/home/u/sonarqube-stack', '/home/u/sonarqube-stack/docker-compose.yml') })
 
-    expect(composeProjectOf(snapshot)).toEqual({
-      name: 'sonarqube',
-      workingDir: '/home/u/sonarqube-stack',
-      configFiles: ['/home/u/sonarqube-stack/docker-compose.yml']
+    expect(composeLabelsOf(snapshot)).toEqual({
+      kind: 'valid',
+      ref: { name: 'sonarqube', workingDir: '/home/u/sonarqube-stack', configFiles: ['/home/u/sonarqube-stack/docker-compose.yml'] }
     })
   })
 
-  it('splits a comma-separated config_files label into one path per file', () => {
-    const snapshot = container({ labels: composeLabels('app', '/srv/app', '/srv/app/compose.yaml,/srv/app/compose.override.yaml') })
-
-    expect(composeProjectOf(snapshot)?.configFiles).toEqual(['/srv/app/compose.yaml', '/srv/app/compose.override.yaml'])
-  })
-
-  it('returns null for a container started outside Compose', () => {
-    expect(composeProjectOf(container({ labels: {} }))).toBeNull()
-  })
-
-  it('trims spaces around comma-separated config files', () => {
+  it('splits a comma-separated config_files label and trims each path', () => {
     const snapshot = container({ labels: composeLabels('app', '/srv/app', '/srv/app/a.yaml, /srv/app/b.yaml') })
 
-    expect(composeProjectOf(snapshot)?.configFiles).toEqual(['/srv/app/a.yaml', '/srv/app/b.yaml'])
+    expect(composeLabelsOf(snapshot)).toEqual({
+      kind: 'valid',
+      ref: { name: 'app', workingDir: '/srv/app', configFiles: ['/srv/app/a.yaml', '/srv/app/b.yaml'] }
+    })
   })
 
   it('normalizes the working dir and config file paths', () => {
     const snapshot = container({ labels: composeLabels('app', '/srv/app/', '/srv/app//compose.yaml') })
 
-    expect(composeProjectOf(snapshot)).toEqual({ name: 'app', workingDir: '/srv/app', configFiles: ['/srv/app/compose.yaml'] })
+    expect(composeLabelsOf(snapshot)).toEqual({
+      kind: 'valid',
+      ref: { name: 'app', workingDir: '/srv/app', configFiles: ['/srv/app/compose.yaml'] }
+    })
+  })
+
+  it('reports a container started outside Compose as none', () => {
+    expect(composeLabelsOf(container({ labels: {} }))).toEqual({ kind: 'none' })
   })
 
   it.each([
-    ['a relative working dir', composeLabels('app', 'srv/app')],
-    ['an empty project name', composeLabels('', '/srv/app')],
-    ['a project name Compose would refuse', composeLabels('--project-directory=/tmp', '/srv/app')],
-    ['a relative config file', composeLabels('app', '/srv/app', 'compose.yaml')]
-  ])('returns null for %s (spec R4)', (_case, labels) => {
-    expect(composeProjectOf(container({ labels }))).toBeNull()
-  })
-
-  it('returns null when the working dir label is missing', () => {
-    expect(composeProjectOf(container({ labels: { 'com.docker.compose.project': 'app' } }))).toBeNull()
+    [composeLabels('app', 'srv/app'), 'app', 'srv/app', 'working dir is not an absolute path: "srv/app"'],
+    [composeLabels('', '/srv/app'), '', '/srv/app', 'not a valid Compose project name: ""'],
+    [composeLabels('Bad Name', '/srv/app'), 'Bad Name', '/srv/app', 'not a valid Compose project name: "Bad Name"'],
+    [composeLabels('app', '/srv/app', 'compose.yaml'), 'app', '/srv/app', 'config file is not an absolute path: "compose.yaml"'],
+    [{ 'com.docker.compose.project': 'app' }, 'app', '', 'missing working dir label']
+  ])('keeps a container with unsafe labels as invalid, with its raw labels and the reason (spec §10 P2): %j', (labels, rawProject, rawWorkingDir, reason) => {
+    expect(composeLabelsOf(container({ labels }))).toEqual({ kind: 'invalid', rawProject, rawWorkingDir, reason })
   })
 })
 

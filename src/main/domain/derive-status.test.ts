@@ -10,7 +10,7 @@ const stopped = container({ id: 'd', state: 'exited', exitCode: 137 })
 const initJobDone = container({ id: 'e', state: 'exited', exitCode: 0 })
 
 function inputs(overrides: Partial<StatusInputs> = {}): StatusInputs {
-  return { containers: [running], pending: null, filesExist: true, conflict: false, healthGate: 'none', ...overrides }
+  return { containers: [running], pending: null, filesExist: true, conflict: false, invalid: false, healthGate: 'none', ...overrides }
 }
 
 describe('deriveStatus — spec §4 precedence', () => {
@@ -100,8 +100,12 @@ describe('deriveStatus — spec §4 precedence', () => {
     expect(deriveStatus(inputs({ filesExist: false, pending: 'stop' }))).toBe('missing')
   })
 
-  it('is conflict above everything else', () => {
+  it('is conflict above everything but invalid', () => {
     expect(deriveStatus(inputs({ conflict: true, filesExist: false, pending: 'start' }))).toBe('conflict')
+  })
+
+  it('is invalid above everything else (spec §10 P2)', () => {
+    expect(deriveStatus(inputs({ invalid: true, conflict: true, filesExist: false, pending: 'stop' }))).toBe('invalid')
   })
 })
 
@@ -116,6 +120,10 @@ describe('allowedControls — spec §4 Start / Stop columns', () => {
 
   it('allows both when partial', () => {
     expect(allowedControls('partial', inputs({ containers: [running, stopped] }))).toEqual({ start: true, stop: true })
+  })
+
+  it('allows nothing on invalid', () => {
+    expect(allowedControls('invalid', inputs({ invalid: true }))).toEqual({ start: false, stop: false })
   })
 
   it('allows nothing on conflict', () => {

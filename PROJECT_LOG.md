@@ -92,3 +92,27 @@ Chronological operational logbook. Complements `git log` with the human context.
     and a force-push of every upper branch. The next PR is retargeted before a branch is deleted.
 - **PR #3 merged** (`e8d142b`) — `feat(domain): add pure service domain with tests`.
 - **Next**: PR 4, adapters, carrying spec §10 P1 and P2.
+- **PR #4 merged** (`fda3875`) — `docs(log): record merges of PRs #1-#3 and the stacked-PR incident`.
+
+## 2026-10-10 → 2026-10-14
+
+- **Adapters** (branch `feat/adapters`), written test-first (owner decision: TDD for adapters too):
+  - **Decisions**:
+    - `Docker Engine API without SDK` (ADR-0005) — `node:http` over the Unix socket, three
+      calls; `dockerode` rejected for six unused dependencies (gRPC, protobuf, tar-fs…) next to
+      a root-equivalent socket.
+    - `yaml` for the pin file (ADR-0005) — no dependency, alias expansion capped by default.
+    - `One sync procedure` (diagram 06) — subscribe with buffering, list and inspect into a
+      fresh map, apply the buffer; same at startup and after every stream loss.
+    - Spec §10 P1 — real project name of never-started pins from `docker compose config`
+      (workstation: dir `sonarqube-stack` → name `sonarqube`). P2 — new status `invalid`
+      instead of hiding projects with unsafe labels.
+    - `CLI pinned to the observed daemon` (ADR-0002) — every `COMPOSE_*` and `DOCKER_CONTEXT`
+      removed, `DOCKER_HOST` set to the observed socket; `up` / `config` in the project dir,
+      `stop` in `/`; remote `include:` disabled for name resolution.
+  - Pre-push review (design, tests, security, docs): 5 Must, 11 Should — resolved; Nice
+    deferred (owner decision). Verification pass: 3 more Should resolved (timeout bounded with
+    process-group kill, unreadable container skipped, socket path required). Report:
+    `docs/architecture/review-local.md`. 222 tests.
+  - Read-only smoke run against the workstation Docker: statuses and port owners as designed;
+    two real name collisions shown as `conflict` (`sonarqube`, `bulle-de-je`).

@@ -1,65 +1,51 @@
-# Local review — dock-n-roll (branch feat/domain)
+# Local review — dock-n-roll (branch feat/adapters)
 
-- Date: 2026-10-09
-- Commit: 0488ccb (reviewed), fixes in the following commit
-- Scope: branch diff `chore/scaffold...feat/domain` — pure domain `src/main/domain`, tests, class diagram, lint/test config
+- Date: 2026-10-11 (fixes), report written 2026-10-14
+- Commit: 7d971ad (reviewed), fixes in 810e520
+- Scope: branch diff `main...feat/adapters` — OS adapters, domain §10 P1/P2, ADR-0005, diagrams 03–06
 - Checks run: design · tests · security · correctness · docs
-- Verdict: fix Must Have first · Must 6 · Should 10 · Nice 7 — Must and Should resolved (owner decision: Nice deferred)
+- Verdict: Must 5 · Should 11 · Nice ~8 — Must and Should resolved (owner decision: Nice deferred)
 
-## 🔴 Must Have
+## 🔴 Must Have — all done, each reproduced by a failing test first
 
-- `src/main/domain/derive-status.ts:35` `[design|tests|correctness]` · An init job exited 0 made `allRunning` false, so the `healthUrl` gate was skipped: SonarQube + migration showed `on` before ready. · Gate on "all running or done"; spec §3 wording aligned. **Done** — test "waits for the healthUrl gate even when an init job is done".
-- `src/main/domain/compose-labels.ts:11` · `pin-file.ts:26` · `service-catalog.ts:40` `[design|tests|security]` · Paths neither validated nor normalized: relative or NUL label paths accepted; pin `/home/x/` ≠ label `/home/x` produced a phantom never-started row whose Start could raise a second stack. · `normalizeAbsolutePath` in labels and pins; `composeProjectOf` returns `null` on invalid paths. **Done**.
-- `src/main/domain/compose-labels.ts:10` · `pin-file.ts:31` · `compose-args.ts:13` `[security|design]` · Project names never validated: an empty label gave `--project-name=` (Stop on another project); an invalid pin `project` was dropped, widening the pin to the whole dir. · Compose rule `^[a-z0-9][a-z0-9_-]*$` in labels, pins (entry rejected) and argument builder. **Done**.
-- `src/main/domain/service-catalog.ts:71` `[security|correctness]` · A never-started pin whose project name already runs from another dir got no conflict, so Start was enabled and `up -p` would take over those containers. · Conflicts computed with the name the pin would start under (`project` or `defaultProjectName(dir)`). **Done**.
-- `src/main/domain/compose-args.ts:26` · `types.ts:57` · `05-class-domain.md` `[docs|design]` · Throws undocumented; `Service.id` rule wrong in code doc and diagram. · `@throws` added; id rule and its instability documented (pending operations keyed by dir + project). **Done**.
-- `src/main/domain/service-catalog.test.ts:76,86` · `compose-args.test.ts:46` `[tests]` · No length assertion on pin merges; `toContain` on the R4 invariant. · Exact assertions, plus the "pin narrowed to another project" case. **Done**.
+- `src/main/adapters/compose-runner.ts` `[security|docs]` · A context selected with `docker context use` sent Start / Stop to another daemon than the observed one · `DOCKER_HOST=unix://<observed socket>` set in the child environment.
+- `src/main/domain/service-catalog.ts` `[security|design]` · An invalid container dropped its project out of the name map, so a pin elsewhere could start under that name and take over its containers · every project with a valid name holds it, invalid ones included.
+- `src/main/adapters/docker-observer.ts` `[design|security]` · A slow answer of an abandoned connection could overwrite the new snapshot · fresh map per sync, generation check before every write.
+- `src/main/adapters/compose-runner.ts` · ADR-0002 `[security|docs]` · Inconsistent, undocumented cwd: name resolution and `up` could read different `.env` files · `up` and `config` run in the project dir, `stop` in `/`.
+- `src/main/adapters/*.test.ts` `[tests]` · An event line split across chunks and the initial load of an existing pin file were untested · both covered.
 
-## 🟡 Should Have
+## 🟡 Should Have — all done
 
-- `pin-file.ts` `[design|security]` · Duplicate pins → duplicate service ids. · Rejected with a message. **Done**.
-- `derive-status.ts` `[design]` · "`healthUrl` only without HEALTHCHECK" enforced outside the domain. · Enforced in `deriveStatus`. **Done**.
-- `derive-status.ts` `[security|correctness]` · Stale health on a stopped container kept `starting`. · Health read on running containers only. **Done**.
-- `derive-status.ts` `[design|security|tests]` · `restarting` / `removing` / `paused` / `unhealthy` → `partial` with Start enabled. · Start disabled while a container is `restarting` or `removing`; spec §4 states the cases; tests pin them. **Done**.
-- `service-catalog.ts:88` `[design]` · Sort not deterministic on ties. · Tie-break by display name then id. **Done**.
-- `port-join.ts` `[design|security]` · First socket wins on merge; owner matched on host port only (UDP and other addresses credited). · Best-known owner kept; TCP + compatible address only. **Done**.
-- `pin-file.ts` `[security]` · URLs validated on the parsed form but stored raw; credentials accepted. · Store `URL.href`; reject credentials. **Done**.
-- `compose-args.ts` `[security]` · No `--project-directory`; inherited `COMPOSE_*` env could redirect the command. · `--project-directory` added; env stripping recorded in ADR-0002 for the runner (adapters PR). **Done** (env part tracked for the adapters PR).
-- `*.test.ts` `[tests]` · Missing cases: stopped-only discovery, config-file merge and trim, hidden fixture defaults, pin-file branches, exact error messages. · Added. **Done**.
-- `types.ts` · `05-class-domain.md` · `PROJECT_LOG.md` `[docs]` · Type contracts, undefined diagram types, `allowedControls` / `joinPorts` contracts, key count, `--wait-timeout` form. · Documented. **Done**.
+- `docker-observer.ts` · Non-200 list treated as an outage; only 404 removes a container; a response cut mid-body rejects instead of hanging; listener errors are logged, never reported as Docker outages; retry scheduler injectable.
+- `compose-runner.ts` · Remote git / OCI `include:` disabled for name resolution; timeout cause named ahead of the CLI output; SIGTERM then SIGKILL after a grace period; synchronous `execFile` errors reported as failed runs.
+- `service-catalog.ts` · `resolvedNames` is required, with its refresh policy documented.
+- `eslint.config.mjs` · Adapters import guard fixed (`**/renderer/**`, `**/preload/**`), proven with a probe file.
+- `pin-file-store.ts` · Sequential reloads, watcher error handler, re-arm after the directory is removed, listener errors caught.
+- `port-scanner.ts` · Crafted process names can no longer misattribute a port (match anchored on `,fd=N)`).
+- Tests · Exact backoff sequence and reset, 404 live and during a sync, abandoned-connection guard, live event during the buffered flush, debounce / close / filename filter, real `ss` scan of the test's own port.
+- Docs · Event list, diagram 06 message names, class diagram (`ComposeLabels`, `ResolvedNames`, conflict rule), ADR-0002, spec §10, README, contracts of exported functions.
 
-## 🔵 Nice to Have
+## 🔵 Nice to Have — deferred
 
-- `compose-labels.ts` `[security]` · Config paths containing commas or spaces split wrongly. · **Deferred — backlog.**
-- `port-join.ts` `[correctness]` · `[::ffff:0.0.0.0]` not treated as wildcard; paused containers' ports shown `unknown`. · **Deferred — backlog.**
-- `pin-file.ts` `[security]` · Keys inherited from the prototype pass validation (`Object.hasOwn`). · **Deferred — to settle with the YAML parser choice (adapters PR).**
-- `service-catalog.ts` `[design]` · Config-file merge order follows container list order. · **Deferred — note in ADR-0002 if it ever matters.**
-- `eslint.config.mjs` `[docs]` · Comment omits `yaml` and parent imports. · **Deferred — backlog.**
-- `compose-labels.ts:24` `[docs]` · WHY of the `'True'` literal. · Done in passing (one comment line).
-- `service-catalog.ts` `[docs]` · Ordering contract in the doc comment. · Done in passing (rewritten with the tie-break).
-
-### Verification pass (security reviewer, re-ran probes on 4f847e1)
-
-Findings 1–11: 10 resolved, 1 partially (`paused` / `unhealthy` stay `partial` with Start enabled, as now stated in spec §4).
-
-| New finding | Severity | Response |
-|---|---|---|
-| N1 — a never-started pin elsewhere put the running project in `conflict` (Stop blocked); two never-started pins blocked each other | 🔴 Must | done — only the pin is flagged, against discovered projects only (2 red tests, then green) |
-| N2 — `defaultProjectName` ignores the compose file `name:` / `COMPOSE_PROJECT_NAME` | 🟡 Should | deferred to the adapters PR (owner decision; needs IO / adapter design) — spec §10 P1 |
-| N3 — one bad label hides a whole project, or one of its containers | 🟡 Should | deferred to the adapters PR (owner decision; needs IO / adapter design) — spec §10 P2 |
-| N4 — prototype keys read by the pin validator | 🔵 Nice | deferred — same item as above (YAML parser choice) |
-| N5 — `::ffff:` addresses, wildcard socket credited to a loopback-bound container, paused containers | 🔵 Nice | deferred — backlog |
-
-## ⚪ Disagree / Intentional
-
-- `compose-args.ts:7` `[design]` · `InvalidServiceError` class in a pure domain · no IO; now in the class diagram.
-- `derive-status.ts` `[design]` · `idle` checked for `on` / `partial` although unreachable today · cheap guard against future precedence changes.
-- `src/main/domain/test-fixtures.ts` `[design]` · Fixtures beside the domain · imported by tests only, never bundled.
+- Absolute paths for `docker` and `ss`; `DOCKER_CONFIG` / `DOCKER_API_VERSION` passthrough.
+- One publish per drained event queue instead of one per event.
+- Comment on grouping invalid containers that have no working-dir label.
 
 ## Per-dimension summary
 
-- Design: structure unchanged and conformant; four business-rule defects fixed.
-- Tests: 60 → 131 pure unit tests; exact assertions on security invariants and user-facing messages.
-- Security: Compose name rule and path normalization close label / pin injection and project takeover.
-- Correctness: health gate, stale health and unstartable states fixed.
-- Docs: types, class diagram, spec §3 / §4 / R4 and ADR-0002 aligned with the code.
+- Design: structure conformant to ADR-0005 and diagrams 03 / 06; one concurrency defect fixed.
+- Tests: 199 → 220; stable across repeated and loaded runs; mutation-checked race test.
+- Security: daemon pinned, takeover via invalid labels closed, no background remote fetch.
+- Correctness: HTTP errors, truncated responses and listener faults no longer corrupt or freeze state.
+- Docs: ADR-0002, spec and diagrams match the code.
+
+## Verification pass (security reviewer, probes re-run on 810e520)
+
+Findings 1–11: 8 resolved; 2 partially — #5 (timeout, completed by N1 below) and #8 (missing-cwd message, nice, deferred); 1 not resolved by design — #9 (binaries from `PATH`, nice, deferred).
+
+| New finding | Severity | Response |
+|---|---|---|
+| N1 — the timeout did not bound the wait when a grandchild (Compose plugin) held the pipes: 3 s instead of 0.6 s | 🟡 Should | done — `spawn` in its own process group, SIGTERM / SIGKILL sent to the group, result settled at the end of the grace period (red test first) |
+| N2 — one container with an unreadable inspect made the observer fail on every retry | 🟡 Should | done — that container is skipped and logged (red test first) |
+| N3 — `socketPath` defaulted to `/var/run/docker.sock`, wrong for rootless Docker | 🟡 Should | done — `socketPath` required in `RunOptions` and `composeEnv` |
+| N4 — re-arm can leak a watcher if triggered twice; no retry after a failed `mkdir` | 🔵 Nice | deferred — backlog |

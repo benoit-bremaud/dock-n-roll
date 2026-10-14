@@ -10,13 +10,16 @@ input change (container events, pending operation, path check, conflict check). 
 shows that derivation as a decision chain in precedence order. It replaces a hand-written
 transition list, which cannot stay complete when Docker changes state on its own.
 Colours: `on` green, `off` red, `starting` / `stopping` / `partial` orange, `missing` /
-`conflict` grey.
+`conflict` / `invalid` grey.
 
 ## Diagram
 
 ```mermaid
 stateDiagram-v2
-  [*] --> IsConflict
+  [*] --> IsInvalid
+  state IsInvalid <<choice>>
+  IsInvalid --> Invalid: a container has Compose labels failing the R4 checks
+  IsInvalid --> IsConflict: else
   state IsConflict <<choice>>
   IsConflict --> Conflict: name seen with 2+ working dirs
   IsConflict --> IsMissing: else
@@ -35,6 +38,7 @@ stateDiagram-v2
   state IsOff <<choice>>
   IsOff --> Off: all relevant containers stopped or none yet
   IsOff --> Partial: else
+  Invalid --> [*]
   Conflict --> [*]
   Missing --> [*]
   Stopping --> [*]

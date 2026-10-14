@@ -29,10 +29,13 @@ function isUnstartable(container: ContainerSnapshot): boolean {
 
 /**
  * Status of one service, derived on every input change — never stored (spec §4).
- * Precedence: conflict > missing > stopping > starting > on > off > partial.
+ * Precedence: invalid > conflict > missing > stopping > starting > on > off > partial.
  */
 export function deriveStatus(inputs: StatusInputs): ServiceStatus {
   const { containers } = inputs
+  if (inputs.invalid) {
+    return 'invalid'
+  }
   if (inputs.conflict) {
     return 'conflict'
   }
@@ -70,6 +73,7 @@ export function deriveStatus(inputs: StatusInputs): ServiceStatus {
 export function allowedControls(status: ServiceStatus, inputs: StatusInputs): Controls {
   const idle = inputs.pending === null
   switch (status) {
+    case 'invalid':
     case 'conflict':
     case 'stopping':
       return { start: false, stop: false }
