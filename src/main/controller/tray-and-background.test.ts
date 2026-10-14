@@ -143,6 +143,12 @@ describe('listBackground — UC4', () => {
     expect(view.containers[0]?.health).toBeNull()
   })
 
+  it('keeps the health of a running container', async () => {
+    const view = await listBackground([container({ state: 'running', health: 'unhealthy' })], () => Promise.resolve([]))
+
+    expect(view.containers[0]?.health).toBe('unhealthy')
+  })
+
   it('still lists the containers when ss fails', async () => {
     const view = await listBackground([container()], () => Promise.reject(new Error('spawn ss ENOENT')))
 

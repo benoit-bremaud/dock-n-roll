@@ -1,16 +1,20 @@
 import type { ControllerState } from '../../../shared/ipc'
 
-/** Docker outage and pin-file errors (spec §4, §9 Q1), announced to screen readers. */
-export function Banners({ state }: { readonly state: ControllerState }): React.JSX.Element | null {
+/**
+ * Docker outage and pin-file errors (spec §4, §9 Q1). One alert region stays mounted, so a
+ * push that changes nothing here is not announced again by screen readers.
+ */
+export function Banners({ state, error }: { readonly state: ControllerState | null; readonly error: string | null }): React.JSX.Element {
   const messages = [
-    ...(state.dockerAvailable ? [] : [`Docker unavailable${state.dockerReason === null ? '' : `: ${state.dockerReason}`}`]),
-    ...state.pinErrors
+    ...(error === null ? [] : [error]),
+    ...(state === null || state.dockerAvailable ? [] : [`Docker unavailable${state.dockerReason === null ? '' : `: ${state.dockerReason}`}`]),
+    ...(state?.pinErrors ?? [])
   ]
-  if (messages.length === 0) return null
   return (
-    <div className="banners">
-      {messages.map((message) => (
-        <p key={message} role="alert" className="banner">
+    <div role="alert" className="banners">
+      {messages.map((message, index) => (
+        // The same message can repeat: the index keeps keys unique; the list has no row state.
+        <p key={`${String(index)}:${message}`} className="banner">
           {message}
         </p>
       ))}

@@ -42,8 +42,32 @@ button {
 }
 
 button:disabled {
-  opacity: 0.4;
+  opacity: var(--opacity-disabled);
+  border-style: dashed;
   cursor: default;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--color-fg);
+  outline-offset: 2px;
+}
+
+.banners:empty {
+  display: none;
+}
+
+.service--greyed .service__name,
+.service--greyed .service__dir {
+  color: var(--color-muted);
+}
+
+.service--greyed .service__badge {
+  background: none;
+  border: 1px dashed var(--status-unavailable);
+}
+
+.running__error {
+  color: var(--status-off);
 }
 
 .banner {

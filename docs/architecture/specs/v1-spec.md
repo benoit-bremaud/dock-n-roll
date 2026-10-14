@@ -124,7 +124,8 @@ Primary actor for all: **Developer**. Supporting actor: **Docker Engine**.
 ### UC4 — Inspect background activity
 
 - Developer opens the "Running" tab; system lists:
-  - containers (name, image, status, uptime, Compose project if any, published ports);
+  - containers (name, image, state, health while running, Compose project if any); published
+    ports appear in the ports list below, with the container as owner (uptime is not shown in V1);
   - listening TCP ports (address:port, process name + PID when visible, else the container
     publishing it, else "unknown (root process)").
 - Read-only in V1.

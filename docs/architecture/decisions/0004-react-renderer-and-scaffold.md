@@ -35,3 +35,13 @@ private on a personal account.
   `--flag=value` arguments) and, from the domain PR on, by unit tests of the argument builder.
 - Tool-imposed exceptions to the named-exports rule: `electron.vite.config.ts`,
   `vitest.config.ts` and `eslint.config.mjs` need a default export.
+
+## Amendment — renderer tests (2026-10-14)
+
+- **React Testing Library + user-event**, in a **happy-dom** environment: components are tested
+  through roles and accessible names, as a user reaches them. happy-dom over jsdom: smaller and
+  faster, and enough for buttons, lists and tables (no layout or canvas needed).
+- The preload API (`window.dockNRoll`) is faked at that boundary in the tests; it is typed by
+  `src/shared/ipc.ts` and its main-process side is tested separately.
+- Vitest runs two projects: `node` for the main process and the domain, `renderer` (happy-dom)
+  for `src/renderer/**/*.test.tsx`.

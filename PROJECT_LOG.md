@@ -142,3 +142,18 @@ Chronological operational logbook. Complements `git log` with the human context.
     mutants had survived, now covered. Verification pass: 2 more Should resolved. 276 tests.
   - Smoke run on the workstation (AppIndicator extension now active): the live tray menu lists
     the real projects with statuses, controls and conflict reasons.
+- **PR #6 merged** (`74ff0cd`) — `feat(controller): wire domain and adapters into the tray and IPC`.
+  No bot review posted (automated reviewer at its usage limit); merged on the owner's explicit
+  instruction after the local review and its verification pass.
+- **Dashboard** (branch `feat/dashboard`, component diagram 09), test-first:
+  - React window: Services tab (status word next to the colour badge, allowed controls only,
+    reasons), banners for Docker outage and pin-file errors, Running tab (containers and ports,
+    on open and Refresh).
+  - **Decisions**:
+    - `Renderer tests with React Testing Library + happy-dom` (ADR-0004 amendment) — chosen over
+      logic-only tests and Electron end-to-end tests; preload API faked at its boundary.
+    - `Rows greyed without badge while Docker is unavailable` — the spec §4 rule, applied in the
+      review instead of changing the spec.
+  - Live run found and fixed one defect: stopped containers showed a stale health in the
+    Running tab.
+  - Pre-push review: 5 Must, 12 Should resolved; no security finding. 302 tests.

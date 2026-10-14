@@ -15,24 +15,26 @@ the controller. Does not cover the tray menu (07) or packaging (PR 7).
 ```mermaid
 flowchart TB
   subgraph Renderer ["src/renderer/src"]
-    App["App — tabs Services / Running"]
+    Root["Root — explains a missing preload API"]
+    App["App — tabs Services / Running (WAI-ARIA tabs)"]
     Hook["useControllerState(api) — subscribe, then getState"]
     Banners["Banners — Docker unavailable, pin-file errors"]
-    List["ServiceList"]
     Row["ServiceRow — badge, name, dir, reason, Start / Stop / Open"]
     Running["RunningTab — containers and ports, refresh"]
-    Tokens[/"styles/tokens.css — status colours"/]
+    Css[/"styles/global.css — status to colour mapping"/]
+    Tokens[/"styles/tokens.css — design tokens"/]
   end
   Api[["window.dockNRoll (preload)"]]
+  Root --> App
   App --> Hook
   App --> Banners
-  App --> List
+  App -->|"services.map"| Row
   App --> Running
-  List --> Row
   Hook --> Api
   Row -->|"start(id) / stop(id) / openUrl(id)"| Api
   Running -->|"listBackground()"| Api
-  Row --> Tokens
+  Row --> Css
+  Css --> Tokens
 ```
 
 ## Wireframe
@@ -40,8 +42,8 @@ flowchart TB
 ```text
 ┌ dock-n-roll ─────────────────────────────────────────────────┐
 │ [ Services ]  [ Running ]                                     │
-│ ⚠ Docker unavailable: connect ENOENT /var/run/docker.sock     │  ← banner, only when down
-│ ⚠ services.yaml: bad indentation at line 3                    │  ← banner, pin-file errors
+│ Docker unavailable: connect ENOENT /var/run/docker.sock       │  ← banner, only when down
+│ services.yaml: bad indentation at line 3                      │  ← banner, pin-file errors
 │                                                               │
 │ ● projet-ind-2-inscription   ~/…/docker-mysql      [Stop]     │  green
 │ ● happihub-docker-audit      ~/…/happihub          [Start]    │  red
@@ -54,14 +56,23 @@ flowchart TB
 ## Notes
 
 - **`useControllerState`** subscribes with `onStateChanged` **before** calling `getState`
-  (contract of `DockNRollApi`), keeps the latest state, and unsubscribes on unmount.
+  (contract of `DockNRollApi`); a push always wins over the initial read, also across a
+  StrictMode re-run; a failed read shows an alert; it unsubscribes on unmount.
+- **Docker unavailable**: rows are greyed without badge or status word (spec §4) — the last
+  known status may be wrong; every control is already off in the pushed state.
+- **Banners**: one `role="alert"` region stays mounted, so an unchanged message is not announced
+  again on every push.
+- **`Root`** shows an alert instead of a blank window when `window.dockNRoll` is missing (wrong
+  preload path in a packaged build).
 - **Buttons mirror `controls`** exactly; the main process re-checks anyway. A clicked button
   shows no optimistic state: the next pushed state (orange `starting`) is the feedback.
 - **Badge = status colour token** (`--status-on`, `--status-off`, `--status-transitional`,
   `--status-unavailable`, spec §4), plus the status word for screen readers and colour-blind
   users — colour is never the only signal.
 - **Running tab** calls `listBackground()` when opened and on a Refresh button (the main
-  process caches it for 1 s); no polling.
-- **Accessibility**: buttons are real `<button>`s with the service name in their accessible
-  label ("Start Blog"); the banner region is `role="alert"`.
+  process caches it for 1 s); no polling. An older answer arriving after a newer one is
+  ignored; a failed scan and an empty result are said in words.
+- **Accessibility**: WAI-ARIA tabs pattern (tabpanel, one tab stop, arrow keys / Home / End);
+  buttons are real `<button>`s with the service name in their accessible label ("Start Blog");
+  visible focus; disabled buttons dashed and at `--opacity-disabled`.
 - Text from Docker and the pin file is rendered as React text (escaped), never as HTML.

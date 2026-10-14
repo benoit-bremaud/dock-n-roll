@@ -46,11 +46,13 @@ export interface BackgroundView {
  * command ends, also when refused: the outcome is only in the next pushed state.
  */
 export interface DockNRollApi {
-  getState(): Promise<ControllerState>
+  /** `null` when the main process refuses the caller (not the dashboard frame). */
+  getState(): Promise<ControllerState | null>
   start(id: string): Promise<void>
   stop(id: string): Promise<void>
   openUrl(id: string): Promise<void>
-  listBackground(): Promise<BackgroundView>
+  /** `null` when the main process refuses the caller. */
+  listBackground(): Promise<BackgroundView | null>
   /** Returns the unsubscribe function. */
   onStateChanged(callback: (state: ControllerState) => void): () => void
 }
