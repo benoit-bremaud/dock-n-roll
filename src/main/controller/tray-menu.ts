@@ -4,7 +4,8 @@ import type { ControllerState, ServiceView } from '../../shared/ipc'
 /** Subset of Electron's `MenuItemConstructorOptions`, kept Electron-free so it is unit-tested. */
 export interface MenuEntry {
   readonly label?: string
-  readonly type?: 'separator'
+  readonly type?: 'separator' | 'checkbox'
+  readonly checked?: boolean
   readonly enabled?: boolean
   readonly click?: () => void
   readonly submenu?: readonly MenuEntry[]
@@ -16,6 +17,12 @@ export interface TrayActions {
   openUrl(id: string): void
   openDashboard(): void
   quit(): void
+  toggleAutostart(): void
+}
+
+export interface TrayOptions {
+  /** Current "Start at login" setting; absent when autostart is not available (dev builds). */
+  readonly autostart?: boolean
 }
 
 /** Status colours of spec §4, as text (tray menus cannot be styled). */
@@ -58,7 +65,7 @@ function serviceEntry(service: ServiceView, actions: TrayActions): MenuEntry {
  * The tray menu for a state. On Linux the tray click is not guaranteed (spec R5, ADR-0001), so
  * every action is reachable from here; the main process re-checks each control anyway.
  */
-export function buildTrayMenu(state: ControllerState, actions: TrayActions): MenuEntry[] {
+export function buildTrayMenu(state: ControllerState, actions: TrayActions, options: TrayOptions = {}): MenuEntry[] {
   let head: MenuEntry[]
   if (!state.dockerAvailable) {
     head = [{ label: `Docker unavailable${state.dockerReason === null ? '' : `: ${menuLabel(state.dockerReason)}`}`, enabled: false }]
@@ -71,6 +78,9 @@ export function buildTrayMenu(state: ControllerState, actions: TrayActions): Men
     ...head,
     { type: 'separator' },
     { label: 'Open dashboard', click: () => { actions.openDashboard() } },
+    ...(options.autostart === undefined
+      ? []
+      : [{ label: 'Start at login', type: 'checkbox' as const, checked: options.autostart, click: () => { actions.toggleAutostart() } }]),
     { label: 'Quit', click: () => { actions.quit() } }
   ]
 }

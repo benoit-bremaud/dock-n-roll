@@ -1,0 +1,28 @@
+# Linux .deb only (ADR-0006): keeps Chromium's sandbox (chrome-sandbox installed setuid by the package).
+appId: fr.bremaud.dock-n-roll
+productName: dock-n-roll
+directories:
+  output: dist
+files:
+  - out/**
+  - package.json
+# Outside the asar, read from process.resourcesPath (src/main/controller/resources.ts).
+extraResources:
+  - from: resources/tray-icon.png
+    to: tray-icon.png
+linux:
+  target: deb
+  executableName: dock-n-roll
+  category: Development
+  maintainer: Benoît Bremaud
+  synopsis: Start and stop local Docker Compose projects from the GNOME top bar
+  desktop:
+    entry:
+      Name: dock-n-roll
+      Comment: Start and stop local Docker Compose projects from the top bar
+      StartupWMClass: dock-n-roll
+      Terminal: "false"
+deb:
+  depends:
+    - docker-ce-cli | docker.io
+    - iproute2

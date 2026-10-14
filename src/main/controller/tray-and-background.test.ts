@@ -29,7 +29,8 @@ function recordingActions(): TrayActions & { calls: string[] } {
     stop: (id) => calls.push(`stop ${id}`),
     openUrl: (id) => calls.push(`open ${id}`),
     openDashboard: () => calls.push('dashboard'),
-    quit: () => calls.push('quit')
+    quit: () => calls.push('quit'),
+    toggleAutostart: () => calls.push('autostart')
   }
 }
 
@@ -68,6 +69,21 @@ describe('buildTrayMenu — every action reachable from the menu (spec R5)', () 
 
     expect(labels(menu)).toEqual(['Docker unavailable: connect ENOENT /var/run/docker.sock', '<separator>', 'Open dashboard', 'Quit'])
     expect(menu[0]?.enabled).toBe(false)
+  })
+
+  it('offers a Start at login checkbox reflecting the current setting, when available', () => {
+    const actions = recordingActions()
+    const menu = buildTrayMenu(state(), actions, { autostart: true })
+    const entry = menu.find((item) => item.label === 'Start at login')
+
+    expect(entry).toMatchObject({ type: 'checkbox', checked: true })
+    entry?.click?.()
+    expect(actions.calls).toEqual(['autostart'])
+    expect(labels(menu).slice(-4)).toEqual(['<separator>', 'Open dashboard', 'Start at login', 'Quit'])
+  })
+
+  it('has no Start at login entry when autostart is not available (dev builds)', () => {
+    expect(labels(buildTrayMenu(state(), recordingActions()))).not.toContain('Start at login')
   })
 
   it('says so when there is no service yet', () => {
