@@ -38,3 +38,14 @@
 - Security: daemon pinned, takeover via invalid labels closed, no background remote fetch.
 - Correctness: HTTP errors, truncated responses and listener faults no longer corrupt or freeze state.
 - Docs: ADR-0002, spec and diagrams match the code.
+
+## Verification pass (security reviewer, probes re-run on 810e520)
+
+Findings 1–11: 9 resolved, 1 partially (#8 missing-cwd message, nice), 1 not resolved by design (#9 binaries from `PATH`, nice — deferred).
+
+| New finding | Severity | Response |
+|---|---|---|
+| N1 — the timeout did not bound the wait when a grandchild (Compose plugin) held the pipes: 3 s instead of 0.6 s | 🟡 Should | done — `spawn` in its own process group, SIGTERM / SIGKILL sent to the group, result settled at the end of the grace period (red test first) |
+| N2 — one container with an unreadable inspect made the observer fail on every retry | 🟡 Should | done — that container is skipped and logged (red test first) |
+| N3 — `socketPath` defaulted to `/var/run/docker.sock`, wrong for rootless Docker | 🟡 Should | done — `socketPath` required in `RunOptions` and `composeEnv` |
+| N4 — re-arm can leak a watcher if triggered twice; no retry after a failed `mkdir` | 🔵 Nice | deferred — backlog |

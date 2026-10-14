@@ -14,6 +14,7 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.sta
 appendFileSync(process.env.FAKE_DOCKER_LOG, JSON.stringify({ args, cwd: process.cwd(), env }) + '\\n')
 if (args.includes('--fail')) { process.stderr.write('boom: no such service'); process.exit(3) }
 if (args.includes('--hang')) { process.stderr.write('Container app-web-1 Starting\\n'); setInterval(() => {}, 1000) }
+if (args.includes('--hang-with-child')) { require('node:child_process').spawn('sleep', ['5'], { stdio: 'inherit' }); setInterval(() => {}, 1000) }
 if (args.includes('--hang-ignoring-term')) { process.on('SIGTERM', () => {}); setInterval(() => {}, 1000) }
 if (args.includes('config')) {
   const dir = basename(process.cwd())
@@ -23,6 +24,7 @@ if (args.includes('config')) {
 process.stdout.write('ok')
 `
 
+const SOCKET = '/var/run/docker.sock'
 let root: string
 let docker: string
 let log: string
@@ -77,7 +79,7 @@ describe('composeEnv — ADR-0002 environment', () => {
 describe('runCompose', () => {
   it('passes the argument array untouched, in the given cwd, with the pinned daemon only', async () => {
     const args = ['compose', '--project-name=app', 'up', '-d', '--wait']
-    const result = await runCompose(args, { cwd: join(root, 'app'), docker, env: { ...baseEnv(), COMPOSE_FILE: 'x', DOCKER_HOST: 'tcp://x' } })
+    const result = await runCompose(args, { cwd: join(root, 'app'), docker, socketPath: SOCKET, env: { ...baseEnv(), COMPOSE_FILE: 'x', DOCKER_HOST: 'tcp://x' } })
 
     expect(result).toEqual({ exitCode: 0, stdout: 'ok', stderr: '' })
     expect(calls()).toEqual([{ args, cwd: join(root, 'app'), env: { DOCKER_HOST: 'unix:///var/run/docker.sock' } }])
@@ -86,14 +88,14 @@ describe('runCompose', () => {
   it('does not interpret shell metacharacters in arguments', async () => {
     const marker = join(root, 'pwned')
     const args = ['compose', `--project-name=$(touch ${marker});x`, 'stop']
-    await runCompose(args, { cwd: root, docker, env: baseEnv() })
+    await runCompose(args, { cwd: root, docker, socketPath: SOCKET, env: baseEnv() })
 
     expect(calls()[0]?.args).toEqual(args)
     expect(existsSync(marker)).toBe(false)
   })
 
   it('reports a non-zero exit with its stderr instead of throwing', async () => {
-    await expect(runCompose(['compose', '--fail'], { cwd: root, docker, env: baseEnv() })).resolves.toEqual({
+    await expect(runCompose(['compose', '--fail'], { cwd: root, docker, socketPath: SOCKET, env: baseEnv() })).resolves.toEqual({
       exitCode: 3,
       stdout: '',
       stderr: 'boom: no such service'
@@ -101,14 +103,14 @@ describe('runCompose', () => {
   })
 
   it('reports a missing executable as a failed run', async () => {
-    const result = await runCompose(['compose', 'stop'], { cwd: root, docker: join(root, 'no-such-docker'), env: baseEnv() })
+    const result = await runCompose(['compose', 'stop'], { cwd: root, docker: join(root, 'no-such-docker'), socketPath: SOCKET, env: baseEnv() })
 
     expect(result.exitCode).toBe(-1)
     expect(result.stderr).toContain('ENOENT')
   })
 
   it('names the timeout as the cause, ahead of the progress Compose wrote', async () => {
-    const result = await runCompose(['compose', '--hang'], { cwd: root, docker, env: baseEnv(), timeoutMs: 200 })
+    const result = await runCompose(['compose', '--hang'], { cwd: root, docker, socketPath: SOCKET, env: baseEnv(), timeoutMs: 200 })
 
     expect(result.exitCode).toBe(-1)
     expect(result.stderr).toMatch(/^timed out after 0\.2 s/)
@@ -117,14 +119,22 @@ describe('runCompose', () => {
 
   it('kills a run that ignores SIGTERM after the grace period', async () => {
     const started = Date.now()
-    const result = await runCompose(['compose', '--hang-ignoring-term'], { cwd: root, docker, env: baseEnv(), timeoutMs: 100, killGraceMs: 200 })
+    const result = await runCompose(['compose', '--hang-ignoring-term'], { cwd: root, docker, socketPath: SOCKET, env: baseEnv(), timeoutMs: 100, killGraceMs: 200 })
 
     expect(result.exitCode).toBe(-1)
     expect(Date.now() - started).toBeLessThan(3000)
   })
 
+  it('stops waiting at the timeout even when a grandchild keeps the output open', async () => {
+    const started = Date.now()
+    const result = await runCompose(['compose', '--hang-with-child'], { cwd: root, docker, socketPath: SOCKET, env: baseEnv(), timeoutMs: 200, killGraceMs: 200 })
+
+    expect(result.exitCode).toBe(-1)
+    expect(Date.now() - started).toBeLessThan(1500)
+  })
+
   it('reports an argument the OS refuses as a failed run, never a rejection', async () => {
-    await expect(runCompose(['compose', 'a\0b'], { cwd: root, docker, env: baseEnv() })).resolves.toMatchObject({ exitCode: -1 })
+    await expect(runCompose(['compose', 'a\0b'], { cwd: root, docker, socketPath: SOCKET, env: baseEnv() })).resolves.toMatchObject({ exitCode: -1 })
   })
 })
 
@@ -132,7 +142,7 @@ describe('resolveProjectName — spec §10 P1', () => {
   it('reads the name Compose resolves, running in the project dir with remote includes disabled', async () => {
     const dir = join(root, 'sonarqube-stack')
 
-    await expect(resolveProjectName(dir, { docker, env: baseEnv() })).resolves.toBe('sonarqube')
+    await expect(resolveProjectName(dir, { docker, socketPath: SOCKET, env: baseEnv() })).resolves.toBe('sonarqube')
     expect(calls()).toEqual([
       {
         args: ['compose', `--project-directory=${dir}`, 'config', '--format=json'],
@@ -147,14 +157,14 @@ describe('resolveProjectName — spec §10 P1', () => {
   })
 
   it('returns null when the resolved name does not follow the Compose name rule', async () => {
-    await expect(resolveProjectName(join(root, 'app'), { docker, env: baseEnv() })).resolves.toBeNull()
+    await expect(resolveProjectName(join(root, 'app'), { docker, socketPath: SOCKET, env: baseEnv() })).resolves.toBeNull()
   })
 
   it('returns null when Compose output is not JSON', async () => {
-    await expect(resolveProjectName(join(root, 'broken'), { docker, env: baseEnv() })).resolves.toBeNull()
+    await expect(resolveProjectName(join(root, 'broken'), { docker, socketPath: SOCKET, env: baseEnv() })).resolves.toBeNull()
   })
 
   it('returns null when the dir no longer exists', async () => {
-    await expect(resolveProjectName(join(root, 'gone'), { docker, env: baseEnv() })).resolves.toBeNull()
+    await expect(resolveProjectName(join(root, 'gone'), { docker, socketPath: SOCKET, env: baseEnv() })).resolves.toBeNull()
   })
 })

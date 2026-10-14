@@ -260,6 +260,15 @@ describe('observeDocker — sequence diagram 06', () => {
     expect(stateOf('db')).toBe('running')
   })
 
+  it('skips a container whose inspect it cannot read, and keeps observing the others', async () => {
+    daemon.add({ id: 'odd', name: 'odd-1', status: 'hibernating' })
+    start()
+
+    await waitFor(() => snapshots.length > 0)
+    expect(latest().map((c) => c.id)).toEqual(['web', 'db'])
+    expect(outages).toEqual([])
+  })
+
   it('keeps observing when the listener throws: a listener bug is not a Docker outage', async () => {
     let calls = 0
     start({}, (containers) => {

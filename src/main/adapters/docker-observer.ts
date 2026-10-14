@@ -141,8 +141,15 @@ export function observeDocker(options: DockerObserverOptions, listener: DockerLi
       into.delete(id)
       return
     }
-    const container = status === 200 ? toContainerSnapshot(body) : null
-    if (container === null) throw new Error(`Docker answered the inspect of ${id} with HTTP ${String(status)}`)
+    if (status !== 200) throw new Error(`Docker answered the inspect of ${id} with HTTP ${String(status)}`)
+    const container = toContainerSnapshot(body)
+    if (container === null) {
+      // A shape this version cannot read (e.g. a state added by a newer Docker): skip that one
+      // container rather than treating the whole daemon as unavailable on every retry.
+      console.error(`dock-n-roll: skipping container ${id}, unreadable inspect`)
+      into.delete(id)
+      return
+    }
     into.set(id, container)
   }
 
