@@ -179,3 +179,15 @@ Chronological operational logbook. Complements `git log` with the human context.
     automated tests only (destructive to run for real).
   - Open point: one launch from the GNOME menu showed the window but never registered its tray
     icon; not reproduced since (relaunch and login autostart both fine).
+- **PR #9 merged** (`9ebf853`) — `feat(packaging): .deb package and Start at login toggle`. Codex P2
+  fixed before merge: a custom `deb.depends` replaces electron-builder's defaults, so Electron's
+  shared libraries are listed explicitly (install simulated with `apt-get install -s`).
+  **V1 delivered.** Follow-up: issue #8 (tray icon missing after one GNOME-menu launch).
+- **Visual polish** (PR #10 merged, `53d74de`), option A of the owner's choice: header summary
+  ("N of M on", hidden while Docker is down), paths shown as `~/…` via `ControllerState.homeDir`,
+  underlined tabs, filled Start, disabled buttons kept in place but quiet (spec UC2 unchanged),
+  tinted banners. Found on the way: the Running tables had never been styled (missing wrapper) and
+  renderer `.ts` tests ran in no Vitest project. Pre-push review: 0 Must, 2 Should resolved
+  (button edge contrast to 3:1, diagram 07). 342 tests.
+- **Portfolio**: a dock-n-roll card was prepared for benoitbremaud.fr, then withdrawn on the
+  owner's decision (PR closed, branch deleted). The project stays off the portfolio.
