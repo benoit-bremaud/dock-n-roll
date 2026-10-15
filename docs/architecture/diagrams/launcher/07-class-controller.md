@@ -7,7 +7,7 @@
 
 The main-process application layer that wires the pure domain (`05-class-domain.md`) to the
 adapters (`03-component.md`) and exposes it to the renderer and the tray. Does not cover the
-dashboard UI (PR 6) or packaging (PR 7).
+dashboard UI (PR #7) or packaging (PR #9).
 
 ## Diagram
 

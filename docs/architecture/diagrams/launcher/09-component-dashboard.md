@@ -8,7 +8,7 @@
 
 The React page shown in the dashboard window. It only renders what the main process pushes
 and sends ids back: every rule (statuses, allowed controls, reasons) is already decided by
-the controller. Does not cover the tray menu (07) or packaging (PR 7).
+the controller. Does not cover the tray menu (07) or packaging (PR #9).
 
 ## Diagram
 
@@ -79,10 +79,10 @@ flowchart TB
   ignored; a failed scan and an empty result are said in words.
 - **Accessibility**: WAI-ARIA tabs pattern (tabpanel, one tab stop, arrow keys / Home / End);
   buttons are real `<button>`s with the service name in their accessible label ("Start Blog");
-  visible focus; disabled buttons borderless and muted (PR 8, replaces the dashed style).
+  visible focus; disabled buttons borderless and muted (PR #10, replaces the dashed style).
 - **Paths** are shown with the home folder as `~` (`shortenPath`, using `ControllerState.homeDir`:
   the sandboxed renderer cannot read it itself); the full path stays in the row's `title`.
-- **Visual hierarchy** (PR 8): the one allowed Start is the filled button; disabled buttons stay
+- **Visual hierarchy** (PR #10): the one allowed Start is the filled button; disabled buttons stay
   in place (aligned columns, spec UC2) but quiet — borderless, muted, still `disabled`. Banners
   are a tinted block, no side stripe.
 - Text from Docker and the pin file is rendered as React text (escaped), never as HTML.

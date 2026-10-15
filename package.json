@@ -1,9 +1,14 @@
 {
   "name": "dock-n-roll",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "GNOME top-bar launcher for local dev services: one-click ON/OFF for Docker Compose projects + background activity monitor",
   "license": "UNLICENSED",
+  "homepage": "https://github.com/benoit-bremaud/dock-n-roll",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/benoit-bremaud/dock-n-roll.git"
+  },
   "main": "./out/main/index.js",
   "packageManager": "pnpm@10.30.3",
   "engines": {
@@ -18,7 +23,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "audit": "pnpm audit --audit-level=high",
-    "dist": "electron-vite build && electron-builder --linux deb"
+    "dist": "electron-vite build && electron-builder --linux deb --publish never"
   },
   "dependencies": {
     "react": "19.3.0",
