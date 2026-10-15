@@ -12,7 +12,7 @@ A tiny GNOME top-bar launcher for local dev services: one button per Docker Comp
 Requirements: Ubuntu GNOME (tested on 24.04), Docker Engine with the Compose plugin, and the
 AppIndicator extension (see [Troubleshooting](#tray-icon-does-not-appear)).
 
-Build the package (or download the `dock-n-roll-deb` artifact of a CI run), then install it:
+Build the package, then install it:
 
 ```bash
 pnpm install && pnpm dist
@@ -21,6 +21,9 @@ pnpm install && pnpm dist
 ```bash
 sudo apt install ./dist/dock-n-roll_*_amd64.deb
 ```
+
+Or download the `dock-n-roll-deb` artifact of a CI run: the `.deb` sits at the root of the
+extracted archive, so run `sudo apt install ./dock-n-roll_*_amd64.deb` from that folder.
 
 Launch **dock-n-roll** from the app grid (press the Super key and type its name). The icon shows
 up in the top bar; its menu lists one entry per project (🟢 ON, 🔴 OFF, 🟠 starting, stopping or
