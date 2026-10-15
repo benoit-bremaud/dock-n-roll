@@ -3,6 +3,7 @@ import type { DockNRollApi } from '../../shared/ipc'
 import { Banners } from './components/Banners'
 import { RunningTab } from './components/RunningTab'
 import { ServiceRow } from './components/ServiceRow'
+import { runningSummary } from './format'
 import { useControllerState } from './useControllerState'
 
 const TABS = [
@@ -16,6 +17,7 @@ type Tab = (typeof TABS)[number]['key']
 export function App({ api }: { readonly api: DockNRollApi }): React.JSX.Element {
   const { state, error } = useControllerState(api)
   const [tab, setTab] = useState<Tab>('services')
+  const summary = state?.dockerAvailable === true ? runningSummary(state.services.map((service) => service.status)) : null
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   // WAI-ARIA tabs pattern: one tab stop, arrow keys / Home / End move and select.
@@ -33,7 +35,11 @@ export function App({ api }: { readonly api: DockNRollApi }): React.JSX.Element 
 
   return (
     <main className="app">
-      <h1 className="app__title">dock-n-roll</h1>
+      <header className="app__header">
+        <h1 className="app__title">dock-n-roll</h1>
+        {/* Hidden while Docker is down: the last known statuses may be wrong (spec §4). */}
+        {summary !== null && <p className="app__summary">{summary}</p>}
+      </header>
       <div role="tablist" aria-label="Views" className="tabs" onKeyDown={onKeyDown}>
         {TABS.map((candidate, index) => (
           <button
@@ -64,7 +70,7 @@ export function App({ api }: { readonly api: DockNRollApi }): React.JSX.Element 
         ) : (
           <ul className="services">
             {state.services.map((service) => (
-              <ServiceRow key={service.id} service={service} api={api} dockerAvailable={state.dockerAvailable} />
+              <ServiceRow key={service.id} service={service} api={api} dockerAvailable={state.dockerAvailable} homeDir={state.homeDir} />
             ))}
           </ul>
         )}

@@ -18,7 +18,7 @@ function view(overrides: Partial<ServiceView> = {}): ServiceView {
 }
 
 function state(overrides: Partial<ControllerState> = {}): ControllerState {
-  return { dockerAvailable: true, dockerReason: null, pinErrors: [], services: [view()], ...overrides }
+  return { dockerAvailable: true, dockerReason: null, pinErrors: [], services: [view()], homeDir: '/home/u', ...overrides }
 }
 
 function recordingActions(): TrayActions & { calls: string[] } {

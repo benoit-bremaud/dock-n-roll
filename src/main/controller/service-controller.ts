@@ -22,6 +22,8 @@ export interface ControllerDeps {
   /** One value for the observer and the runner: the CLI acts on the daemon the app displays (ADR-0002). */
   readonly socketPath: string
   readonly pinFilePath: string
+  /** Passed through to the state, for the dashboard's `~/…` paths. */
+  readonly homeDir: string
   observeDocker(options: DockerObserverOptions, listener: DockerListener): DockerObserver
   openPinFileStore(path: string, onChange: (result: PinFileResult) => void): Promise<PinFileStore>
   runCompose(args: readonly string[], options: RunOptions): Promise<ComposeResult>
@@ -121,7 +123,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   const probing = new Map<string, () => void>()
   const lastError = new Map<string, string>()
   const listeners = new Set<(state: ControllerState) => void>()
-  let current: ControllerState = { dockerAvailable, dockerReason, pinErrors, services: [] }
+  let current: ControllerState = { dockerAvailable, dockerReason, pinErrors, services: [], homeDir: deps.homeDir }
   let currentJson = JSON.stringify(current)
   let chain = Promise.resolve()
   let disposed = false
@@ -209,7 +211,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   }
 
   const publish = (): void => {
-    const next: ControllerState = { dockerAvailable, dockerReason, pinErrors, services: services.map(viewOf) }
+    const next: ControllerState = { dockerAvailable, dockerReason, pinErrors, services: services.map(viewOf), homeDir: deps.homeDir }
     const nextJson = JSON.stringify(next)
     // Each push rebuilds the tray menu over D-Bus: an unchanged state must not close it under the pointer.
     if (nextJson === currentJson) return

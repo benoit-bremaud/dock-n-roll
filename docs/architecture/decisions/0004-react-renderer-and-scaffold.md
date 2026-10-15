@@ -44,4 +44,4 @@ private on a personal account.
 - The preload API (`window.dockNRoll`) is faked at that boundary in the tests; it is typed by
   `src/shared/ipc.ts` and its main-process side is tested separately.
 - Vitest runs two projects: `node` for the main process and the domain, `renderer` (happy-dom)
-  for `src/renderer/**/*.test.tsx`.
+  for `src/renderer/**/*.test.{ts,tsx}` (`.ts` added in PR 8: a renderer `.ts` test used to run in no project).

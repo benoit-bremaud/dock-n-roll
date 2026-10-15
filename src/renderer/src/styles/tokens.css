@@ -5,6 +5,10 @@
   --color-bg: #ffffff;
   --color-fg: #1f2328;
   --color-muted: #59636e;
+  /* Hairlines, row hover and banner tint, derived so dark mode follows. */
+  --color-line: color-mix(in srgb, var(--color-muted) 25%, transparent);
+  --color-hover: color-mix(in srgb, var(--color-muted) 8%, transparent);
+  --color-banner: color-mix(in srgb, var(--status-off) 12%, transparent);
 
   --status-on: #1a7f37;
   --status-off: #cf222e;
@@ -13,12 +17,16 @@
 
   --space-1: 4px;
   --space-2: 8px;
-  --space-3: 16px;
-  --space-4: 24px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
 
-  --opacity-disabled: 0.6;
+  --radius: 6px;
+  --badge-size: 10px;
+  --actions-width: 152px;
 
   --font-family: system-ui, sans-serif;
+  --font-size-small: 13px;
   --font-size-body: 14px;
   --font-size-title: 20px;
 }

@@ -40,7 +40,7 @@ export function RunningTab({ api }: { readonly api: DockNRollApi }): React.JSX.E
   }, [refresh])
 
   return (
-    <>
+    <div className="running">
       <button type="button" onClick={refresh}>
         Refresh
       </button>
@@ -80,6 +80,6 @@ export function RunningTab({ api }: { readonly api: DockNRollApi }): React.JSX.E
           </tbody>
         </table>
       )}
-    </>
+    </div>
   )
 }
