@@ -157,9 +157,6 @@ async function start(trayIcon: Tray): Promise<void> {
     return
   }
   controller = created
-  app.on('before-quit', () => {
-    created.dispose()
-  })
   // Wired before any other await: the first full state arrives through `onChange` (diagram 11).
   created.onChange((state) => {
     if (trayIcon.isDestroyed()) return
@@ -191,9 +188,12 @@ if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   app.on('second-instance', showDashboard)
+  // The single shutdown path, emitted before windows close whatever triggered the quit:
+  // flag first (the dashboard really closes), then stop every input, then remove the icon.
   app.on('before-quit', () => {
-    // Emitted before windows close, whatever triggered the quit.
     isQuitting = true
+    controller?.dispose()
+    controller = null
     tray?.destroy()
   })
   // A tray app keeps running with no window open.

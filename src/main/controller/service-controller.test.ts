@@ -493,7 +493,7 @@ describe('review fixes — races and failures', () => {
     expect(controller.state().services.find((s) => s.workingDir === '/srv/app')?.controls.start).toBe(false)
 
     f.resolved.set('/srv/app', 'app')
-    f.heldNames.forEach((held) => held.release())
+    for (const held of f.heldNames) held.release()
     await settle()
 
     expect(controller.state().services.find((s) => s.workingDir === '/srv/app')?.controls.start).toBe(true)
