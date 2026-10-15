@@ -247,3 +247,14 @@ Chronological operational logbook. Complements `git log` with the human context.
   size-cap boundary test, TOCTOU documented as best effort). 364 tests.
 - **PR #24 merged** (`2cfb42f`) — `chore: supply-chain hardening`. Codex 👍, no findings; CI
   green. Nice filed as issues #19–#23.
+
+## 2026-10-15 — Brick D: test quality
+
+- **IPC tested**: `isTrustedSender` extracted from `index.ts` into a pure function
+  (`trusted-sender.ts`, diagram 07 updated first); `registerIpc`, `pushStateTo` and the preload
+  bridge tested with Electron mocked at its boundary only. TDD; mutation-checked (id length).
+- **De-flake** (#18): fixed sleeps replaced by `vi.waitFor` on outcomes; timing-only pin-store
+  checks moved to the fake-timer suite; negative windows named `quietFor`. Fake Docker daemon
+  records sent answers. Full suite run 3× concurrently: green.
+- **Coverage** (MCDA, owner choice A 420/500 vs B 365, C 350): `@vitest/coverage-v8` 5.0.3,
+  `pnpm test:coverage` in CI, thresholds 90/85/90/90 (measured 96.4/90.6/97.2/98.2). ADR-0007.
