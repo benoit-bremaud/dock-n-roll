@@ -6,6 +6,7 @@ import { containerIds, parseDockerEvent, toContainerSnapshot, type DockerEvent }
 
 const API_PREFIX = '/v1.47'
 const REQUEST_TIMEOUT_MS = 5000
+const EVENTS_HEADERS_TIMEOUT_MS = 5000
 const EVENTS_PATH = `/events?filters=${encodeURIComponent(JSON.stringify({ type: ['container'] }))}`
 
 export interface DockerObserverOptions {
@@ -13,6 +14,8 @@ export interface DockerObserverOptions {
   /** Reconnect backoff: first wait (default 1000 ms), doubled up to `maxDelayMs` (default 30 000 ms), reset after a successful sync. */
   readonly initialDelayMs?: number
   readonly maxDelayMs?: number
+  /** Wait for the event stream's headers before treating the daemon as hung (default 5000 ms). */
+  readonly headersTimeoutMs?: number
   /** Schedules a retry and returns its cancel function; overridable for tests. */
   readonly schedule?: (retry: () => void, delayMs: number) => () => void
 }
@@ -57,15 +60,23 @@ function getJson(socketPath: string, path: string): Promise<{ status: number; bo
   })
 }
 
-/** Opens the event stream; `ready` settles once Docker has accepted it (status 200). */
+/**
+ * Opens the event stream; `ready` resolves once Docker has accepted it (status 200), and rejects
+ * on a refusal, a socket error, or no headers within `headersTimeoutMs`.
+ */
 function openEvents(
   socketPath: string,
+  headersTimeoutMs: number,
   onLine: (line: string) => void,
   onClose: (reason: string) => void
 ): { ready: Promise<void>; close: () => void } {
   let call: ClientRequest | undefined
+  let timer: NodeJS.Timeout | undefined
   const ready = new Promise<void>((resolve, reject) => {
+    // Bounds only the wait for the headers: the open stream itself has no deadline.
+    timer = setTimeout(() => call?.destroy(new Error('Docker did not answer the event stream in time')), headersTimeoutMs)
     call = request({ socketPath, path: API_PREFIX + EVENTS_PATH }, (response) => {
+      clearTimeout(timer)
       if (response.statusCode !== 200) {
         response.resume()
         reject(new Error(`Docker refused the event stream (HTTP ${String(response.statusCode)})`))
@@ -86,12 +97,19 @@ function openEvents(
       })
     })
     call.on('error', (error) => {
+      clearTimeout(timer)
       reject(error)
       onClose(error.message)
     })
     call.end()
   })
-  return { ready, close: () => call?.destroy() }
+  return {
+    ready,
+    close: () => {
+      clearTimeout(timer)
+      call?.destroy()
+    }
+  }
 }
 
 function defaultSchedule(retry: () => void, delayMs: number): () => void {
@@ -116,6 +134,7 @@ export function observeDocker(options: DockerObserverOptions, listener: DockerLi
   const initialDelay = options.initialDelayMs ?? 1000
   const maxDelay = options.maxDelayMs ?? 30_000
   const schedule = options.schedule ?? defaultSchedule
+  const headersTimeout = options.headersTimeoutMs ?? EVENTS_HEADERS_TIMEOUT_MS
   let snapshot = new Map<string, ContainerSnapshot>()
   let delay = initialDelay
   let generation = 0
@@ -195,6 +214,7 @@ export function observeDocker(options: DockerObserverOptions, listener: DockerLi
 
     const stream = openEvents(
       options.socketPath,
+      headersTimeout,
       (line) => {
         const event = parseDockerEvent(line)
         if (event === null || !isCurrent(attempt)) return

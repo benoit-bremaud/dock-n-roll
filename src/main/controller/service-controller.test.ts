@@ -137,6 +137,7 @@ async function controllerWith(setup?: (f: ReturnType<typeof fakes>) => void) {
   const f = fakes()
   setup?.(f)
   const controller = await createServiceController(f.deps)
+  await settle()
   const states: ControllerState[] = []
   controller.onChange((state) => states.push(state))
   const row = (id: string) => controller.state().services.find((service) => service.id === id)
@@ -144,6 +145,43 @@ async function controllerWith(setup?: (f: ReturnType<typeof fakes>) => void) {
 }
 
 describe('createServiceController — one way in, one way out (diagram 07)', () => {
+  it('returns before the first recomputation ends, then publishes it (diagram 11)', async () => {
+    const f = fakes()
+    f.setInitialPins([pin({ workingDir: '/srv/blog', name: 'Blog' })])
+    f.holdFiles(true)
+
+    const controller = await createServiceController(f.deps)
+    const states: ControllerState[] = []
+    controller.onChange((state) => states.push(state))
+    expect(controller.state().services).toEqual([])
+
+    await settle()
+    expect(states).toEqual([])
+    expect(f.heldFiles).toHaveLength(1)
+    f.heldFiles.forEach((held) => {
+      held.release()
+    })
+    await settle()
+    expect(states.at(-1)?.services.map((service) => service.displayName)).toEqual(['Blog'])
+  })
+
+  it('publishes nothing once disposed during the first recomputation', async () => {
+    const f = fakes()
+    f.setInitialPins([pin({ workingDir: '/srv/blog', name: 'Blog' })])
+    f.holdFiles(true)
+    const controller = await createServiceController(f.deps)
+    const states: ControllerState[] = []
+    controller.onChange((state) => states.push(state))
+    await settle()
+
+    controller.dispose()
+    f.heldFiles.forEach((held) => {
+      held.release()
+    })
+    await settle()
+    expect(states).toEqual([])
+  })
+
   it('derives the rows from the Docker snapshot and the pins', async () => {
     const { f, controller, row } = await controllerWith((setup) => {
       setup.setInitialPins([pin({ workingDir: '/srv/blog', name: 'Blog', url: 'http://localhost:8086/' })])

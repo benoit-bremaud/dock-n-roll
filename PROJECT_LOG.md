@@ -191,3 +191,19 @@ Chronological operational logbook. Complements `git log` with the human context.
   (button edge contrast to 3:1, diagram 07). 342 tests.
 - **Portfolio**: a dock-n-roll card was prepared for benoitbremaud.fr, then withdrawn on the
   owner's decision (PR closed, branch deleted). The project stays off the portfolio.
+
+## 2026-10-15 — Brick A: startup robustness
+
+- **Cause of #8 found** (post-V1 audit): the tray was created only after
+  `createServiceController` had awaited the first recomputation (`docker compose config` per pin,
+  up to 20 s), while `second-instance` already showed the dashboard. Same window: a dashboard
+  reading the state before IPC existed stayed stuck on the error (unchanged states are not pushed).
+- **Decision** (MCDA, owner choice B, 435/500 vs A 420, C 410): tray "Starting…" created before
+  startup, controller no longer awaits its first recomputation, state pushed on the dashboard's
+  `did-finish-load`. Sensitivity noted: A wins if regression risk weighs double.
+- **Docker events**: headers timeout (5 s) on `GET /events`; a daemon that accepts the socket but
+  never answers is now a lost connection with retry, not a permanent "Docker unavailable".
+- UML: new diagram 11 (startup sequence), diagram 06 annotated.
+- **Pre-push review** (`docs/architecture/review-local.md`): Must 0 · Should 5 · Nice 4, all
+  applied. Found: quitting from the "Starting…" tray never disposed the controller; the
+  `did-finish-load` push did not cover the early dashboard → replaced by one push after IPC wiring.

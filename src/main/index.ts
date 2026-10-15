@@ -85,6 +85,25 @@ function toElectron(entries: readonly MenuEntry[]): MenuItemConstructorOptions[]
 const AUTOSTART_ENTRY = join(app.getPath('appData'), 'autostart', 'dock-n-roll.desktop')
 let autostart: AutostartToggle | undefined
 
+/** Shown until the controller exists, so a slow startup never leaves the app without a tray (#8). */
+function createStartingTray(): Tray {
+  const trayIcon = new Tray(nativeImage.createFromPath(TRAY_ICON_PATH))
+  trayIcon.setToolTip('dock-n-roll')
+  trayIcon.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: 'Starting…', enabled: false },
+      { type: 'separator' },
+      {
+        label: 'Quit',
+        click: () => {
+          app.quit()
+        }
+      }
+    ])
+  )
+  return trayIcon
+}
+
 function renderTray(trayIcon: Tray, controller: ServiceController, state: ControllerState): void {
   // On Linux the tray click is not guaranteed to be a left click (ADR-0001): every action is
   // in this menu, rebuilt on each state change.
@@ -106,9 +125,9 @@ function renderTray(trayIcon: Tray, controller: ServiceController, state: Contro
 }
 
 /** Composition root: real adapters into the controller, controller into IPC and the tray. */
-async function start(): Promise<void> {
+async function start(trayIcon: Tray): Promise<void> {
   const socketPath = dockerSocketPath(process.env)
-  const controller = await createServiceController({
+  const created = await createServiceController({
     socketPath,
     pinFilePath: join(app.getPath('appData'), 'dock-n-roll', 'services.yaml'),
     homeDir: app.getPath('home'),
@@ -125,14 +144,30 @@ async function start(): Promise<void> {
       }
     }
   })
-  registerIpc(controller, createBackgroundSource(() => controller.containers(), scanListeningPorts), isTrustedSender)
-  const trayIcon = new Tray(nativeImage.createFromPath(TRAY_ICON_PATH))
+  // "Quit" from the starting tray fired `before-quit` before this listener existed.
+  if (isQuitting) {
+    created.dispose()
+    return
+  }
+  app.on('before-quit', () => {
+    created.dispose()
+  })
+  // Wired before any other await: the first full state arrives through `onChange` (diagram 11).
+  created.onChange((state) => {
+    if (trayIcon.isDestroyed()) return
+    renderTray(trayIcon, created, state)
+    pushStateTo(() => dashboard, state)
+  })
+  registerIpc(created, createBackgroundSource(() => created.containers(), scanListeningPorts), isTrustedSender)
+  // A dashboard opened during startup read no state (no IPC yet), and `publish()` skips an
+  // unchanged state: hand it the current one now (diagram 11).
+  pushStateTo(() => dashboard, created.state())
   if (app.isPackaged) {
     autostart = createAutostartToggle({
       initial: await isAutostartEnabled(AUTOSTART_ENTRY),
       write: (enabled) => setAutostart(AUTOSTART_ENTRY, enabled, process.execPath),
       onChange: () => {
-        renderTray(trayIcon, controller, controller.state())
+        renderTray(trayIcon, created, created.state())
       },
       onError: (error) => {
         console.error('dock-n-roll: autostart update failed', error)
@@ -140,16 +175,7 @@ async function start(): Promise<void> {
       }
     })
   }
-  trayIcon.setToolTip('dock-n-roll')
-  tray = trayIcon
-  renderTray(trayIcon, controller, controller.state())
-  controller.onChange((state) => {
-    renderTray(trayIcon, controller, state)
-    pushStateTo(() => dashboard, state)
-  })
-  app.on('before-quit', () => {
-    controller.dispose()
-  })
+  if (!trayIcon.isDestroyed()) renderTray(trayIcon, created, created.state())
 }
 
 if (!app.requestSingleInstanceLock()) {
@@ -174,7 +200,8 @@ if (!app.requestSingleInstanceLock()) {
     if (app.isPackaged) {
       Menu.setApplicationMenu(null)
     }
-    start().catch((error: unknown) => {
+    tray = createStartingTray()
+    start(tray).catch((error: unknown) => {
       // Without this the app would run with no tray and no window, and the single-instance
       // lock would block every relaunch.
       console.error('dock-n-roll: startup failed', error)

@@ -24,6 +24,8 @@ export class FakeDockerDaemon {
   nextInspectStatus: number | undefined
   /** Next inspect sends its headers and half a body, then drops the connection. */
   cutNextInspect = false
+  /** Next `/events` request is accepted but never answered, as a hung daemon would. */
+  hangNextEvents = false
   /** Delay before answering every inspect. */
   inspectDelayMs = 0
   private server: Server | undefined
@@ -86,6 +88,13 @@ export class FakeDockerDaemon {
       response.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body))
     }
     if (url.pathname === '/v1.47/events') {
+      if (this.hangNextEvents) {
+        this.hangNextEvents = false
+        // Tracked so `stop()` ends it even if the client never gives up.
+        this.streams.add(response)
+        response.on('close', () => this.streams.delete(response))
+        return
+      }
       response.writeHead(200, { 'content-type': 'application/json' })
       response.flushHeaders()
       this.streams.add(response)
