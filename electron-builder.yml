@@ -30,7 +30,17 @@ linux:
       StartupWMClass: dock-n-roll
       Terminal: "false"
 deb:
+  # Replaces electron-builder's defaults, so they are repeated: Electron's shared libraries first.
   depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libuuid1
+    - libsecret-1-0
     - docker-ce-cli | docker.io
     - docker-compose-plugin | docker-compose-v2
     - iproute2
