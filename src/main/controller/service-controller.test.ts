@@ -36,6 +36,7 @@ function fakes() {
   const deps: ControllerDeps = {
     socketPath: SOCKET,
     pinFilePath: '/home/u/.config/dock-n-roll/services.yaml',
+    homeDir: '/home/u',
     observeDocker: (options, listener) => {
       expect(options.socketPath).toBe(SOCKET)
       docker = listener
@@ -170,7 +171,7 @@ describe('createServiceController — one way in, one way out (diagram 07)', () 
 
     f.snapshot([web])
     await settle()
-    expect(controller.state()).toMatchObject({ dockerAvailable: true, dockerReason: null })
+    expect(controller.state()).toMatchObject({ dockerAvailable: true, dockerReason: null, homeDir: '/home/u' })
   })
 
   it('shows pin-file errors without dropping the pins', async () => {

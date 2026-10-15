@@ -1,4 +1,5 @@
 import type { DockNRollApi, ServiceView } from '../../../shared/ipc'
+import { shortenPath } from '../format'
 
 /**
  * One service. Buttons mirror the controls the controller derived (the main process re-checks
@@ -9,11 +10,13 @@ import type { DockNRollApi, ServiceView } from '../../../shared/ipc'
 export function ServiceRow({
   service,
   api,
-  dockerAvailable
+  dockerAvailable,
+  homeDir
 }: {
   readonly service: ServiceView
   readonly api: DockNRollApi
   readonly dockerAvailable: boolean
+  readonly homeDir: string
 }): React.JSX.Element {
   const name = service.displayName
   return (
@@ -22,11 +25,13 @@ export function ServiceRow({
       <div className="service__main">
         <span className="service__name">{name}</span>
         {dockerAvailable && <span className="service__status">{service.status}</span>}
-        <span className="service__dir">{service.workingDir}</span>
+        <span className="service__dir" title={service.workingDir}>
+          {shortenPath(service.workingDir, homeDir)}
+        </span>
         {service.reason !== null && <span className="service__reason">{service.reason}</span>}
       </div>
       <div className="service__actions">
-        <button type="button" aria-label={`Start ${name}`} disabled={!service.controls.start} onClick={() => void api.start(service.id)}>
+        <button type="button" className="button--primary" aria-label={`Start ${name}`} disabled={!service.controls.start} onClick={() => void api.start(service.id)}>
           Start
         </button>
         <button type="button" aria-label={`Stop ${name}`} disabled={!service.controls.stop} onClick={() => void api.stop(service.id)}>

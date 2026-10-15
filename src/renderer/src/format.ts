@@ -1,0 +1,16 @@
+import type { ServiceStatus } from '../../main/domain/types'
+
+/** `/home/u/x` → `~/x`. Only a whole home folder is replaced, never a prefix of another name. */
+export function shortenPath(path: string, homeDir: string): string {
+  const home = homeDir.replace(/\/+$/, '')
+  if (home === '') return path
+  if (path === home) return '~'
+  return path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path
+}
+
+/** Header line, e.g. "2 of 4 on"; `null` when there is nothing to count. */
+export function runningSummary(statuses: readonly ServiceStatus[]): string | null {
+  if (statuses.length === 0) return null
+  const on = statuses.filter((status) => status === 'on').length
+  return `${String(on)} of ${String(statuses.length)} on`
+}

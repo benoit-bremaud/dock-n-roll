@@ -29,6 +29,7 @@ classDiagram
     +string|null dockerReason
     +string[] pinErrors
     +ServiceView[] services
+    +string homeDir
   }
   class BackgroundView {
     <<shared/ipc.ts, crosses IPC>>

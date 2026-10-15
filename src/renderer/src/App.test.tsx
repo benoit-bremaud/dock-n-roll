@@ -18,7 +18,7 @@ function view(overrides: Partial<ServiceView> = {}): ServiceView {
 }
 
 function state(overrides: Partial<ControllerState> = {}): ControllerState {
-  return { dockerAvailable: true, dockerReason: null, pinErrors: [], services: [view()], ...overrides }
+  return { dockerAvailable: true, dockerReason: null, pinErrors: [], services: [view()], homeDir: '/home/u', ...overrides }
 }
 
 /** Stand-in for the preload API (a boundary already tested in the main process). */
@@ -80,6 +80,28 @@ const button = (name: string): HTMLButtonElement => screen.getByRole('button', {
 
 afterEach(() => {
   cleanup()
+})
+
+describe('App — header and paths (diagram 09)', () => {
+  it('summarises how many services are on', async () => {
+    render(<App api={fakeApi(state({ services: [view(), view({ id: 'sq', displayName: 'SonarQube', status: 'on' })] })).api} />)
+
+    expect(await screen.findByText('1 of 2 on')).toBeTruthy()
+  })
+
+  it('hides the summary while Docker is unavailable, as the statuses may be wrong', async () => {
+    render(<App api={fakeApi(state({ dockerAvailable: false, dockerReason: 'down' })).api} />)
+
+    await rowOf('Blog')
+    expect(screen.queryByText(/ of \d+ on$/)).toBeNull()
+  })
+
+  it('shows the working dir with the home folder as ~, the full path as a tooltip', async () => {
+    render(<App api={fakeApi(state({ services: [view({ workingDir: '/home/u/Documents/blog' })] })).api} />)
+
+    const dir = within(await rowOf('Blog')).getByText('~/Documents/blog')
+    expect(dir.getAttribute('title')).toBe('/home/u/Documents/blog')
+  })
 })
 
 describe('App — services tab (spec §4, UC1–UC3, UC5)', () => {

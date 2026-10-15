@@ -4,15 +4,29 @@ body {
   color: var(--color-fg);
   font-family: var(--font-family);
   font-size: var(--font-size-body);
+  line-height: 1.4;
 }
 
 .app {
-  padding: var(--space-4);
+  padding: var(--space-5);
+}
+
+.app__header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
 }
 
 .app__title {
-  margin: 0 0 var(--space-3);
+  margin: 0;
   font-size: var(--font-size-title);
+}
+
+.app__summary {
+  margin: 0 0 0 auto;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .app__empty {
@@ -20,30 +34,59 @@ body {
   color: var(--color-muted);
 }
 
+/* Tabs: text with an underline on the selected one, over a hairline. */
 .tabs {
   display: flex;
-  gap: var(--space-2);
-  margin-bottom: var(--space-3);
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.tabs [role='tab'] {
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: var(--space-2) 0;
+  margin-bottom: -1px;
+  color: var(--color-muted);
 }
 
 .tabs [aria-selected='true'] {
+  color: var(--color-fg);
   font-weight: 600;
-  border-bottom: 2px solid var(--color-fg);
+  border-bottom-color: var(--color-fg);
 }
 
 button {
   font: inherit;
   color: inherit;
   background: transparent;
-  border: 1px solid var(--color-muted);
-  border-radius: var(--space-1);
-  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-3);
   cursor: pointer;
 }
 
+button:hover:enabled {
+  background: var(--color-hover);
+}
+
+/* The one action to take: filled with the ink colour (no extra accent hue). */
+.button--primary:enabled {
+  background: var(--color-fg);
+  border-color: var(--color-fg);
+  color: var(--color-bg);
+}
+
+.button--primary:hover:enabled {
+  background: var(--color-muted);
+  border-color: var(--color-muted);
+}
+
+/* Disabled stays in place (aligned columns) but quiet; `disabled` tells assistive tech. */
 button:disabled {
-  opacity: var(--opacity-disabled);
-  border-style: dashed;
+  border-color: transparent;
+  color: var(--color-muted);
   cursor: default;
 }
 
@@ -56,25 +99,11 @@ button:focus-visible {
   display: none;
 }
 
-.service--greyed .service__name,
-.service--greyed .service__dir {
-  color: var(--color-muted);
-}
-
-.service--greyed .service__badge {
-  background: none;
-  border: 1px dashed var(--status-unavailable);
-}
-
-.running__error {
-  color: var(--status-off);
-}
-
 .banner {
   margin: 0 0 var(--space-2);
   padding: var(--space-2) var(--space-3);
-  border-left: 4px solid var(--status-off);
-  background: color-mix(in srgb, var(--status-off) 10%, transparent);
+  border-radius: var(--radius);
+  background: var(--color-banner);
 }
 
 .services {
@@ -87,14 +116,20 @@ button:focus-visible {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-muted) 30%, transparent);
+  padding: var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.service:hover {
+  background: var(--color-hover);
 }
 
 .service__badge {
   flex: none;
-  width: var(--space-3);
-  height: var(--space-3);
+  align-self: flex-start;
+  margin-top: 5px;
+  width: var(--badge-size);
+  height: var(--badge-size);
   border-radius: 50%;
 }
 
@@ -108,42 +143,81 @@ button:focus-visible {
 .service__badge[data-status='conflict'],
 .service__badge[data-status='invalid'] { background: var(--status-unavailable); }
 
+.service--greyed .service__name,
+.service--greyed .service__dir {
+  color: var(--color-muted);
+}
+
+.service--greyed .service__badge {
+  background: none;
+  border: 1px dashed var(--status-unavailable);
+}
+
 .service__main {
   flex: 1;
   display: grid;
   grid-template-columns: auto 1fr;
   column-gap: var(--space-2);
+  row-gap: 2px;
   min-width: 0;
 }
 
-.service__name { font-weight: 600; }
+.service__name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
 
-.service__status,
-.service__dir,
-.service__reason {
+.service__status {
   color: var(--color-muted);
 }
 
 .service__dir,
 .service__reason {
   grid-column: 1 / -1;
+  font-size: var(--font-size-small);
+  color: var(--color-muted);
   overflow-wrap: anywhere;
 }
 
+.service__reason {
+  color: var(--color-fg);
+}
+
 .service__actions {
+  flex: none;
   display: flex;
+  justify-content: flex-end;
   gap: var(--space-2);
+  min-width: var(--actions-width);
+}
+
+.running__error {
+  color: var(--status-off);
+}
+
+.running h2 {
+  margin: var(--space-5) 0 var(--space-2);
+  font-size: var(--font-size-body);
 }
 
 .running table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: var(--space-3);
 }
 
 .running th,
 .running td {
   text-align: left;
-  padding: var(--space-1) var(--space-2);
-  border-bottom: 1px solid color-mix(in srgb, var(--color-muted) 30%, transparent);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.running th {
+  font-size: var(--font-size-small);
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.running td {
+  font-variant-numeric: tabular-nums;
 }

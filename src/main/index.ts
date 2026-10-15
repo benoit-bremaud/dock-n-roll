@@ -111,6 +111,7 @@ async function start(): Promise<void> {
   const controller = await createServiceController({
     socketPath,
     pinFilePath: join(app.getPath('appData'), 'dock-n-roll', 'services.yaml'),
+    homeDir: app.getPath('home'),
     observeDocker,
     openPinFileStore,
     runCompose,

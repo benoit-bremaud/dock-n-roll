@@ -24,6 +24,8 @@ export interface ControllerState {
   /** Pin-file problems, shown as a banner; the last valid pins stay in use. */
   readonly pinErrors: readonly string[]
   readonly services: readonly ServiceView[]
+  /** The user's home folder, so the sandboxed renderer can show paths as `~/…`. */
+  readonly homeDir: string
 }
 
 /** UC4 container row. */
