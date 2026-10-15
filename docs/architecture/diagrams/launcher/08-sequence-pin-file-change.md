@@ -23,6 +23,7 @@ sequenceDiagram
 
   Dev->>PF: save services.yaml
   PF->>PF: after the burst: dir removed or recreated? re-arm the watch
+  PF->>PF: stat, refuse over 64 KiB (keep last pins + error), else read and parse
   PF-->>SC: onChange(entries, errors)
   SC->>SC: pins = entries
   opt no resolution running and a pin dir is due (never tried, or failed 30 s ago)

@@ -34,6 +34,9 @@ present, `~/.config/autostart` exists.
   shown in a dialog and the checkbox snaps back.
 - **Electron fuses**: `runAsNode`, `NODE_OPTIONS` and the inspect flags are off, and the app only
   loads from its asar: the binary launched at every login is not a general Node runtime.
+  `grantFileProtocolExtraPrivileges` stays on: turning it off breaks `loadFile()` of the dashboard
+  from the asar (ERR_FILE_NOT_FOUND, checked on the built app, brick C) until the renderer is served
+  from a custom protocol. ASAR integrity validation is enforced on macOS/Windows only.
 - **Dependencies**: Docker CLI, the Compose plugin and `iproute2` (`ss`).
 
 ### Consequences

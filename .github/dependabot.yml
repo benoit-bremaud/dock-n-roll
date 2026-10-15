@@ -1,0 +1,20 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # A just-published (possibly compromised) release waits a few days before it is proposed.
+    cooldown:
+      default-days: 5
+    groups:
+      # One PR for the routine bumps; majors stay separate so each is reviewed on its own.
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
