@@ -227,3 +227,7 @@ Chronological operational logbook. Complements `git log` with the human context.
 - **Pre-push review**: Must 2 · Should 7 · Nice 3. Must: a *rejecting* resolver looped without
   pause (reproduced: the test hung), and a false-confidence single-flight test. All Must/Should
   applied (timed 30 s name retry, re-arm retry, SRP split, fs-boundary tests). 362 tests.
+- **PR #17 merged** (`a3956d6`) — `fix: runtime robustness`. Codex first pass 👍, no findings;
+  CI green. Manual test by Claude on the built app: tray registered on D-Bus in ~1.7 s, live pin
+  add, 30 s timed name retry observed, config dir recreated → one inotify watch on the new inode,
+  Quit via dbusmenu → clean exit in ~200 ms. Nice filed as issue #18.
