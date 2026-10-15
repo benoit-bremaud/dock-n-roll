@@ -245,3 +245,5 @@ Chronological operational logbook. Complements `git log` with the human context.
 - **CI**: `timeout-minutes` on every job (15 quality, 10 audit/gitleaks).
 - **Pre-push review**: Must 0 · Should 3 · Nice 4. Should applied (Dependabot 5-day cooldown,
   size-cap boundary test, TOCTOU documented as best effort). 364 tests.
+- **PR #24 merged** (`2cfb42f`) — `chore: supply-chain hardening`. Codex 👍, no findings; CI
+  green. Nice filed as issues #19–#23.
