@@ -230,6 +230,8 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   const rebuild = async (): Promise<void> => {
     const next = buildServices(containers, pins, resolvedNames)
     const checks = await Promise.all(next.map((service) => deps.filesExist(service.workingDir, service.configFiles)))
+    // `dispose()` may have run during the await: no publish, no new probe after it.
+    if (disposed) return
     services = next
     services.forEach((service, index) => filesOk.set(service.id, checks[index] ?? true))
     prune()

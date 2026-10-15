@@ -165,6 +165,23 @@ describe('createServiceController — one way in, one way out (diagram 07)', () 
     expect(states.at(-1)?.services.map((service) => service.displayName)).toEqual(['Blog'])
   })
 
+  it('schedules no health probe once disposed during a recomputation', async () => {
+    const f = fakes()
+    f.setInitialPins([pin({ workingDir: '/srv/blog', healthUrl: 'http://localhost/health' })])
+    f.holdFiles(true)
+    const controller = await createServiceController(f.deps)
+    f.snapshot([web])
+    await settle()
+    f.heldFiles.shift()?.release()
+    await settle()
+    expect(f.heldFiles).toHaveLength(1)
+
+    controller.dispose()
+    f.heldFiles.shift()?.release()
+    await settle()
+    expect(f.scheduled).toEqual([])
+  })
+
   it('publishes nothing once disposed during the first recomputation', async () => {
     const f = fakes()
     f.setInitialPins([pin({ workingDir: '/srv/blog', name: 'Blog' })])

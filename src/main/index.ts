@@ -32,6 +32,8 @@ function isTrustedSender(event: IpcMainInvokeEvent): boolean {
 let dashboard: BrowserWindow | null = null
 // Kept at module level: a garbage-collected Tray disappears from the top bar.
 let tray: Tray | null = null
+// Set once the controller exists: a dashboard that finishes loading afterwards gets its state.
+let controller: ServiceController | null = null
 // Set on any quit (tray item, logout, SIGTERM): lets the dashboard close for real instead of hiding.
 let isQuitting = false
 
@@ -54,6 +56,11 @@ function createDashboard(): BrowserWindow {
     event.preventDefault()
   })
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  // Defensive: a push sent while the page is still loading can be dropped, and `publish()` skips
+  // unchanged states, so every freshly loaded page is handed the current state (diagram 11).
+  window.webContents.on('did-finish-load', () => {
+    if (controller !== null) pushStateTo(() => window, controller.state())
+  })
 
   // Closing hides the dashboard: the app lives in the top bar until "Quit".
   window.on('close', (event) => {
@@ -149,6 +156,7 @@ async function start(trayIcon: Tray): Promise<void> {
     created.dispose()
     return
   }
+  controller = created
   app.on('before-quit', () => {
     created.dispose()
   })

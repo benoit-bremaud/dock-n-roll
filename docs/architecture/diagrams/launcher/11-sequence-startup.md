@@ -36,6 +36,7 @@ sequenceDiagram
     M->>SC: onChange(render tray, push to window)
     M->>M: registerIpc
     M->>W: push current state, if a window was opened early (second-instance)
+    Note over M,W: a page still loading drops that push; its did-finish-load pushes again
     opt packaged build
       M->>M: await autostart state
     end
@@ -49,7 +50,8 @@ sequenceDiagram
 ## Notes
 
 - The dashboard may load before the controller exists: its `getState` then rejects, and
-  `publish()` skips unchanged states. The one push right after `registerIpc` closes that gap.
+  `publish()` skips unchanged states. Two pushes close that gap: one right after `registerIpc`
+  (page already loaded), one on `did-finish-load` once the controller exists (page still loading).
 - "Quit" in the starting tray fires `before-quit` before the dispose listener exists: startup
   checks for it after the controller is created and disposes it itself.
 - A startup failure still shows an error box and quits: otherwise the single-instance lock
