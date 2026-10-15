@@ -1,5 +1,12 @@
-# Linux .deb only (ADR-0006): keeps Chromium's sandbox (chrome-sandbox installed setuid by the package).
+# Linux .deb only (ADR-0006): keeps Chromium's sandbox — the package installs an AppArmor profile
+# allowing user namespaces (Ubuntu 24.04), and makes chrome-sandbox setuid only where they are unavailable.
 appId: fr.bremaud.dock-n-roll
+# The installed binary runs at every login: turn off the fuses that make it a general Node runtime.
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  onlyLoadAppFromAsar: true
 productName: dock-n-roll
 directories:
   output: dist
@@ -25,4 +32,5 @@ linux:
 deb:
   depends:
     - docker-ce-cli | docker.io
+    - docker-compose-plugin | docker-compose-v2
     - iproute2

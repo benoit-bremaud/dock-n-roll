@@ -1,18 +1,19 @@
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { app, BrowserWindow, dialog, Menu, nativeImage, session, shell, Tray, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
+import { isAutostartEnabled, setAutostart } from './adapters/autostart'
 import { resolveProjectName, runCompose } from './adapters/compose-runner'
 import { observeDocker } from './adapters/docker-observer'
 import { filesExist } from './adapters/file-probe'
 import { probeHealth } from './adapters/health-probe'
 import { openPinFileStore } from './adapters/pin-file-store'
 import { scanListeningPorts } from './adapters/port-scanner'
+import { createAutostartToggle, type AutostartToggle } from './controller/autostart-toggle'
 import { createBackgroundSource } from './controller/background-monitor'
 import { dockerSocketPath } from './controller/docker-socket'
 import { createServiceController, type ServiceController } from './controller/service-controller'
 import { trayIconPath } from './controller/resources'
 import { buildTrayMenu, type MenuEntry } from './controller/tray-menu'
-import { isAutostartEnabled, setAutostart } from './adapters/autostart'
 import { pushStateTo, registerIpc } from './ipc'
 import type { ControllerState } from '../shared/ipc'
 
@@ -82,7 +83,7 @@ function toElectron(entries: readonly MenuEntry[]): MenuItemConstructorOptions[]
 
 /** XDG autostart entry; only offered in the installed app, whose executable is stable (ADR-0006). */
 const AUTOSTART_ENTRY = join(app.getPath('appData'), 'autostart', 'dock-n-roll.desktop')
-let autostart: boolean | undefined
+let autostart: AutostartToggle | undefined
 
 function renderTray(trayIcon: Tray, controller: ServiceController, state: ControllerState): void {
   // On Linux the tray click is not guaranteed to be a left click (ADR-0001): every action is
@@ -99,19 +100,8 @@ function renderTray(trayIcon: Tray, controller: ServiceController, state: Contro
     quit: () => {
       app.quit()
     },
-    toggleAutostart: () => {
-      const next = autostart !== true
-      setAutostart(AUTOSTART_ENTRY, next, process.execPath).then(
-        () => {
-          autostart = next
-          renderTray(trayIcon, controller, controller.state())
-        },
-        (error: unknown) => {
-          console.error('dock-n-roll: autostart update failed', error)
-        }
-      )
-    }
-  }, autostart === undefined ? {} : { autostart })
+    toggleAutostart: () => void autostart?.toggle()
+  }, autostart === undefined ? {} : { autostart: autostart.enabled() })
   trayIcon.setContextMenu(Menu.buildFromTemplate(toElectron(entries)))
 }
 
@@ -135,8 +125,20 @@ async function start(): Promise<void> {
     }
   })
   registerIpc(controller, createBackgroundSource(() => controller.containers(), scanListeningPorts), isTrustedSender)
-  if (app.isPackaged) autostart = await isAutostartEnabled(AUTOSTART_ENTRY)
   const trayIcon = new Tray(nativeImage.createFromPath(TRAY_ICON_PATH))
+  if (app.isPackaged) {
+    autostart = createAutostartToggle({
+      initial: await isAutostartEnabled(AUTOSTART_ENTRY),
+      write: (enabled) => setAutostart(AUTOSTART_ENTRY, enabled, process.execPath),
+      onChange: () => {
+        renderTray(trayIcon, controller, controller.state())
+      },
+      onError: (error) => {
+        console.error('dock-n-roll: autostart update failed', error)
+        dialog.showErrorBox('Could not change Start at login', error instanceof Error ? error.message : String(error))
+      }
+    })
+  }
   trayIcon.setToolTip('dock-n-roll')
   tray = trayIcon
   renderTray(trayIcon, controller, controller.state())

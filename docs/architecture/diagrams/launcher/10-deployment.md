@@ -13,10 +13,11 @@ Where the packaged app lives and what it touches at runtime once installed from 
 flowchart LR
   subgraph Workstation ["Ubuntu 24.04 workstation"]
     subgraph Opt ["/opt/dock-n-roll (from the .deb)"]
-      Exe["dock-n-roll executable + chrome-sandbox (setuid)"]
+      Exe["dock-n-roll executable (Electron fuses set)"]
       Asar["resources/app.asar — out/main, out/preload, out/renderer"]
       Icon["resources/tray-icon.png (extraResources)"]
     end
+    AppArmor[/"/etc/apparmor.d/dock-n-roll (from the .deb) — allows user namespaces"/]
     subgraph Home ["~ (per user)"]
       Autostart[/"~/.config/autostart/dock-n-roll.desktop"/]
       Pins[/"~/.config/dock-n-roll/services.yaml"/]
@@ -27,6 +28,7 @@ flowchart LR
   end
   Session -->|"XDG autostart"| Autostart
   Autostart -->|"Exec"| Exe
+  AppArmor -.->|"Chromium sandbox"| Exe
   Exe --> Asar
   Exe --> Icon
   Exe --> Pins

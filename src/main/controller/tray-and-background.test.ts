@@ -82,6 +82,12 @@ describe('buildTrayMenu — every action reachable from the menu (spec R5)', () 
     expect(labels(menu).slice(-4)).toEqual(['<separator>', 'Open dashboard', 'Start at login', 'Quit'])
   })
 
+  it('keeps the Start at login entry, unchecked, once it is turned off', () => {
+    const entry = buildTrayMenu(state(), recordingActions(), { autostart: false }).find((item) => item.label === 'Start at login')
+
+    expect(entry).toMatchObject({ type: 'checkbox', checked: false })
+  })
+
   it('has no Start at login entry when autostart is not available (dev builds)', () => {
     expect(labels(buildTrayMenu(state(), recordingActions()))).not.toContain('Start at login')
   })
