@@ -26,11 +26,16 @@ function fakes() {
   const healthy = new Set<string>()
   const scheduled: (() => void)[] = []
   const delays: number[] = []
+  const nameRetries: (() => void)[] = []
   const counters = { observerStopped: 0, storeClosed: 0, probesCancelled: 0, filesChecks: 0 }
   /** When set, filesExist answers only when the test releases it. */
   const heldFiles: { release: () => void }[] = []
   let holdFiles = false
+  /** When set, resolveProjectName answers only when the test releases it. */
+  const heldNames: { release: () => void }[] = []
+  let holdNames = false
   let rejectNextRun: Error | undefined
+  let rejectNames = false
   const clock = { now: 0 }
 
   const deps: ControllerDeps = {
@@ -69,7 +74,15 @@ function fakes() {
       }),
     resolveProjectName: (dir) => {
       resolveCalls.push(dir)
-      return Promise.resolve(resolved.get(dir) ?? null)
+      if (rejectNames) return Promise.reject(new Error('spawn docker ENOENT'))
+      if (!holdNames) return Promise.resolve(resolved.get(dir) ?? null)
+      return new Promise((resolve) => {
+        heldNames.push({
+          release: () => {
+            resolve(resolved.get(dir) ?? null)
+          }
+        })
+      })
     },
     filesExist: (dir) => {
       counters.filesChecks += 1
@@ -85,6 +98,13 @@ function fakes() {
     probeHealth: (url) => Promise.resolve(healthy.has(url)),
     now: () => clock.now,
     schedule: (retry, delayMs) => {
+      // Name-resolution retries (30 s) are kept apart from health probes (2 s).
+      if (delayMs === 30_000) {
+        nameRetries.push(retry)
+        return () => {
+          nameRetries.splice(nameRetries.indexOf(retry), 1)
+        }
+      }
       scheduled.push(retry)
       delays.push(delayMs)
       return () => {
@@ -103,11 +123,19 @@ function fakes() {
     healthy,
     scheduled,
     delays,
+    nameRetries,
     counters,
     clock,
     heldFiles,
     holdFiles: (on: boolean) => {
       holdFiles = on
+    },
+    heldNames,
+    rejectNames: () => {
+      rejectNames = true
+    },
+    holdNames: (on: boolean) => {
+      holdNames = on
     },
     rejectNextRun: (error: Error) => {
       rejectNextRun = error
@@ -464,6 +492,88 @@ describe('review fixes — races and failures', () => {
     await settle()
     expect(controller.state().services[0]?.controls.start).toBe(true)
     expect(f.resolveCalls).toEqual(['/srv/blog', '/srv/blog'])
+  })
+
+  it('publishes Docker changes while a name resolution hangs, then applies the name', async () => {
+    const { f, controller, row } = await controllerWith((setup) => {
+      setup.holdNames(true)
+      setup.setInitialPins([pin({ workingDir: '/srv/app' })])
+    })
+
+    f.snapshot([web])
+    await settle()
+
+    expect(row(BLOG)).toMatchObject({ status: 'on' })
+    expect(controller.state().services.find((s) => s.workingDir === '/srv/app')?.controls.start).toBe(false)
+
+    f.resolved.set('/srv/app', 'app')
+    for (const held of f.heldNames) held.release()
+    await settle()
+
+    expect(controller.state().services.find((s) => s.workingDir === '/srv/app')?.controls.start).toBe(true)
+  })
+
+  it('starts no second name resolution while one is running, without blocking the chain', async () => {
+    const { f, row } = await controllerWith((setup) => {
+      setup.holdNames(true)
+      setup.setInitialPins([pin({ workingDir: '/srv/app' })])
+    })
+
+    f.changePins({ entries: [pin({ workingDir: '/srv/app' }), pin({ workingDir: '/srv/other' })], errors: [] })
+    f.snapshot([web])
+    await settle()
+
+    expect(row(BLOG)).toMatchObject({ status: 'on' })
+    expect(f.resolveCalls).toEqual(['/srv/app'])
+
+    for (const held of f.heldNames.splice(0)) held.release()
+    await settle()
+
+    expect(f.resolveCalls).toEqual(['/srv/app', '/srv/other'])
+  })
+
+  it('treats a rejected name resolution as a failure, retried only after 30 s', async () => {
+    const { f } = await controllerWith((setup) => {
+      setup.rejectNames()
+      setup.setInitialPins([pin({ workingDir: '/srv/app' }), pin({ workingDir: '/srv/other' })])
+    })
+
+    f.snapshot([])
+    await settle()
+
+    expect(f.resolveCalls).toEqual(['/srv/app', '/srv/other'])
+  })
+
+  it('retries a failed name resolution after 30 s even when no other input arrives', async () => {
+    const { f, controller } = await controllerWith((setup) => {
+      setup.setInitialPins([pin({ workingDir: '/srv/blog' })])
+    })
+    f.snapshot([])
+    await settle()
+    f.resolved.set('/srv/blog', 'blog')
+    f.clock.now = 30_000
+
+    expect(f.nameRetries).toHaveLength(1)
+    for (const retry of f.nameRetries.splice(0)) retry()
+    await settle()
+
+    expect(controller.state().services[0]?.controls.start).toBe(true)
+  })
+
+  it('publishes nothing when a held name resolution ends after dispose', async () => {
+    const { f, controller, states } = await controllerWith((setup) => {
+      setup.holdNames(true)
+      setup.setInitialPins([pin({ workingDir: '/srv/app' })])
+    })
+    const before = states.length
+
+    controller.dispose()
+    f.resolved.set('/srv/app', 'app')
+    for (const held of f.heldNames) held.release()
+    await settle()
+
+    expect(states).toHaveLength(before)
+    expect(f.nameRetries).toEqual([])
   })
 
   it('clears the pending operation and shows the error when the runner itself throws', async () => {

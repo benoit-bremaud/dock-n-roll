@@ -1,11 +1,15 @@
 import { stat } from 'node:fs/promises'
+import { withTimeout } from './with-timeout'
+
+/** Runs inside the recomputation chain: a hung mount must not hold it. */
+const STAT_TIMEOUT_MS = 2000
 
 async function isKind(path: string, kind: 'dir' | 'file'): Promise<boolean> {
   try {
-    const info = await stat(path)
+    const info = await withTimeout(stat(path), STAT_TIMEOUT_MS, `stat ${path}`)
     return kind === 'dir' ? info.isDirectory() : info.isFile()
   } catch {
-    // Gone, unreadable or not a path: all mean the project cannot be started from here.
+    // Gone, unreadable, hung or not a path: all mean the project cannot be started from here.
     return false
   }
 }
