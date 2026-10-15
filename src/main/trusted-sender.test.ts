@@ -45,4 +45,11 @@ describe('isTrustedSender', () => {
     expect(at(FILE_URL)).toBe(false)
     expect(at('https://example.com/')).toBe(false)
   })
+
+  it('compares the dev server origin, not a string prefix', () => {
+    const dev = { kind: 'devServer', url: 'http://localhost:5173' } as const
+    for (const url of ['http://localhost:51730/', 'http://localhost:5173.evil.com/', 'not a url']) {
+      expect(isTrustedSender(event({ senderFrame: { parent: null, url } }), dashboard, dev)).toBe(false)
+    }
+  })
 })

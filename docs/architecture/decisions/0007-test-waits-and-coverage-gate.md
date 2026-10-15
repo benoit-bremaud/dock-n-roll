@@ -13,7 +13,8 @@ no coverage measurement, so an untested module (IPC handlers, preload) could go 
 
 Weights: regression protection 35, CI stability 25, simplicity 20, maintenance 20.
 
-1. **Global thresholds = measured coverage minus ~5 points, raised by hand** — 420/500.
+1. **Global thresholds = measured coverage rounded down to a multiple of 5 (5–8 points
+   under), raised by hand** — 420/500.
 2. `thresholds.autoUpdate` (Vitest ratchets the numbers itself) — 365/500: a refactor that
    deletes tested code turns CI red.
 3. Report only, no threshold — 350/500: blocks nothing.
@@ -31,7 +32,9 @@ Weights: regression protection 35, CI stability 25, simplicity 20, maintenance 2
   `src/renderer/src/main.tsx` (covered by the manual test of the built app), test helpers and
   declaration files.
 - The trust check of IPC callers is a pure function (`src/main/trusted-sender.ts`, diagram 07),
-  so it is unit-tested without Electron.
+  so it is unit-tested without Electron. Its wiring in `index.ts` (live window, page origin) is
+  not covered automatically: it stays in the composition root, checked by the manual test of
+  the built app (the dashboard loads its state over IPC).
 
 ### Consequences
 

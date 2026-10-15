@@ -6,8 +6,9 @@ import { defineConfig } from 'vitest/config'
 // Every renderer test (`.ts` or `.tsx`) runs in the DOM project; none is left unrun.
 export default defineConfig({
   test: {
-    // Thresholds = measured coverage minus ~5 points, raised by hand (ADR-0007). Excluded: the
-    // Electron composition roots (exercised by the manual test of the built app) and test helpers.
+    // Thresholds = measured coverage rounded down to a multiple of 5 (5–8 points under), raised
+    // by hand (ADR-0007). Excluded: the Electron composition roots (exercised by the manual test
+    // of the built app) and test helpers.
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],

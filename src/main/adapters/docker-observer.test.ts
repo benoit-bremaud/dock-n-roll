@@ -206,7 +206,8 @@ describe('observeDocker — sequence diagram 06', () => {
     const destroyWeb = JSON.stringify({ Type: 'container', Action: 'destroy', Actor: { ID: 'web' } })
 
     daemon.emitRaw(startDb.slice(0, 20))
-    await quietFor(20) // separate writes reach the client as separate chunks
+    // Not a negative check: a short pause so the two writes reach the client as separate chunks.
+    await new Promise((resolve) => setTimeout(resolve, 20))
     daemon.emitRaw(`${startDb.slice(20)}\nnot json\n${destroyWeb}\n`)
 
     await waitFor(() => stateOf('db') === 'running' && latest().every((c) => c.id !== 'web'))
@@ -288,13 +289,17 @@ describe('observeDocker — sequence diagram 06', () => {
     if (db !== undefined) db.status = 'running'
     daemon.dropStreams()
     await waitFor(() => stateOf('db') === 'running' && daemon.openStreams === 1)
+    const afterResync = snapshots.length - 1
 
-    // The stale answer lands; the next publish must still say running.
+    // The stale answer lands (third `db` answer: first sync, slow re-inspect, resync); no publish
+    // from then on may say `db` is not running.
     await waitFor(() => daemon.answered.filter((path) => path.endsWith('/db/json')).length === 3)
     const published = snapshots.length
     daemon.emit('start', 'web')
     await waitFor(() => snapshots.length > published)
-    expect(stateOf('db')).toBe('running')
+    for (const snapshot of snapshots.slice(afterResync)) {
+      expect(snapshot.find((c) => c.id === 'db')?.state).toBe('running')
+    }
   })
 
   it('skips a container whose inspect it cannot read, and keeps observing the others', async () => {

@@ -12,12 +12,22 @@ export interface SenderEvent {
 /** Where the dashboard page is served from: the bundled file, or the dev server in development. */
 export type DashboardOrigin = { readonly kind: 'file'; readonly url: string } | { readonly kind: 'devServer'; readonly url: string }
 
+function originOf(url: string): string | null {
+  return URL.canParse(url) ? new URL(url).origin : null
+}
+
 /**
  * IPC calls are accepted only from the dashboard page itself: the top frame of the dashboard
- * window's own `webContents`, on the bundled page (exact URL) or the dev server (URL prefix).
+ * window's own `webContents`, on the bundled page (exact URL) or the dev server (same origin —
+ * a string prefix would also accept `http://localhost:51730`).
+ *
+ * @param dashboardContents the dashboard window's `webContents`, or `null` when there is no live
+ *   window (every call is then refused).
  */
-export function isTrustedSender(event: SenderEvent, dashboard: unknown, origin: DashboardOrigin): boolean {
+export function isTrustedSender(event: SenderEvent, dashboardContents: object | null, origin: DashboardOrigin): boolean {
   const frame = event.senderFrame
-  if (frame === null || frame.parent !== null || dashboard === null || event.sender !== dashboard) return false
-  return origin.kind === 'devServer' ? frame.url.startsWith(origin.url) : frame.url === origin.url
+  if (frame === null || frame.parent !== null || dashboardContents === null || event.sender !== dashboardContents) return false
+  if (origin.kind === 'file') return frame.url === origin.url
+  const frameOrigin = originOf(frame.url)
+  return frameOrigin !== null && frameOrigin === originOf(origin.url)
 }
