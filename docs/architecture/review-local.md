@@ -5,7 +5,7 @@
 - Scope: branch diff main...fix/runtime-robustness
 - Checks run: design · docs · tests · security · correctness
 - Verdict: fix Must Have first  ·  Must 2 · Should 7 · Nice 3
-- Resolution: all Must and Should applied (`bb…` commits below); Nice: pin comment and 1999 ms check applied, the fixed-sleep test kept as noted
+- Resolution: all Must and Should applied (commits after `442449d`); Nice: pin comment and 1999 ms check applied, the fixed-sleep test kept as noted
 
 ## 🔴 Must Have
 - `src/main/controller/service-controller.ts:283` `[design|correctness]` · A **rejecting** `resolveProjectName` makes `Promise.all` reject: `failedAt` is never set, `.finally` recomputes, the same dirs are due again → hot loop of `docker compose config` spawns; one bad dir also drops the others' names · catch per dir (`.catch(() => null)`) so every failure lands in `failedAt`; test with a rejecting fake asserting one call.
