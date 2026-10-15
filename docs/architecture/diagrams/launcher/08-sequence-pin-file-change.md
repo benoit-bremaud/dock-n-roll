@@ -46,9 +46,11 @@ sequenceDiagram
   publish in order, so an older recomputation can never publish after a newer one.
 - Name resolution (`docker compose config`, up to 20 s) runs **outside** the chain, one at a
   time: a slow or failing dir never delays a snapshot or a pin change. Until it ends the row is
-  unresolved and Start stays refused. Only dirs not resolved yet are fetched.
+  unresolved and Start stays refused. Only dirs not resolved yet are fetched; a failed (or
+  throwing) resolution is retried by a timer 30 s later, without waiting for another input.
 - `PinFileStore` keeps exactly one live watcher. After each burst it re-arms when the directory
   reported its own removal or its inode changed (a recreated directory may reuse the inode
-  number). Its `mkdir`, `stat` and reads time out after 5 s.
+  number). Its `mkdir`, `stat` and reads time out after 5 s; a failed re-arm is retried after
+  5 s, so the store never stays unwatched.
 - Pin-file errors are shown (dashboard banner) but never clear the last valid pins — that is
   `PinFileStore`'s contract.

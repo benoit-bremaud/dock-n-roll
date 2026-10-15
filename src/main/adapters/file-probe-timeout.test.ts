@@ -11,9 +11,14 @@ describe('filesExist — hung filesystem', () => {
 
   it('answers false after 2 s instead of holding every recomputation', async () => {
     vi.useFakeTimers()
-    const result = filesExist('/mnt/nfs/app', ['/mnt/nfs/app/compose.yaml'])
+    let settled = false
+    const result = filesExist('/mnt/nfs/app', ['/mnt/nfs/app/compose.yaml']).finally(() => {
+      settled = true
+    })
 
-    await vi.advanceTimersByTimeAsync(2000)
+    await vi.advanceTimersByTimeAsync(1999)
+    expect(settled).toBe(false)
+    await vi.advanceTimersByTimeAsync(1)
 
     await expect(result).resolves.toBe(false)
   })

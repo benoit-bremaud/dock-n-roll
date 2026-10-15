@@ -10,6 +10,8 @@ import { withTimeout } from './with-timeout'
 const DEBOUNCE_MS = 100
 /** A config dir on a stale network mount must not hang the store forever. */
 const FS_TIMEOUT_MS = 5000
+/** A re-arm that failed (directory not creatable, mount hung) is tried again after this. */
+const REARM_RETRY_MS = 5000
 
 export interface PinFileStore {
   /** Latest pins, with the errors of the latest read. */
@@ -73,8 +75,9 @@ async function inodeOf(directory: string): Promise<number | null> {
  * last valid pins and reports the error. Reloads run one at a time, so a slow read can never
  * overwrite a newer one. After each burst of events, if the directory reported its own removal
  * or its inode changed or is gone (even recreated within the debounce), it is recreated if
- * needed and watched again,
- * with exactly one live watcher. Every filesystem call is bounded by `FS_TIMEOUT_MS`.
+ * needed and watched again, with exactly one live watcher; a failed re-arm is retried after
+ * `REARM_RETRY_MS`.
+ * Every filesystem call is bounded by `FS_TIMEOUT_MS`.
  *
  * Known limit: a symlinked `services.yaml` is read, but edits made to its target are not seen
  * until the link itself changes or the app restarts.
@@ -90,9 +93,10 @@ export async function openPinFileStore(path: string, onChange: (result: PinFileR
   let closed = false
   let timer: NodeJS.Timeout | undefined
   let watcher: FSWatcher | undefined
-  let pendingReload = false
+  let retryTimer: NodeJS.Timeout | undefined
+  /** What the current burst of events asks for, read and reset once it ends. */
+  let burst = { reload: false, rearm: false }
   let rearming = false
-  let selfEvent = false
   let chain = Promise.resolve()
 
   const reload = async (): Promise<void> => {
@@ -134,10 +138,10 @@ export async function openPinFileStore(path: string, onChange: (result: PinFileR
       if (closed) return
       // `filename` can be null on some platforms: reload rather than miss a change.
       const concernsFile = filename === null || filename === file
-      pendingReload ||= concernsFile
       // Linux reports the watched directory's own removal under its name; its inode number can
       // be reused by a directory recreated at once, so the inode check alone would miss it.
-      selfEvent ||= filename === basename(directory)
+      // A file named like its directory only costs a harmless extra re-arm.
+      burst = { reload: burst.reload || concernsFile, rearm: burst.rearm || filename === basename(directory) }
       clearTimeout(timer)
       timer = setTimeout(checkAfterBurst, DEBOUNCE_MS)
     })
@@ -149,15 +153,13 @@ export async function openPinFileStore(path: string, onChange: (result: PinFileR
   /** A removed or recreated directory leaves the watcher on a dead inode: re-arm, else reload. */
   const checkAfterBurst = (): void => {
     if (closed) return
-    const reloadWanted = pendingReload
-    const rearmWanted = selfEvent
-    pendingReload = false
-    selfEvent = false
+    const wanted = burst
+    burst = { reload: false, rearm: false }
     chain = chain.then(async () => {
       if (closed) return
-      if (rearmWanted || (await inodeOf(directory)) !== watchedInode) {
+      if (wanted.rearm || (await inodeOf(directory)) !== watchedInode) {
         rearm()
-      } else if (reloadWanted) {
+      } else if (wanted.reload) {
         reloadAndNotify()
       }
     })
@@ -179,6 +181,8 @@ export async function openPinFileStore(path: string, onChange: (result: PinFileR
       .catch((error: unknown) => {
         result = { entries: result.entries, errors: [errorText(error)] }
         notify()
+        // Without a watcher no event would ever trigger another attempt.
+        if (!closed) retryTimer = setTimeout(rearm, REARM_RETRY_MS)
       })
       .finally(() => {
         rearming = false
@@ -193,6 +197,7 @@ export async function openPinFileStore(path: string, onChange: (result: PinFileR
     close: () => {
       closed = true
       clearTimeout(timer)
+      clearTimeout(retryTimer)
       watcher?.close()
     }
   }

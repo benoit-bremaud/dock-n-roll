@@ -211,3 +211,19 @@ Chronological operational logbook. Complements `git log` with the human context.
   Codex round: 2 P2 fixed in `0e39846` (state pushed again on `did-finish-load`; `rebuild()` stops
   after `dispose()`); re-review clean. Issue #8 closed after the owner's cold + warm GNOME-menu
   test. Found on the way: `pnpm dist` fails in a worktree (missing `homepage`) → issue #16.
+
+## 2026-10-15 — Brick B: runtime robustness
+
+- **Audit verified in code**: name resolution ran inside the serialized recomputation chain (a
+  failing pin dir held every Docker snapshot for up to ~20 s each retry); pin-file watcher could
+  leak on a double re-arm and stayed dead when its directory was recreated within the debounce
+  (Linux reuses the inode number — found while testing); `stat`/`mkdir`/reads had no timeout and
+  `existsSync` ran synchronously; two `before-quit` listeners.
+- **Decision** (MCDA, owner choice A, 475/500 vs B 375, C 300): resolution moved outside the
+  chain, single-flight, result applied by a later recomputation.
+- Pin store: one live watcher, re-arm on self-removal event or inode change, failed re-arm
+  retried after 5 s; `withTimeout` (2 s `filesExist`, 5 s pin store). Single ordered shutdown
+  (flag → dispose → tray), part of #12. UML 07/08/11 updated.
+- **Pre-push review**: Must 2 · Should 7 · Nice 3. Must: a *rejecting* resolver looped without
+  pause (reproduced: the test hung), and a false-confidence single-flight test. All Must/Should
+  applied (timed 30 s name retry, re-arm retry, SRP split, fs-boundary tests). 362 tests.
