@@ -261,3 +261,13 @@ Chronological operational logbook. Complements `git log` with the human context.
 - **Pre-push review**: Must 0 · Should 6 applied · Nice filed as issue #25. 390 tests.
 - **PR #26 merged** (`c96eb44`) — `test: brick D — IPC tests, de-flaked waits, coverage gate`.
   Codex no findings; CI green; #18 closed.
+
+## 2026-10-15 — Brick E: docs & release
+
+- **Version** (MCDA, owner choice A v1.0.0 475/500 vs C rc.1 325, B 0.1.0 285): package.json
+  bumped to 1.0.0; `CHANGELOG.md` (Keep a Changelog). Tag `v1.0.0` cut from main after merge.
+- **#16 fixed**: `homepage` + `repository` in package.json — `pnpm dist` works without the
+  `-c.extraMetadata` override. New CI job `package` builds the `.deb` (artifact, 7 days).
+- **README**: install, uninstall, pin file, troubleshooting (AppIndicator, AppArmor sandbox,
+  Docker socket / rootless `DOCKER_HOST`).
+- **Diagrams 07/09**: plan step numbers replaced with the real PRs (#7, #9, #10).
