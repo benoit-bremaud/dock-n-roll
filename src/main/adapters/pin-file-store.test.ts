@@ -163,7 +163,17 @@ describe('openPinFileStore — spec §9 Q1 (watched file)', () => {
     expect(store.current().entries).toEqual([VALID_ENTRY])
   })
 
-  it('refuses a file over the size cap without reading it, keeping the last valid pins', async () => {
+  it('accepts a file of exactly the size cap', async () => {
+    mkdirSync(dirname(path), { recursive: true })
+    const text = `${VALID}#`
+    writeFileSync(path, text.padEnd(64 * 1024 - 1, 'x') + '\n')
+
+    store = await openPinFileStore(path, (result) => seen.push(result))
+
+    expect(store.current()).toEqual({ entries: [VALID_ENTRY], errors: [] })
+  })
+
+  it('refuses a file over the size cap, keeping the last valid pins', async () => {
     store = await openPinFileStore(path, (result) => seen.push(result))
     writeFileSync(path, VALID)
     await waitFor(() => store?.current().entries.length === 1)

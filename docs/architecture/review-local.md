@@ -1,37 +1,42 @@
-# Local review — dock-n-roll (brick B: runtime robustness)
+# Local review — dock-n-roll (brick C: supply chain & hardening)
 
 - Date: 2026-10-15
-- Commit: 442449d
-- Scope: branch diff main...fix/runtime-robustness
+- Commit: 9ef3a2d
+- Scope: branch diff main...chore/supply-chain-hardening
 - Checks run: design · docs · tests · security · correctness
-- Verdict: fix Must Have first  ·  Must 2 · Should 7 · Nice 3
-- Resolution: all Must and Should applied (commits after `442449d`); Nice: pin comment and 1999 ms check applied, the fixed-sleep test kept as noted
+- Verdict: ship after Should fixes  ·  Must 0 · Should 3 · Nice 4 (all Should applied)
 
 ## 🔴 Must Have
-- `src/main/controller/service-controller.ts:283` `[design|correctness]` · A **rejecting** `resolveProjectName` makes `Promise.all` reject: `failedAt` is never set, `.finally` recomputes, the same dirs are due again → hot loop of `docker compose config` spawns; one bad dir also drops the others' names · catch per dir (`.catch(() => null)`) so every failure lands in `failedAt`; test with a rejecting fake asserting one call.
-- `src/main/controller/service-controller.test.ts:502` `[tests]` · "one name resolution at a time" also passes on the old code (false confidence); no test for dispose during a held resolution · rewrite to prove the `resolving` guard (second due dir while the first call is held, chain not blocked); add hold → dispose → release → no `onChange`.
+
+_None._
 
 ## 🟡 Should Have
-- `src/main/controller/service-controller.ts:270` `[correctness|docs]` · A failed name is retried only when another input arrives, while diagrams 07/08 say "retried after 30 s" · schedule one `recompute()` after `NAME_RETRY_MS` on failure (via `deps.schedule`), cancelled on `dispose`.
-- `src/main/adapters/pin-file-store.ts:176` `[correctness]` · A failed or timed-out re-arm leaves no watcher: pin edits ignored until restart · retry the re-arm after a delay, timer cleared on `close()`.
-- `src/main/controller/service-controller.ts:264` `[design]` · `resolveNamesInBackground` also prunes caches and republishes `resolvedNames` (SRP) · split into `pruneNames(dirs)` + the single-flight launch.
-- `src/main/adapters/pin-file-store.ts:93` `[design]` · Three loose flags form an implicit state machine · collapse the two burst flags into one `burst: { reload, rearm }` swapped in `checkAfterBurst`.
-- `src/main/adapters/pin-file-store.ts` `[tests]` · Timeout paths untested (hung `mkdir` rejects open; hung read keeps last pins with error) · new test file with `vi.mock('node:fs/promises')` + fake timers.
-- `src/main/adapters/pin-file-store.ts` `[tests]` · "exactly one live watcher" unguarded · spy on `watch`, recreate the dir twice, assert open − closed = 1.
-- `src/main/adapters/with-timeout.test.ts` `[tests]` · timer clearing not asserted · `expect(vi.getTimerCount()).toBe(0)` after resolve/reject.
+
+- `src/main/adapters/pin-file-store.ts:52` `[design|correctness]` · stat-then-read race: the
+  comment claimed a huge file "never reaches memory". · Applied: comment reworded as best effort
+  (TOCTOU accepted in the owner's MCDA choice A; the file is the user's own config).
+- `.github/dependabot.yml` `[security]` · no cooldown: a freshly published, possibly compromised
+  release is proposed the same day. · Applied: `cooldown.default-days: 5` on npm.
+- `src/main/adapters/pin-file-store.test.ts:166` `[tests]` · test name promised "without reading it"
+  (unasserted) and the `>` boundary was untested. · Applied: renamed; exact-64 KiB acceptance test.
 
 ## 🔵 Nice to Have
-- `src/main/adapters/pin-file-store.ts:140` `[design|correctness]` · a file named like its directory triggers a harmless extra re-arm · one-line comment.
-- `src/main/adapters/file-probe-timeout.test.ts:16` `[tests]` · assert not settled at 1999 ms to pin the 2 s limit.
-- `src/main/adapters/pin-file-store.test.ts:139` `[tests]` · fixed 300 ms sleep relies on inotify timing; it does catch the bug — keep, revisit if flaky.
+
+- `pin-file-store.ts:54` `[correctness]` · a FIFO/device named `services.yaml` passes with size 0
+  (bounded by the 5 s timeout) — an `isFile()` check would give a clearer error.
+- `pin-file-store.ts:54` `[docs]` · error says "65536 bytes"; "64 KiB" would match ADR-0005.
+- `electron-builder.yml:10` `[docs]` · fuse rationale duplicated with ADR-0006 — point to the ADR.
+- `pin-file-store.test.ts` `[design|tests]` · the cap is hard-coded in tests; export the constant.
 
 ## ⚪ Disagree / Intentional
-- `src/main/adapters/pin-file-store.ts` `[correctness]` · "store can notify after close()" — `notify()` already returns when `closed` (first line); no change.
-- `src/main/adapters/with-timeout.ts` `[design]` · not over-engineered: two callers, real boundary helper.
+
+- `pin-file-store.ts:52` `[correctness]` · `stat` follows symlinks (target size checked) and ENOENT
+  still means no pins through the existing catch.
+- `electron-builder.yml` `[security]` · `grantFileProtocolExtraPrivileges` stays on: turning it off
+  broke the dashboard on the built app (ADR-0006).
 
 ## Per-dimension summary
-- Design: no over-engineering; one SRP split, flag simplification, and the rejection hot loop.
-- Docs: diagrams 07/08/11 match except the "30 s retry" wording (fixed by the timer).
-- Tests: healthy pyramid, no over-mocking; one false-confidence test and missing timeout/dispose/watcher-count cases.
-- Security: nothing found (paths only in error labels, no shell).
-- Correctness: one Must (rejection loop), two Should (no timed retry, dead store after failed re-arm).
+
+- Design: no over-engineering, dependency rule kept · Docs: ADR-0005/0006 and diagram 08 match
+  the code · Tests: trustworthy, boundary added · Security: Dependabot valid, cooldown added, fuse
+  reasoning sound · Correctness: no bug, race documented.

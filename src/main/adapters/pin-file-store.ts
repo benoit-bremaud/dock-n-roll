@@ -48,7 +48,8 @@ export function parsePinFileText(text: string): PinFileResult {
 
 async function readPinFile(path: string): Promise<string | null> {
   try {
-    // Checked before reading, so a huge file never reaches memory or the parser (ADR-0005).
+    // Checked before reading, so a huge file is refused unread (ADR-0005). Best effort: a file
+    // growing between stat and read is not caught — acceptable for the user's own config.
     const { size } = await withTimeout(stat(path), FS_TIMEOUT_MS, `stat ${path}`)
     if (size > MAX_PIN_FILE_BYTES) throw new Error(`file too large (${String(size)} bytes, max ${String(MAX_PIN_FILE_BYTES)})`)
     return await withTimeout(readFile(path, 'utf8'), FS_TIMEOUT_MS, `read ${path}`)

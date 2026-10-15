@@ -242,4 +242,6 @@ Chronological operational logbook. Complements `git log` with the human context.
   encryption has nothing to protect. Recorded in electron-builder.yml and ADR-0006.
 - **Pin file size cap** (MCDA, owner choice A `stat` before read, 450/500 vs B 375, C 345):
   > 64 KiB refused before reading, last valid pins kept (ADR-0005, diagram 08). TDD.
-- **CI**: `timeout-minutes` on every job (15 quality, 10 audit/gitleaks). 363 tests.
+- **CI**: `timeout-minutes` on every job (15 quality, 10 audit/gitleaks).
+- **Pre-push review**: Must 0 · Should 3 · Nice 4. Should applied (Dependabot 5-day cooldown,
+  size-cap boundary test, TOCTOU documented as best effort). 364 tests.
