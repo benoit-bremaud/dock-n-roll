@@ -1,6 +1,6 @@
 {
   "name": "dock-n-roll",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "GNOME top-bar launcher for local dev services: one-click ON/OFF for Docker Compose projects + background activity monitor",
   "license": "UNLICENSED",
