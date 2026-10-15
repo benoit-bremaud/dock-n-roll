@@ -60,6 +60,37 @@ describe('observeDocker — sequence diagram 06', () => {
     ])
   })
 
+  it('gives up on an event stream whose headers never come, then resyncs', async () => {
+    daemon.hangNextEvents = true
+    start({ headersTimeoutMs: 50 })
+
+    await waitFor(() => outages.length > 0)
+    expect(outages[0]).toMatch(/did not answer/)
+    await waitFor(() => snapshots.length > 0)
+    expect(outages).toHaveLength(1)
+    expect(eventRequests()).toBe(2)
+  })
+
+  it('reports no outage when stopped while the event request hangs', async () => {
+    daemon.hangNextEvents = true
+    start({ headersTimeoutMs: 50 })
+    await waitFor(() => eventRequests() === 1)
+
+    observer?.stop()
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    expect(outages).toEqual([])
+  })
+
+  it('keeps an open event stream past the headers timeout', async () => {
+    const startedAt = Date.now()
+    start({ headersTimeoutMs: 50 })
+
+    await waitFor(() => snapshots.length > 0)
+    await new Promise((resolve) => setTimeout(resolve, Math.max(0, startedAt + 150 - Date.now())))
+    expect(outages).toEqual([])
+    expect(daemon.openStreams).toBe(1)
+  })
+
   it('subscribes to events before listing containers', async () => {
     start()
 

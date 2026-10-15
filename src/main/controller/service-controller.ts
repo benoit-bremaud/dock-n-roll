@@ -100,9 +100,10 @@ function allUp(containers: readonly ContainerSnapshot[]): boolean {
 }
 
 /**
- * Wires the adapters to the domain (class diagram 07). Resolves once the pin file is loaded and
- * the first state is computed; rejects only if `openPinFileStore` rejects. Later adapter
- * failures are logged or shown on the rows, never thrown. Call `dispose()` on quit.
+ * Wires the adapters to the domain (class diagram 07). Resolves once the pin file is loaded,
+ * before the first state is computed: until then `state()` lists no service, and the computed
+ * state arrives through `onChange`. Rejects only if
+ * `openPinFileStore` rejects. Later adapter failures are logged or shown on the rows, never thrown. Call `dispose()` on quit.
  */
 export async function createServiceController(deps: ControllerDeps): Promise<ServiceController> {
   let containers: readonly ContainerSnapshot[] = []
@@ -229,6 +230,8 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   const rebuild = async (): Promise<void> => {
     const next = buildServices(containers, pins, resolvedNames)
     const checks = await Promise.all(next.map((service) => deps.filesExist(service.workingDir, service.configFiles)))
+    // `dispose()` may have run during the await: no publish, no new probe after it.
+    if (disposed) return
     services = next
     services.forEach((service, index) => filesOk.set(service.id, checks[index] ?? true))
     prune()
@@ -329,8 +332,9 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
       }
     }
   )
+  // Not awaited: the first recomputation can wait on `docker compose config` per pin (up to
+  // 20 s). The caller gets the controller at once and the full state via `onChange` (diagram 11).
   applyPins(store.current())
-  await chain
 
   return {
     state: () => current,

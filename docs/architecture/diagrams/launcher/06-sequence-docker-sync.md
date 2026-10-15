@@ -21,6 +21,7 @@ sequenceDiagram
   SC->>DO: observeDocker(options, listener)
   loop sync — at startup, then after every stream loss
     DO->>API: GET /events filters type=container (stream)
+    Note over DO: headers awaited 5 s at most (a hung daemon is a lost connection); the open stream has no deadline
     Note over DO: events are buffered, not applied yet
     DO->>API: GET /containers/json?all=1
     API-->>DO: container ids
