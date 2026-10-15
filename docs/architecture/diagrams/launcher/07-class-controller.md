@@ -122,9 +122,10 @@ classDiagram
   (spec R6): `openUrl(id)` opens the pin's validated `http`/`https` URL.
 - **`reason`** carries what the row must explain: `invalidReason`, the conflicting dirs, a
   missing folder, or the stderr excerpt of the last failed command (spec UC1-4a, UC2-3a).
-- **Name resolution (spec §10 P1)**: on a pin-file change, `resolveProjectName` runs only for
-  pin dirs (without `project`) not resolved yet, so a slow `docker compose config` does not
-  hold every input; names of removed pins are dropped.
+- **Name resolution (spec §10 P1)**: `resolveProjectName` runs only for pin dirs (without
+  `project`) not resolved yet (failures retried after 30 s), outside the serialized chain and
+  one batch at a time, so a slow `docker compose config` never holds another input; its result
+  lands through a new recomputation. Names of removed pins are dropped.
 - **Health gate (spec §3)**: while a service's containers all run or are done and its pin has a
   `healthUrl` with no container HEALTHCHECK, the controller probes it every 2 s
   (`schedule`); the gate becomes `passed` on the first 2xx/3xx and resets when the service
