@@ -130,6 +130,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   let disposed = false
   /** Single flight: a resolution runs outside the chain, at most one at a time. */
   let resolving = false
+  let cancelNameRetry: () => void = () => undefined
 
   /** A never-started pin without `project` whose Compose name is unknown: `up` could take over another dir. */
   const unresolved = (service: Service): boolean =>
@@ -247,7 +248,9 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
       .then(async () => {
         if (disposed) return
         await before?.()
-        resolveNamesInBackground()
+        const dirs = unpinnedNameDirs()
+        pruneNames(dirs)
+        resolveNamesInBackground(dirs)
         await rebuild()
       })
       .catch((error: unknown) => {
@@ -255,32 +258,50 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
       })
   }
 
-  /**
-   * Resolves pin dirs not resolved yet — failures again after `NAME_RETRY_MS` — so a temporary
-   * failure does not refuse Start until the app restarts. Runs **outside** the chain: a slow
-   * `docker compose config` (up to 20 s) never holds a Docker snapshot or a pin change; the
-   * rows stay unresolved (Start refused) until it ends, then one recomputation applies it.
-   */
-  const resolveNamesInBackground = (): void => {
-    const dirs = [...new Set(pins.filter((entry) => entry.project === undefined).map((entry) => entry.workingDir))]
+  /** Pin dirs without `project`, whose Compose name must be resolved. */
+  const unpinnedNameDirs = (): string[] => [
+    ...new Set(pins.filter((entry) => entry.project === undefined).map((entry) => entry.workingDir))
+  ]
+
+  /** Names of removed pins are dropped; the rows read the cache as it is now. */
+  const pruneNames = (dirs: readonly string[]): void => {
     for (const map of [nameCache, failedAt]) for (const dir of map.keys()) if (!dirs.includes(dir)) map.delete(dir)
     resolvedNames = new Map(nameCache)
+  }
+
+  /**
+   * Resolves pin dirs not resolved yet — failures again after `NAME_RETRY_MS`, on a timer, so a
+   * temporary failure does not refuse Start until the next input. Runs **outside** the chain and
+   * one batch at a time: a slow `docker compose config` (up to 20 s) never holds a Docker
+   * snapshot or a pin change; the rows stay unresolved (Start refused) until it ends, then one
+   * recomputation applies it.
+   */
+  const resolveNamesInBackground = (dirs: readonly string[]): void => {
     if (resolving) return
     const due = dirs.filter((dir) => !nameCache.has(dir) && now() - (failedAt.get(dir) ?? -Infinity) >= NAME_RETRY_MS)
     if (due.length === 0) return
     resolving = true
-    void resolveNames(due)
-      .catch((error: unknown) => {
-        console.error('dock-n-roll: name resolution failed', error)
-      })
-      .finally(() => {
-        resolving = false
-        recompute()
-      })
+    void resolveNames(due).then((anyFailed) => {
+      resolving = false
+      if (disposed) return
+      if (anyFailed) {
+        cancelNameRetry()
+        cancelNameRetry = deps.schedule(() => {
+          recompute()
+        }, NAME_RETRY_MS)
+      }
+      recompute()
+    })
   }
 
-  const resolveNames = async (due: readonly string[]): Promise<void> => {
-    const names = await Promise.all(due.map((dir) => deps.resolveProjectName(dir, { socketPath: deps.socketPath })))
+  /** Never rejects: a throwing resolution counts as a failure of its own dir only. */
+  const resolveNames = async (due: readonly string[]): Promise<boolean> => {
+    const names = await Promise.all(
+      due.map((dir) => deps.resolveProjectName(dir, { socketPath: deps.socketPath }).catch((error: unknown) => {
+        console.error('dock-n-roll: name resolution failed', error)
+        return null
+      }))
+    )
     due.forEach((dir, index) => {
       const name = names[index] ?? null
       if (name === null) {
@@ -290,6 +311,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
         failedAt.delete(dir)
       }
     })
+    return names.some((name) => name === null)
   }
 
   const applyPins = (result: PinFileResult): void => {
@@ -369,6 +391,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     },
     dispose: () => {
       disposed = true
+      cancelNameRetry()
       observer.stop()
       store.close()
       for (const id of [...probing.keys()]) cancelProbe(id)
