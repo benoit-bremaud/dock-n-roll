@@ -84,6 +84,13 @@ classDiagram
   class TrayMenu {
     <<buildTrayMenu(views, actions), pure>>
   }
+  class IpcHandlers {
+    <<registerIpc(controller, listBackground, isTrusted)>>
+    +getState / start / stop / openUrl / listBackground
+  }
+  class TrustedSender {
+    <<isTrustedSender(event, dashboard, origin), pure>>
+  }
   ServiceController ..> ControllerDeps : uses
   ServiceController ..> ControllerState : produces
   ControllerState o-- ServiceView
@@ -91,6 +98,9 @@ classDiagram
   TrayMenu ..> ServiceView : renders
   DockNRollApi ..> ControllerState
   DockNRollApi ..> BackgroundView
+  DockNRollApi ..> IpcHandlers : invokes
+  IpcHandlers ..> TrustedSender : checks every call
+  IpcHandlers ..> ServiceController : delegates ids
 ```
 
 ## Notes
@@ -120,6 +130,10 @@ classDiagram
   views; an unknown id, or a control the derived status forbids, is refused in the main
   process (spec §4 columns enforced on both sides). URLs never come from the renderer
   (spec R6): `openUrl(id)` opens the pin's validated `http`/`https` URL.
+- **Trusted sender**: every handler first checks `isTrustedSender` — top frame of the dashboard
+  window's own `webContents`, URL equal to the bundled `index.html` (prefix of the dev server
+  URL in development). Pure function of the event, the dashboard and the expected origin, so it
+  is unit-tested without Electron; `index.ts` only supplies the live values.
 - **`reason`** carries what the row must explain: `invalidReason`, the conflicting dirs, a
   missing folder, or the stderr excerpt of the last failed command (spec UC1-4a, UC2-3a).
 - **Name resolution (spec §10 P1)**: `resolveProjectName` runs only for pin dirs (without
