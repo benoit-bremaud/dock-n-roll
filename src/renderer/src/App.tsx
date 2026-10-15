@@ -17,6 +17,7 @@ type Tab = (typeof TABS)[number]['key']
 export function App({ api }: { readonly api: DockNRollApi }): React.JSX.Element {
   const { state, error } = useControllerState(api)
   const [tab, setTab] = useState<Tab>('services')
+  const summary = state?.dockerAvailable === true ? runningSummary(state.services.map((service) => service.status)) : null
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   // WAI-ARIA tabs pattern: one tab stop, arrow keys / Home / End move and select.
@@ -37,7 +38,7 @@ export function App({ api }: { readonly api: DockNRollApi }): React.JSX.Element 
       <header className="app__header">
         <h1 className="app__title">dock-n-roll</h1>
         {/* Hidden while Docker is down: the last known statuses may be wrong (spec §4). */}
-        {state?.dockerAvailable === true && <p className="app__summary">{runningSummary(state.services.map((service) => service.status))}</p>}
+        {summary !== null && <p className="app__summary">{summary}</p>}
       </header>
       <div role="tablist" aria-label="Views" className="tabs" onKeyDown={onKeyDown}>
         {TABS.map((candidate, index) => (

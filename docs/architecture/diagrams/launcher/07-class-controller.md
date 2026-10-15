@@ -73,6 +73,7 @@ classDiagram
     +openPinFileStore
     +socketPath
     +pinFilePath
+    +homeDir
     +schedule
   }
   class BackgroundMonitor {

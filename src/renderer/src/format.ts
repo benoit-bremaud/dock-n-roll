@@ -1,4 +1,6 @@
-import type { ServiceStatus } from '../../main/domain/types'
+import type { ServiceView } from '../../shared/ipc'
+
+type ServiceStatus = ServiceView['status']
 
 /** `/home/u/x` → `~/x`. Only a whole home folder is replaced, never a prefix of another name. */
 export function shortenPath(path: string, homeDir: string): string {
