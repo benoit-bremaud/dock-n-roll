@@ -30,6 +30,9 @@ function fakes() {
   /** When set, filesExist answers only when the test releases it. */
   const heldFiles: { release: () => void }[] = []
   let holdFiles = false
+  /** When set, resolveProjectName answers only when the test releases it. */
+  const heldNames: { release: () => void }[] = []
+  let holdNames = false
   let rejectNextRun: Error | undefined
   const clock = { now: 0 }
 
@@ -69,7 +72,14 @@ function fakes() {
       }),
     resolveProjectName: (dir) => {
       resolveCalls.push(dir)
-      return Promise.resolve(resolved.get(dir) ?? null)
+      if (!holdNames) return Promise.resolve(resolved.get(dir) ?? null)
+      return new Promise((resolve) => {
+        heldNames.push({
+          release: () => {
+            resolve(resolved.get(dir) ?? null)
+          }
+        })
+      })
     },
     filesExist: (dir) => {
       counters.filesChecks += 1
@@ -108,6 +118,10 @@ function fakes() {
     heldFiles,
     holdFiles: (on: boolean) => {
       holdFiles = on
+    },
+    heldNames,
+    holdNames: (on: boolean) => {
+      holdNames = on
     },
     rejectNextRun: (error: Error) => {
       rejectNextRun = error
@@ -464,6 +478,39 @@ describe('review fixes — races and failures', () => {
     await settle()
     expect(controller.state().services[0]?.controls.start).toBe(true)
     expect(f.resolveCalls).toEqual(['/srv/blog', '/srv/blog'])
+  })
+
+  it('publishes Docker changes while a name resolution hangs, then applies the name', async () => {
+    const { f, controller, row } = await controllerWith((setup) => {
+      setup.holdNames(true)
+      setup.setInitialPins([pin({ workingDir: '/srv/app' })])
+    })
+
+    f.snapshot([web])
+    await settle()
+
+    expect(row(BLOG)).toMatchObject({ status: 'on' })
+    expect(controller.state().services.find((s) => s.workingDir === '/srv/app')?.controls.start).toBe(false)
+
+    f.resolved.set('/srv/app', 'app')
+    f.heldNames.forEach((held) => held.release())
+    await settle()
+
+    expect(controller.state().services.find((s) => s.workingDir === '/srv/app')?.controls.start).toBe(true)
+  })
+
+  it('runs one name resolution at a time, whatever the number of inputs', async () => {
+    const { f } = await controllerWith((setup) => {
+      setup.holdNames(true)
+      setup.setInitialPins([pin({ workingDir: '/srv/app' })])
+    })
+
+    f.clock.now = 60_000
+    f.snapshot([])
+    f.snapshot([web])
+    await settle()
+
+    expect(f.resolveCalls).toEqual(['/srv/app'])
   })
 
   it('clears the pending operation and shows the error when the runner itself throws', async () => {
