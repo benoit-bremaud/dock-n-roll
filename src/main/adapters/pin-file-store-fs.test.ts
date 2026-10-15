@@ -106,4 +106,51 @@ describe('openPinFileStore — hung filesystem and watcher lifecycle', () => {
     expect(store.current().errors).toEqual([])
     store.close()
   })
+
+  it('coalesces a burst of events into one notification', async () => {
+    const seen: PinFileResult[] = []
+    const store = await openPinFileStore(PATH, (result) => seen.push(result))
+
+    for (let i = 0; i < 3; i += 1) fsState.listeners.at(-1)?.('change', 'services.yaml')
+    await vi.advanceTimersByTimeAsync(99)
+    expect(seen).toEqual([])
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(seen).toHaveLength(1)
+    store.close()
+  })
+
+  it('ignores events about other files of the directory', async () => {
+    const seen: PinFileResult[] = []
+    const store = await openPinFileStore(PATH, (result) => seen.push(result))
+
+    await event('other.yaml')
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(seen).toEqual([])
+    store.close()
+  })
+
+  it('does not notify after close(), even with a reload already pending', async () => {
+    const seen: PinFileResult[] = []
+    const store = await openPinFileStore(PATH, (result) => seen.push(result))
+
+    fsState.listeners.at(-1)?.('change', 'services.yaml')
+    await vi.advanceTimersByTimeAsync(50)
+    store.close()
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(seen).toEqual([])
+  })
+
+  it('ignores events delivered after close()', async () => {
+    const seen: PinFileResult[] = []
+    const store = await openPinFileStore(PATH, (result) => seen.push(result))
+    store.close()
+
+    await event('services.yaml')
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(seen).toEqual([])
+  })
 })

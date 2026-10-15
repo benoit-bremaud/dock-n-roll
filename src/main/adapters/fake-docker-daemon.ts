@@ -17,6 +17,8 @@ export interface FakeContainer {
 export class FakeDockerDaemon {
   readonly containers = new Map<string, FakeContainer>()
   readonly requests: string[] = []
+  /** Paths whose response has been fully sent, in order: lets tests wait for a slow answer. */
+  readonly answered: string[] = []
   /** Runs once, when the next container list is requested — before it is answered. */
   beforeNextList: (() => void) | undefined
   /** Next list / inspect answered with this HTTP status and an HTML body, as a broken proxy would. */
@@ -84,6 +86,7 @@ export class FakeDockerDaemon {
   private handle(request: IncomingMessage, response: ServerResponse): void {
     const url = new URL(request.url ?? '/', 'http://docker')
     this.requests.push(url.pathname)
+    response.on('finish', () => this.answered.push(url.pathname))
     const json = (status: number, body: unknown): void => {
       response.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body))
     }
