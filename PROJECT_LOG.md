@@ -231,3 +231,15 @@ Chronological operational logbook. Complements `git log` with the human context.
   CI green. Manual test by Claude on the built app: tray registered on D-Bus in ~1.7 s, live pin
   add, 30 s timed name retry observed, config dir recreated → one inotify watch on the new inode,
   Quit via dbusmenu → clean exit in ~200 ms. Nice filed as issue #18.
+
+## 2026-10-15 — Brick C: supply chain & hardening
+
+- **Dependabot** added (npm + github-actions, weekly, minor/patch grouped); electron 44.7.0 → 44.7.2.
+- **Fuses**: the four already set (no RunAsNode, NODE_OPTIONS, inspect; asar only) were kept.
+  `grantFileProtocolExtraPrivileges: false` was tried and **reverted**: on the built app, the
+  dashboard's `loadFile()` from the asar fails with ERR_FILE_NOT_FOUND (control build with the
+  fuse on renders). Needs a custom protocol first. ASAR integrity is macOS/Windows only; cookie
+  encryption has nothing to protect. Recorded in electron-builder.yml and ADR-0006.
+- **Pin file size cap** (MCDA, owner choice A `stat` before read, 450/500 vs B 375, C 345):
+  > 64 KiB refused before reading, last valid pins kept (ADR-0005, diagram 08). TDD.
+- **CI**: `timeout-minutes` on every job (15 quality, 10 audit/gitleaks). 363 tests.

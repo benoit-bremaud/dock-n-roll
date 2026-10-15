@@ -50,7 +50,7 @@ async function readPinFile(path: string): Promise<string | null> {
   try {
     // Checked before reading, so a huge file never reaches memory or the parser (ADR-0005).
     const { size } = await withTimeout(stat(path), FS_TIMEOUT_MS, `stat ${path}`)
-    if (size > MAX_PIN_FILE_BYTES) throw new Error(`file too large (${size} bytes, max ${MAX_PIN_FILE_BYTES})`)
+    if (size > MAX_PIN_FILE_BYTES) throw new Error(`file too large (${String(size)} bytes, max ${String(MAX_PIN_FILE_BYTES)})`)
     return await withTimeout(readFile(path, 'utf8'), FS_TIMEOUT_MS, `read ${path}`)
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return null
