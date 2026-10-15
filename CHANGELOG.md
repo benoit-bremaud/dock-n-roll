@@ -20,8 +20,8 @@ First release.
   projects, reloaded on save (#5).
 - Linux `.deb` package with an AppArmor profile keeping Chromium's sandbox, and a
   *Start at login* toggle (#9).
-- Rootless Docker support through a `unix://` `DOCKER_HOST`.
-- CI builds the `.deb` and keeps it as an artifact.
+- Rootless Docker support through a `unix://` `DOCKER_HOST` (#5).
+- CI builds the `.deb` and keeps it as an artifact (brick E).
 
 ### Changed
 
@@ -37,7 +37,7 @@ First release.
 
 ### Fixed
 
-- `pnpm dist` no longer needs a `homepage` override (#16).
+- `pnpm dist` no longer needs a `homepage` override (closes #16).
 
 [Unreleased]: https://github.com/benoit-bremaud/dock-n-roll/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/benoit-bremaud/dock-n-roll/releases/tag/v1.0.0

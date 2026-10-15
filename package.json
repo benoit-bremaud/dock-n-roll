@@ -23,7 +23,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "audit": "pnpm audit --audit-level=high",
-    "dist": "electron-vite build && electron-builder --linux deb"
+    "dist": "electron-vite build && electron-builder --linux deb --publish never"
   },
   "dependencies": {
     "react": "19.3.0",

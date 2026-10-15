@@ -19,12 +19,12 @@ pnpm install && pnpm dist
 ```
 
 ```bash
-sudo apt install ./dist/dock-n-roll_1.0.0_amd64.deb
+sudo apt install ./dist/dock-n-roll_*_amd64.deb
 ```
 
 Launch **dock-n-roll** from the app grid (press the Super key and type its name). The icon shows
-up in the top bar; its menu lists one entry per project (🟢 ON, 🔴 OFF, 🟠 busy, ⚪ unusable) with
-Start/Stop, then **Open dashboard**, **Start at login** and **Quit**. Projects are discovered from the containers Docker knows about; pin the others (below).
+up in the top bar; its menu lists one entry per project (🟢 ON, 🔴 OFF, 🟠 starting, stopping or
+partial, ⚪ unusable) with Start/Stop, then **Open dashboard**, **Start at login** and **Quit**. Projects are discovered from the containers Docker knows about; pin the others (below).
 
 ## Uninstall
 
@@ -57,7 +57,7 @@ services:
 ```
 
 Invalid entries are skipped and the problem is shown in the dashboard; invalid YAML or a file over
-64 KiB keeps the last valid pins. Full rules: [spec §8](docs/architecture/specs/v1-spec.md).
+64 KiB keeps the last valid pins. Full rules: [spec §8](docs/architecture/specs/v1-spec.md#8-pin-file--format-sketch).
 
 ## Troubleshooting
 
@@ -75,7 +75,9 @@ On a non-Ubuntu GNOME, install *AppIndicator and KStatusNotifierItem Support* fi
 
 Ubuntu 24.04 restricts unprivileged user namespaces, which Chromium's sandbox needs. The package
 installs `/etc/apparmor.d/dock-n-roll` to allow them for this app only. If the app exits at once
-(run `dock-n-roll` in a terminal to see the error), reload the profile:
+(run `dock-n-roll` in a terminal to see the error), check that the profile is loaded
+(`sudo aa-status | grep dock-n-roll`); if the file is missing, reinstall the package, otherwise
+reload it:
 
 ```bash
 sudo apparmor_parser -r /etc/apparmor.d/dock-n-roll
@@ -91,7 +93,8 @@ The app reads the Docker socket `/var/run/docker.sock`; your user must be allowe
 sudo usermod -aG docker "$USER"
 ```
 
-Log out and back in afterwards. For **rootless Docker**, the app uses `DOCKER_HOST` when it is a
+Log out and back in afterwards. Note: the `docker` group is root-equivalent on this machine; prefer
+rootless Docker if that matters to you. For **rootless Docker**, the app uses `DOCKER_HOST` when it is a
 `unix://` path at login (for example `unix:///run/user/1000/docker.sock`); other values
 (`tcp://`, `ssh://`) fall back to the standard socket. Set it in `~/.profile`, not only in your
 shell's rc file, so that apps started from the desktop see it.
