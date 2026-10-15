@@ -207,3 +207,7 @@ Chronological operational logbook. Complements `git log` with the human context.
 - **Pre-push review** (`docs/architecture/review-local.md`): Must 0 · Should 5 · Nice 4, all
   applied. Found: quitting from the "Starting…" tray never disposed the controller; the
   `did-finish-load` push did not cover the early dashboard → replaced by one push after IPC wiring.
+- **PR #15 merged** (`0097ed6`) — `fix(startup): show the tray before slow initialisation (#8)`.
+  Codex round: 2 P2 fixed in `0e39846` (state pushed again on `did-finish-load`; `rebuild()` stops
+  after `dispose()`); re-review clean. Issue #8 closed after the owner's cold + warm GNOME-menu
+  test. Found on the way: `pnpm dist` fails in a worktree (missing `homepage`) → issue #16.
