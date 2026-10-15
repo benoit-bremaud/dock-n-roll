@@ -4,3 +4,5 @@
 # `install-electron` bin, which the dev/start scripts run first (electron-vite does not trigger it).
 allowBuilds:
   esbuild: true
+  # Windows installer helper pulled by electron-builder: never needed for the Linux .deb (ADR-0006).
+  electron-winstaller: false

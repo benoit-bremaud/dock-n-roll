@@ -1,0 +1,46 @@
+# Linux .deb only (ADR-0006): keeps Chromium's sandbox — the package installs an AppArmor profile
+# allowing user namespaces (Ubuntu 24.04), and makes chrome-sandbox setuid only where they are unavailable.
+appId: fr.bremaud.dock-n-roll
+# The installed binary runs at every login: turn off the fuses that make it a general Node runtime.
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  onlyLoadAppFromAsar: true
+productName: dock-n-roll
+directories:
+  output: dist
+files:
+  - out/**
+  - package.json
+# Outside the asar, read from process.resourcesPath (src/main/controller/resources.ts).
+extraResources:
+  - from: resources/tray-icon.png
+    to: tray-icon.png
+linux:
+  target: deb
+  executableName: dock-n-roll
+  category: Development
+  maintainer: Benoît Bremaud
+  synopsis: Start and stop local Docker Compose projects from the GNOME top bar
+  desktop:
+    entry:
+      Name: dock-n-roll
+      Comment: Start and stop local Docker Compose projects from the top bar
+      StartupWMClass: dock-n-roll
+      Terminal: "false"
+deb:
+  # Replaces electron-builder's defaults, so they are repeated: Electron's shared libraries first.
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libuuid1
+    - libsecret-1-0
+    - docker-ce-cli | docker.io
+    - docker-compose-plugin | docker-compose-v2
+    - iproute2

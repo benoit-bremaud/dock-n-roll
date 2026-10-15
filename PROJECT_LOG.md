@@ -157,3 +157,25 @@ Chronological operational logbook. Complements `git log` with the human context.
   - Live run found and fixed one defect: stopped containers showed a stale health in the
     Running tab.
   - Pre-push review: 5 Must, 12 Should resolved; no security finding. 302 tests.
+- **PR #7 merged** (`6dff221`) — `feat(dashboard): React dashboard window`.
+- **Packaging + autostart** (branch `feat/packaging`, ADR-0006, deployment diagram 10), test-first:
+  - `.deb` built by electron-builder 26.15.3 (`pnpm dist`), installed to `/opt/dock-n-roll`;
+    tray icon shipped outside the asar; "Start at login" checkbox in the tray menu writes or
+    removes `~/.config/autostart/dock-n-roll.desktop` (installed app only).
+  - **Decisions**:
+    - `.deb over AppImage` — on Ubuntu 24.04 (AppArmor restricts unprivileged user namespaces)
+      the package's AppArmor profile keeps Chromium's sandbox; an AppImage would need
+      `--no-sandbox` or root anyway.
+    - `Electron fuses off` (RunAsNode, NODE_OPTIONS, inspect flags; asar only) — the binary runs
+      at every login.
+    - `Checkbox changes only once the file is written` — failures shown in a dialog; clicks during
+      a write ignored.
+  - Pre-push review (design, docs, tests, security): 3 Must, 6 Should resolved — Exec escaping off
+    the Desktop Entry spec, sandbox mechanism misdocumented (AppArmor, not setuid), silent toggle
+    failure, missing Compose plugin dependency. 330 tests.
+  - Acceptance run on the installed `.deb`: AC1–AC7 and AC9 pass live (renderer sandboxed,
+    `chrome-sandbox` 0755 with the AppArmor profile; Start → orange → green in under 2 s; terminal
+    changes seen in under 0.4 s; icon back on its own after logout/login); AC8 and AC10 covered by
+    automated tests only (destructive to run for real).
+  - Open point: one launch from the GNOME menu showed the window but never registered its tray
+    icon; not reproduced since (relaunch and login autostart both fine).
