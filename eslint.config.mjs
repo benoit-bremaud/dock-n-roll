@@ -4,7 +4,7 @@ import tseslint from 'typescript-eslint'
 
 // ESLint resolves flat config through the default export (tool constraint).
 export default tseslint.config(
-  { ignores: ['out/', 'dist/', 'node_modules/'] },
+  { ignores: ['out/', 'dist/', 'node_modules/', 'coverage/'] },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   {

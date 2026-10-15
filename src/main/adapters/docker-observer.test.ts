@@ -1,17 +1,23 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ContainerSnapshot } from '../domain/types'
 import { observeDocker, type DockerObserver, type DockerObserverOptions } from './docker-observer'
 import { FakeDockerDaemon } from './fake-docker-daemon'
 
-async function waitFor(check: () => boolean, timeoutMs = 3000): Promise<void> {
-  const deadline = Date.now() + timeoutMs
-  while (!check()) {
-    if (Date.now() > deadline) throw new Error('condition not met in time')
-    await new Promise((resolve) => setTimeout(resolve, 10))
-  }
+async function waitFor(check: () => boolean): Promise<void> {
+  await vi.waitFor(() => {
+    expect(check()).toBe(true)
+  }, { timeout: 3000, interval: 10 })
+}
+
+/**
+ * Gives something that must NOT happen the time to happen anyway. Only for negative checks: a
+ * slow runner can make such a test pass wrongly, never fail wrongly, so it cannot flake red.
+ */
+async function quietFor(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 describe('observeDocker — sequence diagram 06', () => {
@@ -77,7 +83,7 @@ describe('observeDocker — sequence diagram 06', () => {
     await waitFor(() => eventRequests() === 1)
 
     observer?.stop()
-    await new Promise((resolve) => setTimeout(resolve, 150))
+    await quietFor(150) // 3x the headers timeout
     expect(outages).toEqual([])
   })
 
@@ -86,7 +92,7 @@ describe('observeDocker — sequence diagram 06', () => {
     start({ headersTimeoutMs: 50 })
 
     await waitFor(() => snapshots.length > 0)
-    await new Promise((resolve) => setTimeout(resolve, Math.max(0, startedAt + 150 - Date.now())))
+    await quietFor(Math.max(0, startedAt + 150 - Date.now())) // 3x the headers timeout
     expect(outages).toEqual([])
     expect(daemon.openStreams).toBe(1)
   })
@@ -185,7 +191,7 @@ describe('observeDocker — sequence diagram 06', () => {
     const count = snapshots.length
 
     daemon.dropStreams()
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await quietFor(200) // past the 20 ms initial retry delay, several times over
     expect(snapshots).toHaveLength(count)
     expect(eventRequests()).toBe(1)
   })
@@ -200,6 +206,7 @@ describe('observeDocker — sequence diagram 06', () => {
     const destroyWeb = JSON.stringify({ Type: 'container', Action: 'destroy', Actor: { ID: 'web' } })
 
     daemon.emitRaw(startDb.slice(0, 20))
+    // Not a negative check: a short pause so the two writes reach the client as separate chunks.
     await new Promise((resolve) => setTimeout(resolve, 20))
     daemon.emitRaw(`${startDb.slice(20)}\nnot json\n${destroyWeb}\n`)
 
@@ -246,7 +253,7 @@ describe('observeDocker — sequence diagram 06', () => {
     start()
 
     await waitFor(() => latest().length === 2)
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await quietFor(100)
     expect(outages).toHaveLength(1)
     expect(eventRequests()).toBe(2)
   })
@@ -282,13 +289,17 @@ describe('observeDocker — sequence diagram 06', () => {
     if (db !== undefined) db.status = 'running'
     daemon.dropStreams()
     await waitFor(() => stateOf('db') === 'running' && daemon.openStreams === 1)
+    const afterResync = snapshots.length - 1
 
-    // The stale answer lands; the next publish must still say running.
-    await new Promise((resolve) => setTimeout(resolve, 400))
+    // The stale answer lands (third `db` answer: first sync, slow re-inspect, resync); no publish
+    // from then on may say `db` is not running.
+    await waitFor(() => daemon.answered.filter((path) => path.endsWith('/db/json')).length === 3)
+    const published = snapshots.length
     daemon.emit('start', 'web')
-    await waitFor(() => daemon.requests.filter((path) => path.endsWith('/web/json')).length >= 3)
-    await new Promise((resolve) => setTimeout(resolve, 50))
-    expect(stateOf('db')).toBe('running')
+    await waitFor(() => snapshots.length > published)
+    for (const snapshot of snapshots.slice(afterResync)) {
+      expect(snapshot.find((c) => c.id === 'db')?.state).toBe('running')
+    }
   })
 
   it('skips a container whose inspect it cannot read, and keeps observing the others', async () => {

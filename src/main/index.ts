@@ -15,19 +15,15 @@ import { createServiceController, type ServiceController } from './controller/se
 import { trayIconPath } from './controller/resources'
 import { buildTrayMenu, type MenuEntry } from './controller/tray-menu'
 import { pushStateTo, registerIpc } from './ipc'
+import { isTrustedSender, type DashboardOrigin } from './trusted-sender'
 import type { ControllerState } from '../shared/ipc'
 
 const TRAY_ICON_PATH = trayIconPath({ isPackaged: app.isPackaged, resourcesPath: process.resourcesPath, mainDir: __dirname })
 const RENDERER_FILE = join(__dirname, '../renderer/index.html')
 const DEV_SERVER_URL = !app.isPackaged ? process.env['ELECTRON_RENDERER_URL'] : undefined
 
-/** IPC calls are accepted only from the dashboard page itself (top frame of our window). */
-function isTrustedSender(event: IpcMainInvokeEvent): boolean {
-  const frame = event.senderFrame
-  if (frame === null || frame.parent !== null || dashboard === null || event.sender !== dashboard.webContents) return false
-  const url = frame.url
-  return DEV_SERVER_URL !== undefined ? url.startsWith(DEV_SERVER_URL) : url === pathToFileURL(RENDERER_FILE).href
-}
+const DASHBOARD_ORIGIN: DashboardOrigin =
+  DEV_SERVER_URL !== undefined ? { kind: 'devServer', url: DEV_SERVER_URL } : { kind: 'file', url: pathToFileURL(RENDERER_FILE).href }
 
 let dashboard: BrowserWindow | null = null
 // Kept at module level: a garbage-collected Tray disappears from the top bar.
@@ -163,7 +159,10 @@ async function start(trayIcon: Tray): Promise<void> {
     renderTray(trayIcon, created, state)
     pushStateTo(() => dashboard, state)
   })
-  registerIpc(created, createBackgroundSource(() => created.containers(), scanListeningPorts), isTrustedSender)
+  registerIpc(created, createBackgroundSource(() => created.containers(), scanListeningPorts), (event: IpcMainInvokeEvent) =>
+    // A destroyed window's `webContents` throws on access: a call landing during quit is refused.
+    isTrustedSender(event, dashboard !== null && !dashboard.isDestroyed() ? dashboard.webContents : null, DASHBOARD_ORIGIN)
+  )
   // A dashboard opened during startup read no state (no IPC yet), and `publish()` skips an
   // unchanged state: hand it the current one now (diagram 11).
   pushStateTo(() => dashboard, created.state())
