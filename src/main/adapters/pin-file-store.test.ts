@@ -163,6 +163,18 @@ describe('openPinFileStore — spec §9 Q1 (watched file)', () => {
     expect(store.current().entries).toEqual([VALID_ENTRY])
   })
 
+  it('refuses a file over the size cap without reading it, keeping the last valid pins', async () => {
+    store = await openPinFileStore(path, (result) => seen.push(result))
+    writeFileSync(path, VALID)
+    await waitFor(() => store?.current().entries.length === 1)
+
+    writeFileSync(path, `${VALID}#${'x'.repeat(64 * 1024)}\n`)
+
+    await waitFor(() => store?.current().errors.length === 1)
+    expect(store.current().errors[0]).toMatch(/too large/)
+    expect(store.current().entries).toEqual([VALID_ENTRY])
+  })
+
   it('drops every pin when the file is deleted', async () => {
     store = await openPinFileStore(path, (result) => seen.push(result))
     writeFileSync(path, VALID)

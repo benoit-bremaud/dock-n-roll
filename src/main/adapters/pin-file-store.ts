@@ -12,6 +12,8 @@ const DEBOUNCE_MS = 100
 const FS_TIMEOUT_MS = 5000
 /** A re-arm that failed (directory not creatable, mount hung) is tried again after this. */
 const REARM_RETRY_MS = 5000
+/** A hand-written pin list is a few KiB: anything far larger is a mistake, not pins. */
+const MAX_PIN_FILE_BYTES = 64 * 1024
 
 export interface PinFileStore {
   /** Latest pins, with the errors of the latest read. */
@@ -46,6 +48,9 @@ export function parsePinFileText(text: string): PinFileResult {
 
 async function readPinFile(path: string): Promise<string | null> {
   try {
+    // Checked before reading, so a huge file never reaches memory or the parser (ADR-0005).
+    const { size } = await withTimeout(stat(path), FS_TIMEOUT_MS, `stat ${path}`)
+    if (size > MAX_PIN_FILE_BYTES) throw new Error(`file too large (${size} bytes, max ${MAX_PIN_FILE_BYTES})`)
     return await withTimeout(readFile(path, 'utf8'), FS_TIMEOUT_MS, `read ${path}`)
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return null

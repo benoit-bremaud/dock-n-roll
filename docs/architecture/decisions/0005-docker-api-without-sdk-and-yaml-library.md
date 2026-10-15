@@ -33,7 +33,9 @@ YAML parser:
   `GET /containers/{id}/json`, `GET /events?filters={"type":["container"]}`. Responses are
   read into the domain `ContainerSnapshot` by one pure mapping function.
 - **YAML: `yaml`**, `parse(text)` with default options; a parse error keeps the last valid
-  pin file and reports the message with its line (spec §9 Q1).
+  pin file and reports the message with its line (spec §9 Q1). The file is refused before it is
+  read when it exceeds 64 KiB (checked with `stat`, brick C): `maxAliasCount` bounds alias
+  expansion, the size cap bounds the input itself.
 
 ### Consequences
 
