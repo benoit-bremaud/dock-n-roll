@@ -132,6 +132,17 @@ describe('openPinFileStore — spec §9 Q1 (watched file)', () => {
     await waitFor(() => store?.current().entries.length === 1)
   })
 
+  it('re-arms the watch when its directory is recreated before the debounce ends', async () => {
+    store = await openPinFileStore(path, (result) => seen.push(result))
+    rmSync(dirname(path), { recursive: true, force: true })
+    mkdirSync(dirname(path))
+    await new Promise((resolve) => setTimeout(resolve, 300))
+
+    writeFileSync(path, VALID)
+
+    await waitFor(() => store?.current().entries.length === 1)
+  })
+
   it('loads the file and reports changes after an editor-style atomic save', async () => {
     store = await openPinFileStore(path, (result) => seen.push(result))
     writeFileSync(`${path}.tmp`, VALID)
