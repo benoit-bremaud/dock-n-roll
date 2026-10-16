@@ -1,40 +1,39 @@
-# Local review — dock-n-roll (issue #19, dashboard served from app://)
+# Local review — dock-n-roll (brick C, E2E smoke of the packaged app)
 
 - Date: 2026-10-16
-- Commit: 7b033a4
-- Scope: branch diff origin/main...feat/app-protocol
+- Commit: 7a35d60
+- Scope: branch diff origin/main...test/e2e-smoke
 - Checks run: design · docs · tests · security · correctness
-- Verdict: ship (all Should applied) · Must 0 · Should 6 · Nice 5
+- Verdict: ship (Must applied) · Must 2 · Should 4 · Nice 4
 
-## Pre-merge gate (head SHA 7b033a4)
+## Pre-merge gate (head SHA 7a35d60)
 | Step | Result |
 |---|---|
-| 1 Tests | ✅ 532 unit/integration (vitest) |
-| 2 Coverage | tests 97.03 % stmts / 91.6 % branches / 97.56 % funcs / 98.4 % lines (gate 90/85/90/90) · docs: every new export documented |
-| 3 SonarQube | ✅ PASSED (after fixing S7735 negated ternary, `src/main/index.ts:30`) |
-| 4 Secrets | ✅ gitleaks clean (main..HEAD) · no tracked .env · diff read: nothing sensitive |
-| 5 QA pass | ✅ built app (`dist/linux-unpacked`, fuse wire `000001001` = GrantFileProtocolExtraPrivileges off): page at `app://dashboard/index.html`, JS + CSS load, IPC `getState` OK, no CSP error; `../`, `..%2f`, `%252e` → 404, `file:///etc/passwd` blocked · screenshot: `docs/architecture/qa/2026-10-16-app-protocol-dashboard.png` |
-- Gate: **GREEN — merge authorised** (on owner approval)
+| 1 Tests | ✅ 532 unit/integration (vitest) · ✅ E2E smoke 8/8 on the unpacked build (5 local runs) |
+| 2 Coverage | tests 98.2 % lines / 91.7 % branches / 97.3 % funcs (floor 90/85/90/90) · docs: no new public API |
+| 3 SonarQube | ✅ PASSED (new coverage 97.0, duplication 0.0, new violations 0) |
+| 4 Secrets | ✅ gitleaks clean (all history) · no tracked .env · diff read: nothing sensitive |
+| 5 QA pass | ✅ the smoke is the QA pass: packaged binary, scratch config, dashboard opened via a second instance, console clean |
+- Gate: **GREEN for push**; merge after CI green on the PR (first CI run of the smoke step)
 
 ## 🔴 Must Have
-_None._
+- `e2e/smoke.mjs` `[correctness|tests]` · the second instance was not stopped when an assertion failed · fixed: `stop()` both instances in `finally` (7a35d60)
+- `e2e/smoke.mjs` `[correctness]` · an app crash surfaced as a 30 s connection timeout · fixed: `failOnExit()` raced against the connection and the page wait (7a35d60)
 
-## 🟡 Should Have (all applied in 7b033a4)
-- `src/main/app-protocol.ts:61` `[security|tests]` · catch-all turned EACCES / broken asar into a silent 404 · log non-ENOENT/EISDIR errors, test added
-- `src/main/index.ts:235` `[security]` · `app://` handler registered in dev too · register only when serving the bundled page
-- `docs/architecture/diagrams/launcher/15-sequence-dashboard-load.md:33,53` `[docs]` · claimed `%2f`/`%5c` refused; the code decodes once and refuses leftover `%`, `\`, NUL, empty/`.`/`..` segments · notes rewritten
-- `src/main/trusted-sender.test.ts:35` `[tests]` · loop inside one `it` hides which URL fails · `it.each`
-- `docs/architecture/decisions/0009-custom-app-protocol.md:32` `[docs]` · wrong line count · removed
-- `src/main/index.ts:30` `[correctness]` · Sonar S7735 negated condition · flipped
+## 🟡 Should Have
+- `e2e/smoke.mjs` `[tests]` · a 404 could come from a failed fetch · fixed: the dashboard page must answer 200 first
+- `e2e/smoke.mjs` `[tests]` · a hang blocked until the CI job timeout · fixed: global 90 s timeout
+- `.github/workflows/ci.yml` `[security]` · `apparmor_restrict_unprivileged_userns=0` on the runner · kept: ephemeral GitHub runner, the unpacked build has no AppArmor profile, `--no-sandbox` would test another configuration
+- `e2e/smoke.mjs` `[tests]` · `#root > *` accepts any rendered child · kept: the smoke checks the wiring (ADR-0010); the views are unit-tested
 
 ## 🔵 Nice to Have
-- `src/main/app-protocol.ts:60` `[security]` · `nosniff` header (applied); CSP as a response header too (not applied: the meta tag is the single source)
-- `src/main/app-protocol.test.ts` `[tests]` · port in host (applied); `.` segment, case-variant host, directory URL rows (not applied, refused by code)
-- `src/main/app-protocol.ts:5` `[docs]` · `APP_HOST` has no doc comment (private const)
-- `src/main/app-protocol.test.ts:41` `[tests]` · MIME table rows borderline over-testing, kept (cheap)
+- `eslint.config.mjs` `[design]` · hand-written globals instead of the `globals` package · kept: no new dependency for five names
+- `e2e/smoke.mjs` `[design]` · `freePort()` has a small race window · accepted
+- `e2e/smoke.mjs` `[design]` · app logs interleave with `ok -` lines · kept: the logs help when CI fails
+- `e2e/smoke.mjs` `[tests]` · `getState()` result shape not asserted · kept: `null` before the first Docker sync is a valid answer
 
 ## ⚪ Disagree / Intentional
-- `src/main/app-protocol.test.ts:18` `[tests]` · `../` URLs resolve under the root rather than null · the WHATWG URL parser collapses dot segments before the handler; confinement is the invariant
+- `e2e/smoke.mjs` `[tests]` · "the dashboard may already be open before the page wait" · the app starts as a tray only (diagram 11); the dashboard opens on the second instance, as the smoke asserts
 
 ## Per-dimension summary
-- Design: pure module, injected `readFile`, thin Electron wiring · Docs: ADR-0009 + diagram 15 match the code · Tests: real functions, only the FS boundary mocked · Security: confinement sound, minimal scheme privileges, exact trusted-sender URL, fuse off · Correctness: no regression on the dev-server path
+- Design: one script, two dev dependencies, no abstraction · Docs: ADR-0010 and diagram 10 match the script · Tests: one E2E at the top of the pyramid, fail-fast and cleanup now covered · Security: debugging port only in the smoke, on loopback; fuses unchanged · Correctness: process lifecycle fixed
