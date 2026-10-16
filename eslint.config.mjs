@@ -44,7 +44,12 @@ export default tseslint.config(
     rules: { 'no-restricted-exports': 'off' }
   },
   {
-    files: ['*.config.mjs'],
+    files: ['*.config.mjs', 'e2e/*.mjs'],
     ...tseslint.configs.disableTypeChecked
+  },
+  {
+    // Node script; the page callbacks it passes to evaluate() run in the dashboard.
+    files: ['e2e/*.mjs'],
+    languageOptions: { globals: { process: 'readonly', console: 'readonly', window: 'readonly', fetch: 'readonly' } }
   }
 )
