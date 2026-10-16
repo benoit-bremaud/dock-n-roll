@@ -151,16 +151,38 @@ describe('openPinFileStore — spec §9 Q1 (watched file)', () => {
     writeFileSync(path, VALID)
     await waitFor(() => store?.current().entries.length === 1)
 
-    writeFileSync(path, `${VALID}#${'x'.repeat(MAX_PIN_FILE_BYTES)}\n`)
+    // One byte over the cap: pins the rounding up to 65 KiB.
+    writeFileSync(path, `${VALID}#`.padEnd(MAX_PIN_FILE_BYTES, 'x') + '\n')
 
     await waitFor(() => store?.current().errors.length === 1)
     expect(store.current().errors[0]).toMatch(/too large \(65 KiB, max 64 KiB\)/)
     expect(store.current().entries).toEqual([VALID_ENTRY])
   })
 
-  it('refuses a non-regular file at once instead of waiting for the read timeout', async () => {
+  // mkfifo is POSIX only.
+  it.skipIf(process.platform === 'win32')('refuses a FIFO at once instead of waiting for the read timeout', async () => {
     mkdirSync(dirname(path), { recursive: true })
     execFileSync('mkfifo', [path])
+
+    store = await openPinFileStore(path, (result) => seen.push(result))
+
+    expect(store.current()).toEqual({ entries: [], errors: ['services.yaml: not a regular file'] })
+  })
+
+  it.skipIf(process.platform === 'win32')('keeps the last valid pins when a FIFO replaces the file', async () => {
+    store = await openPinFileStore(path, (result) => seen.push(result))
+    writeFileSync(path, VALID)
+    await waitFor(() => store?.current().entries.length === 1)
+
+    unlinkSync(path)
+    execFileSync('mkfifo', [path])
+
+    await waitFor(() => store?.current().errors.length === 1)
+    expect(store.current().errors[0]).toBe('services.yaml: not a regular file')
+  })
+
+  it('refuses a directory named services.yaml', async () => {
+    mkdirSync(path, { recursive: true })
 
     store = await openPinFileStore(path, (result) => seen.push(result))
 

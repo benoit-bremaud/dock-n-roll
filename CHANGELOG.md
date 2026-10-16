@@ -7,6 +7,13 @@ file format (`services.yaml`) and the installed package.
 
 ## [Unreleased]
 
+### Fixed
+
+- Pin file: a FIFO, device or directory named `services.yaml` is refused at once ("not a regular
+  file") instead of after the 5 s read timeout, and a file swapped or grown after the check is still
+  refused unread (#20).
+- Pin file: the size-cap error reads in KiB, like ADR-0005 (#21).
+
 ## [1.1.0] - 2026-10-16
 
 ### Added

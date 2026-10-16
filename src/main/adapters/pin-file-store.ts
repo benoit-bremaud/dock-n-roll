@@ -1,5 +1,6 @@
 import { watch, type FSWatcher } from 'node:fs'
-import { mkdir, readFile, stat } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { mkdir, open, stat, type FileHandle } from 'node:fs/promises'
 import { basename, dirname } from 'node:path'
 import { parse } from 'yaml'
 import { validatePinFile } from '../domain/pin-file'
@@ -12,9 +13,9 @@ const DEBOUNCE_MS = 100
 const FS_TIMEOUT_MS = 5000
 /** A re-arm that failed (directory not creatable, mount hung) is tried again after this. */
 const REARM_RETRY_MS = 5000
-/** A hand-written pin list is a few KiB: anything far larger is a mistake, not pins. */
-export const MAX_PIN_FILE_BYTES = 64 * 1024
 const KIB = 1024
+/** A hand-written pin list is a few KiB: anything far larger is a mistake, not pins. */
+export const MAX_PIN_FILE_BYTES = 64 * KIB
 
 export interface PinFileStore {
   /** Latest pins, with the errors of the latest read. */
@@ -47,21 +48,41 @@ export function parsePinFileText(text: string): PinFileResult {
   return yaml.ok ? validatePinFile(yaml.value) : { entries: [], errors: [yaml.error] }
 }
 
+function tooLarge(bytes: number): Error {
+  // Rounded up, so a file just over the cap never reads as "64 KiB".
+  return new Error(`file too large (${String(Math.ceil(bytes / KIB))} KiB, max ${String(MAX_PIN_FILE_BYTES / KIB)} KiB)`)
+}
+
+/**
+ * Reads the pin file, or null when it is missing. Type, size and content all come from one open
+ * handle, so a file swapped or grown after the check is still refused unread (ADR-0005).
+ */
 async function readPinFile(path: string): Promise<string | null> {
+  let handle: FileHandle
   try {
-    // Checked before reading, so a huge file is refused unread (ADR-0005). Best effort: a file
-    // growing between stat and read is not caught — acceptable for the user's own config.
-    const stats = await withTimeout(stat(path), FS_TIMEOUT_MS, `stat ${path}`)
-    // A FIFO or device reports size 0 and would only fail at the read timeout.
-    if (!stats.isFile()) throw new Error('not a regular file')
-    if (stats.size > MAX_PIN_FILE_BYTES) {
-      // Rounded up, so a file just over the cap never reads as "64 KiB".
-      throw new Error(`file too large (${String(Math.ceil(stats.size / KIB))} KiB, max ${String(MAX_PIN_FILE_BYTES / KIB)} KiB)`)
-    }
-    return await withTimeout(readFile(path, 'utf8'), FS_TIMEOUT_MS, `read ${path}`)
+    // O_NONBLOCK: opening a FIFO with no writer must not block; it is refused just below.
+    handle = await withTimeout(open(path, constants.O_RDONLY | constants.O_NONBLOCK), FS_TIMEOUT_MS, `open ${path}`)
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return null
     throw error
+  }
+  try {
+    const stats = await withTimeout(handle.stat(), FS_TIMEOUT_MS, `stat ${path}`)
+    // A FIFO or device reports size 0 and would only fail at the read timeout.
+    if (!stats.isFile()) throw new Error('not a regular file')
+    if (stats.size > MAX_PIN_FILE_BYTES) throw tooLarge(stats.size)
+    // One byte past the cap is enough to tell a file that grew since the stat.
+    const buffer = Buffer.alloc(MAX_PIN_FILE_BYTES + 1)
+    let length = 0
+    let bytesRead: number
+    do {
+      ;({ bytesRead } = await withTimeout(handle.read(buffer, length, buffer.length - length, length), FS_TIMEOUT_MS, `read ${path}`))
+      length += bytesRead
+    } while (bytesRead > 0 && length < buffer.length)
+    if (length > MAX_PIN_FILE_BYTES) throw tooLarge(length)
+    return buffer.toString('utf8', 0, length)
+  } finally {
+    await handle.close()
   }
 }
 
@@ -90,6 +111,8 @@ async function inodeOf(directory: string): Promise<number | null> {
  * needed and watched again, with exactly one live watcher; a failed re-arm is retried after
  * `REARM_RETRY_MS`.
  * Every filesystem call is bounded by `FS_TIMEOUT_MS`.
+ *
+ * A read error (non-regular or oversized file, timeout) keeps the last valid pins, like invalid YAML.
  *
  * Known limit: a symlinked `services.yaml` is read, but edits made to its target are not seen
  * until the link itself changes or the app restarts.

@@ -17,11 +17,22 @@ const hang = (): Promise<never> => new Promise<never>(() => undefined)
 
 vi.mock('node:fs/promises', () => ({
   mkdir: () => (fsState.hangMkdir ? hang() : fsState.failMkdir ? Promise.reject(new Error('EACCES')) : Promise.resolve(undefined)),
-  stat: () => Promise.resolve({ ino: fsState.ino, size: 0, isFile: () => true }),
-  readFile: () => (fsState.hangRead ? hang() : Promise.resolve(fsState.text))
+  stat: () => Promise.resolve({ ino: fsState.ino }),
+  open: () =>
+    Promise.resolve({
+      stat: () => Promise.resolve({ size: Buffer.byteLength(fsState.text), isFile: () => true }),
+      read: (buffer: Buffer, offset: number, length: number, position: number) => {
+        if (fsState.hangRead) return hang()
+        const bytes = Buffer.from(fsState.text).subarray(position, position + length)
+        bytes.copy(buffer, offset)
+        return Promise.resolve({ bytesRead: bytes.length })
+      },
+      close: () => Promise.resolve()
+    })
 }))
 
 vi.mock('node:fs', () => ({
+  constants: { O_RDONLY: 0, O_NONBLOCK: 2048 },
   watch: (_dir: string, listener: (event: string, filename: string | null) => void) => {
     fsState.open += 1
     fsState.listeners.push(listener)
