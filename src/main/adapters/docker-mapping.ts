@@ -71,6 +71,7 @@ export function toContainerSnapshot(response: unknown): ContainerSnapshot | null
     state,
     // Docker reports 0 for a running container: an exit code only exists once it has stopped.
     exitCode: stopped && typeof exitCode === 'number' ? exitCode : null,
+    oomKilled: response['State']['OOMKilled'] === true,
     health: health !== null && isHealth(health) ? health : null,
     labels: labelsOf(response['Config']['Labels']),
     publishedPorts: isJson(response['NetworkSettings']) ? portsOf(response['NetworkSettings']['Ports']) : []

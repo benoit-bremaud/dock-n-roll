@@ -26,6 +26,8 @@ export interface ContainerSnapshot {
   readonly image: string
   readonly state: ContainerState
   readonly exitCode: number | null
+  /** Docker `State.OOMKilled`: the kernel killed it for lack of memory. */
+  readonly oomKilled: boolean
   /** `null` when the image has no HEALTHCHECK; only meaningful while running. */
   readonly health: Health | null
   readonly labels: Readonly<Record<string, string>>

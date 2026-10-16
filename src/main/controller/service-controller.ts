@@ -4,6 +4,7 @@ import type { ProbeOptions } from '../adapters/health-probe'
 import type { PinFileStore } from '../adapters/pin-file-store'
 import { buildStopArgs, buildUpArgs } from '../domain/compose-args'
 import { allowedControls, deriveStatus } from '../domain/derive-status'
+import { crashedContainers, crashMessage } from '../domain/crash'
 import { buildServices } from '../domain/service-catalog'
 import type { ContainerSnapshot, Controls, HealthGate, PendingOperation, PinEntry, PinFileResult, Service, StatusInputs } from '../domain/types'
 import type { ControllerState, ServiceView } from '../../shared/ipc'
@@ -16,6 +17,8 @@ const HEALTH_TIMEOUT_MS = 1500
 const MAX_REASON_CHARS = 500
 /** A failed `docker compose config` (slow daemon at boot, file mid-edit) is retried after this. */
 const NAME_RETRY_MS = 30_000
+/** At most one crash notification per service in this window, so a crash loop does not flood. */
+const NOTIFY_WINDOW_MS = 60_000
 
 /** The adapters, injected so the controller is tested with in-memory stand-ins. */
 export interface ControllerDeps {
@@ -30,6 +33,8 @@ export interface ControllerDeps {
   resolveProjectName(workingDir: string, options: Omit<RunOptions, 'cwd'>): Promise<string | null>
   filesExist(workingDir: string, configFiles: readonly string[]): Promise<boolean>
   probeHealth(url: string, options: ProbeOptions): Promise<boolean>
+  /** Shows a desktop notification; both texts are plain (the adapter escapes them). */
+  notify(title: string, body: string): void
   /** Clock for retrying failed name resolutions; overridable for tests. */
   readonly now?: () => number
   /** Schedules a health probe and returns its cancel function. */
@@ -125,6 +130,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   const gates = new Map<string, HealthGate>()
   const probing = new Map<string, () => void>()
   const lastError = new Map<string, string>()
+  const notifiedAt = new Map<string, number>()
   const listeners = new Set<(state: ControllerState) => void>()
   let current: ControllerState = { dockerAvailable, dockerReason, pinErrors, services: [], homeDir: deps.homeDir }
   let currentJson = JSON.stringify(current)
@@ -211,7 +217,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   /** Per-service state of services that no longer exist would leak, or resurface on an id change. */
   const prune = (): void => {
     const ids = new Set(services.map((service) => service.id))
-    for (const map of [filesOk, gates, lastError]) {
+    for (const map of [filesOk, gates, lastError, notifiedAt]) {
       for (const id of map.keys()) if (!ids.has(id)) map.delete(id)
     }
     for (const id of [...probing.keys()]) if (!ids.has(id)) cancelProbe(id)
@@ -383,11 +389,33 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     await chain
   }
 
+  /**
+   * Diagram 13: compares with the previous snapshot of the same connection only — after an
+   * outage the gap is unknown, not a crash. The rows used are those of the previous snapshot,
+   * the ones the crashed containers belonged to.
+   */
+  const notifyCrashes = (next: readonly ContainerSnapshot[]): void => {
+    if (!dockerAvailable) return
+    for (const crashed of crashedContainers(containers, next)) {
+      const service = services.find((candidate) => candidate.containers.some((c) => c.id === crashed.id))
+      if (service === undefined || pendingFor(pending, service) !== null) continue
+      const last = notifiedAt.get(service.id)
+      if (last !== undefined && now() - last < NOTIFY_WINDOW_MS) continue
+      notifiedAt.set(service.id, now())
+      try {
+        deps.notify(service.displayName, crashMessage(crashed))
+      } catch (error) {
+        console.error('dock-n-roll: notification failed', error)
+      }
+    }
+  }
+
   const store = await deps.openPinFileStore(deps.pinFilePath, applyPins)
   const observer = deps.observeDocker(
     { socketPath: deps.socketPath },
     {
       onSnapshot: (snapshot) => {
+        notifyCrashes(snapshot)
         containers = snapshot
         dockerAvailable = true
         dockerReason = null

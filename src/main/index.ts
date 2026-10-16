@@ -5,6 +5,7 @@ import { isAutostartEnabled, setAutostart } from './adapters/autostart'
 import { resolveProjectName, runCompose } from './adapters/compose-runner'
 import { observeDocker } from './adapters/docker-observer'
 import { filesExist } from './adapters/file-probe'
+import { showNotification } from './notifier'
 import { probeHealth } from './adapters/health-probe'
 import { openPinFileStore } from './adapters/pin-file-store'
 import { scanListeningPorts } from './adapters/port-scanner'
@@ -141,6 +142,7 @@ async function start(trayIcon: Tray): Promise<void> {
     resolveProjectName,
     filesExist,
     probeHealth,
+    notify: showNotification,
     schedule: (run, delayMs) => {
       const timer = setTimeout(run, delayMs)
       return () => {

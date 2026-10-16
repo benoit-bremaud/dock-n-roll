@@ -20,6 +20,7 @@ function fakes() {
   let pinsChanged: ((result: PinFileResult) => void) | undefined
   let pinFile: PinFileResult = { entries: [], errors: [] }
   const runs: Run[] = []
+  const notified: [string, string][] = []
   const resolved = new Map<string, string>()
   const resolveCalls: string[] = []
   const missing = new Set<string>()
@@ -96,6 +97,9 @@ function fakes() {
       })
     },
     probeHealth: (url) => Promise.resolve(healthy.has(url)),
+    notify: (title, body) => {
+      notified.push([title, body])
+    },
     now: () => clock.now,
     schedule: (retry, delayMs) => {
       // Name-resolution retries (30 s) are kept apart from health probes (2 s).
@@ -117,6 +121,7 @@ function fakes() {
   return {
     deps,
     runs,
+    notified,
     resolved,
     resolveCalls,
     missing,
@@ -546,6 +551,74 @@ describe('restart — UC6, diagram 12', () => {
     await first
     await settle()
     expect(f.runs.map((run) => run.args.at(-1))).toEqual(['stop', '--wait-timeout=180'])
+  })
+})
+
+describe('crash notifications — UC3 extension 3b, diagram 13', () => {
+  const crashed = container({ id: 'w', state: 'exited', exitCode: 1, labels: composeLabels('blog', '/srv/blog') })
+
+  it('notifies a listed service whose running container crashed, with the service name', async () => {
+    const { f, row } = await controllerWith()
+    f.snapshot([web])
+    await settle()
+
+    f.snapshot([crashed])
+    await settle()
+
+    expect(f.notified).toEqual([[row(BLOG)?.displayName, 'app-web-1 exited with code 1']])
+  })
+
+  it('stays silent for a service the developer is stopping or restarting', async () => {
+    const { f, controller } = await controllerWith()
+    f.snapshot([web])
+    await settle()
+
+    void controller.stop(BLOG)
+    await settle()
+    f.snapshot([crashed])
+    await settle()
+
+    expect(f.notified).toEqual([])
+  })
+
+  it('stays silent on the first snapshot after Docker came back', async () => {
+    const { f } = await controllerWith()
+    f.snapshot([web])
+    await settle()
+
+    f.dockerDown('connect ENOENT')
+    f.snapshot([crashed])
+    await settle()
+
+    expect(f.notified).toEqual([])
+  })
+
+  it('notifies at most once per service per minute', async () => {
+    const { f } = await controllerWith()
+    f.snapshot([web])
+    await settle()
+
+    f.snapshot([crashed])
+    f.snapshot([web])
+    f.clock.now = 59_999
+    f.snapshot([crashed])
+    f.snapshot([web])
+    f.clock.now = 60_000
+    f.snapshot([crashed])
+    await settle()
+
+    expect(f.notified).toHaveLength(2)
+  })
+
+  it('ignores containers that belong to no listed service', async () => {
+    const { f } = await controllerWith()
+    f.snapshot([container({ id: 'x' })])
+    await settle()
+
+    f.snapshot([container({ id: 'x', state: 'exited', exitCode: 1 })])
+    await settle()
+
+    expect(f.notified).toEqual([])
   })
 })
 

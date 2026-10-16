@@ -33,6 +33,7 @@ describe('toContainerSnapshot', () => {
       image: 'sonarqube:community',
       state: 'running',
       exitCode: null,
+      oomKilled: false,
       health: 'healthy',
       labels: INSPECT_RUNNING.Config.Labels,
       publishedPorts: [
@@ -48,6 +49,11 @@ describe('toContainerSnapshot', () => {
     expect(toContainerSnapshot(exited)).toMatchObject({ state: 'exited', exitCode: 0, health: null })
   })
 
+  it('reads OOMKilled, only as a strict true', () => {
+    expect(toContainerSnapshot({ ...INSPECT_RUNNING, State: { Status: 'exited', ExitCode: 137, OOMKilled: true } })?.oomKilled).toBe(true)
+    expect(toContainerSnapshot({ ...INSPECT_RUNNING, State: { Status: 'exited', ExitCode: 137, OOMKilled: 'true' } })?.oomKilled).toBe(false)
+  })
+
   it('reads a container without HEALTHCHECK, labels or ports', () => {
     const bare = { Id: 'x', Name: '/bare', Config: { Image: 'alpine', Labels: null }, State: { Status: 'created', ExitCode: 0 }, NetworkSettings: { Ports: {} } }
 
@@ -57,6 +63,7 @@ describe('toContainerSnapshot', () => {
       image: 'alpine',
       state: 'created',
       exitCode: null,
+      oomKilled: false,
       health: null,
       labels: {},
       publishedPorts: []
