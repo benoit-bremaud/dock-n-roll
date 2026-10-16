@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PinFileResult } from '../domain/types'
-import { openPinFileStore } from './pin-file-store'
+import { MAX_PIN_FILE_BYTES, openPinFileStore } from './pin-file-store'
 
 // The filesystem boundary, simulated: hung calls (stale network mount) and watcher lifecycle.
 const fsState = vi.hoisted(() => ({
   hangMkdir: false,
   hangRead: false,
   failMkdir: false,
+  failOpen: false,
+  /** Size the stat reports, when it must differ from the text read (a file growing meanwhile). */
+  statSize: undefined as number | undefined,
   text: 'services: []\n',
   ino: 1,
   open: 0,
@@ -19,8 +22,10 @@ vi.mock('node:fs/promises', () => ({
   mkdir: () => (fsState.hangMkdir ? hang() : fsState.failMkdir ? Promise.reject(new Error('EACCES')) : Promise.resolve(undefined)),
   stat: () => Promise.resolve({ ino: fsState.ino }),
   open: () =>
-    Promise.resolve({
-      stat: () => Promise.resolve({ size: Buffer.byteLength(fsState.text), isFile: () => true }),
+    fsState.failOpen
+      ? Promise.reject(new Error('EACCES: permission denied'))
+      : Promise.resolve({
+      stat: () => Promise.resolve({ size: fsState.statSize ?? Buffer.byteLength(fsState.text), isFile: () => true }),
       read: (buffer: Buffer, offset: number, length: number, position: number) => {
         if (fsState.hangRead) return hang()
         const bytes = Buffer.from(fsState.text).subarray(position, position + length)
@@ -59,11 +64,31 @@ async function event(filename: string): Promise<void> {
 describe('openPinFileStore — hung filesystem and watcher lifecycle', () => {
   beforeEach(() => {
     vi.useFakeTimers()
-    Object.assign(fsState, { hangMkdir: false, hangRead: false, failMkdir: false, text: VALID, ino: 1, open: 0, listeners: [] })
+    Object.assign(fsState, { hangMkdir: false, hangRead: false, failMkdir: false, failOpen: false, statSize: undefined, text: VALID, ino: 1, open: 0, listeners: [] })
   })
 
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  it('refuses a file that grew past the cap after the size check, keeping the last pins', async () => {
+    const store = await openPinFileStore(PATH, () => undefined)
+    fsState.text = VALID.padEnd(MAX_PIN_FILE_BYTES + 1, '#')
+    fsState.statSize = 10
+
+    await event('services.yaml')
+
+    expect(store.current()).toEqual({ entries: [{ workingDir: '/srv/blog', pinned: false, hidden: false }], errors: ['services.yaml: file too large (65 KiB, max 64 KiB)'] })
+    store.close()
+  })
+
+  it('reports an open error other than a missing file', async () => {
+    fsState.failOpen = true
+
+    const store = await openPinFileStore(PATH, () => undefined)
+
+    expect(store.current()).toEqual({ entries: [], errors: ['services.yaml: EACCES: permission denied'] })
+    store.close()
   })
 
   it('rejects after 5 s when the directory cannot be created because the mount hangs', async () => {
