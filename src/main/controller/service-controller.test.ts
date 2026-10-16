@@ -622,6 +622,24 @@ describe('crash notifications — UC3 extension 3b, diagram 13', () => {
     expect(f.notified).toHaveLength(1)
   })
 
+  it('stays silent for the late snapshot of a restart that skipped its `up`', async () => {
+    const { f, controller } = await controllerWith()
+    f.snapshot([web])
+    await settle()
+
+    const done = controller.restart(BLOG)
+    await settle()
+    f.dockerDown('connect ENOENT')
+    f.runs[0]?.finish()
+    await done
+    f.snapshot([web])
+    f.snapshot([crashed])
+    await settle()
+
+    expect(f.runs).toHaveLength(1)
+    expect(f.notified).toEqual([])
+  })
+
   it('notifies a container whose row was not rebuilt yet', async () => {
     const { f } = await controllerWith()
     f.holdFiles(true)

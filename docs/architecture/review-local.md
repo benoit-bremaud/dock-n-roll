@@ -4,7 +4,7 @@
 - Commit: base cfb7e0a..HEAD (branch feat/crash-notifications)
 - Scope: branch diff main...HEAD (domain crash.ts, controller notifyCrashes, notifier.ts, oomKilled mapping, diagrams 01/03/05/07/13, spec UC3 3b, CHANGELOG)
 - Checks run: design · docs · tests · security · correctness
-- Verdict: ship after Should applied · Must 0 · Should 7 (applied) · Nice 6 (4 applied, 2 dropped)
+- Verdict: ship after Should applied · Must 0 · Should 8 (applied) · Nice 6 (4 applied, 2 dropped)
 
 ## 🔴 Must Have
 _None._
@@ -17,6 +17,8 @@ _None._
 - `service-controller.test.ts` `[tests]` · No test of a crash between the two restart steps · added. Applied.
 - `service-controller.test.ts` `[tests]` · `deps.notify` throwing not covered · added (snapshot still applied). Applied.
 - `service-controller.test.ts` `[tests]` · rate-limit test only counted calls · asserts exact title/body. Applied.
+
+- `service-controller.ts` run `[correctness]` · (2nd `/code-review`, Codex out of quota) a restart that skips its `up` set no quiet window, so its late `die` snapshot was notified · `stoppedAt` set when the last step run is a stop; test. Applied.
 
 ## 🔵 Nice to Have
 - `service-controller.ts` notifyCrashes `[correctness]` · no `disposed` guard · added. Applied.

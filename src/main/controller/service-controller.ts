@@ -391,7 +391,8 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
       if (failure !== null) break
     }
     pending = pending.filter((candidate) => candidate !== entry)
-    if (request === 'stop') stoppedAt.set(service.id, now())
+    // Last step run was a stop: a plain Stop, or a restart that skipped its `up`.
+    if (entry?.operation === 'stop') stoppedAt.set(service.id, now())
     if (failure !== null) {
       // Keyed by the row the developer now sees: the id may have changed during the run.
       const row = services.find((candidate) => candidate.workingDir === service.workingDir && candidate.projectName === name)
