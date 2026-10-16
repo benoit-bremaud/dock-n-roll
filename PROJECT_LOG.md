@@ -325,3 +325,14 @@ Restart (#29), crash notifications (#31) and logs view (#32) released as v1.1.0.
   Trusted sender matches `app://dashboard/index.html` exactly. TDD, 532 tests, coverage 97/91.6.
 - Review: Must 0, Should 6 applied. Codex and Copilot unavailable → owner gate: local tests +
   SonarQube green (new violations 0), CI green, then merge.
+
+## 2026-10-16 — Roadmap after #19
+
+Owner MCDA (weights: value 30, risk 25, effort⁻¹ 20, debt 15, unblock 10):
+1. **C** Playwright E2E smoke of the built app, in the CI `package` job (360).
+2. **A+F** runtime robustness #20 #21 #23 #12 + packaging/autostart polish #13 #27 (335 / 230).
+3. **D** major upgrades: TypeScript 7, Vite 8, electron-vite 6, @types/node 26 (260).
+4. **E** dashboard polish #14 + logs follow-ups #33 (245).
+5. **B** Sonar legacy #30 + #22 (235) · 6. **H** test Nice #25 (215) · 7. **G** service groups (155).
+
+Sensitivity: C and A stay top two and G last under value 45 or effort 35; E passes D at value 45.
