@@ -9,8 +9,8 @@ export interface SenderEvent {
   readonly senderFrame: SenderFrame | null
 }
 
-/** Where the dashboard page is served from: the bundled file, or the dev server in development. */
-export type DashboardOrigin = { readonly kind: 'file'; readonly url: string } | { readonly kind: 'devServer'; readonly url: string }
+/** Where the dashboard page is served from: the bundled page on `app://` (ADR-0009), or the dev server in development. */
+export type DashboardOrigin = { readonly kind: 'app'; readonly url: string } | { readonly kind: 'devServer'; readonly url: string }
 
 function originOf(url: string): string | null {
   return URL.canParse(url) ? new URL(url).origin : null
@@ -27,7 +27,7 @@ function originOf(url: string): string | null {
 export function isTrustedSender(event: SenderEvent, dashboardContents: object | null, origin: DashboardOrigin): boolean {
   const frame = event.senderFrame
   if (frame === null || frame.parent !== null || dashboardContents === null || event.sender !== dashboardContents) return false
-  if (origin.kind === 'file') return frame.url === origin.url
+  if (origin.kind === 'app') return frame.url === origin.url
   const frameOrigin = originOf(frame.url)
   return frameOrigin !== null && frameOrigin === originOf(origin.url)
 }
