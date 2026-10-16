@@ -97,3 +97,6 @@ flowchart TB
   the bottom unless the developer scrolled up; a picker when the service has several
   containers; "Stream ended — Reopen" when the stream ends; `closeLogs` on close and unmount.
 - Text from Docker and the pin file is rendered as React text (escaped), never as HTML.
+- **Served from `app://dashboard/`** (ADR-0009, diagram 15): the built page and its assets come
+  from the main process's `app://` handler, confined to `out/renderer`; `'self'` in the CSP is
+  that origin.

@@ -1,6 +1,7 @@
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
-import { app, BrowserWindow, dialog, Menu, nativeImage, session, shell, Tray, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, dialog, Menu, nativeImage, protocol, session, shell, Tray, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
+import { APP_PAGE_URL, APP_SCHEME, createAppProtocolHandler } from './app-protocol'
 import { isAutostartEnabled, setAutostart } from './adapters/autostart'
 import { resolveProjectName, runCompose } from './adapters/compose-runner'
 import { followLogs } from './adapters/docker-logs'
@@ -22,11 +23,15 @@ import { isTrustedSender, type DashboardOrigin } from './trusted-sender'
 import type { ControllerState } from '../shared/ipc'
 
 const TRAY_ICON_PATH = trayIconPath({ isPackaged: app.isPackaged, resourcesPath: process.resourcesPath, mainDir: __dirname })
-const RENDERER_FILE = join(__dirname, '../renderer/index.html')
+const RENDERER_DIR = join(__dirname, '../renderer')
 const DEV_SERVER_URL = !app.isPackaged ? process.env['ELECTRON_RENDERER_URL'] : undefined
 
 const DASHBOARD_ORIGIN: DashboardOrigin =
-  DEV_SERVER_URL !== undefined ? { kind: 'devServer', url: DEV_SERVER_URL } : { kind: 'file', url: pathToFileURL(RENDERER_FILE).href }
+  DEV_SERVER_URL === undefined ? { kind: 'app', url: APP_PAGE_URL } : { kind: 'devServer', url: DEV_SERVER_URL }
+
+// The bundled page is served from app:// (ADR-0009, diagram 15), so the file: protocol needs no
+// extra privileges (fuse off). Must run before ready.
+protocol.registerSchemesAsPrivileged([{ scheme: APP_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } }])
 
 let dashboard: BrowserWindow | null = null
 // Kept at module level: a garbage-collected Tray disappears from the top bar.
@@ -75,11 +80,7 @@ function createDashboard(): BrowserWindow {
     }
   })
 
-  if (DEV_SERVER_URL !== undefined) {
-    void window.loadURL(DEV_SERVER_URL)
-  } else {
-    void window.loadFile(RENDERER_FILE)
-  }
+  void window.loadURL(DASHBOARD_ORIGIN.url)
   return window
 }
 
@@ -231,6 +232,7 @@ if (!app.requestSingleInstanceLock()) {
       callback(false)
     })
     session.defaultSession.setPermissionCheckHandler(() => false)
+    if (DASHBOARD_ORIGIN.kind === 'app') protocol.handle(APP_SCHEME, createAppProtocolHandler(RENDERER_DIR, readFile))
     // A hidden default menu still opens with Alt (Reload, Toggle DevTools): remove it in builds.
     if (app.isPackaged) {
       Menu.setApplicationMenu(null)

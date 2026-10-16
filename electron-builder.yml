@@ -7,9 +7,9 @@ electronFuses:
   enableNodeOptionsEnvironmentVariable: false
   enableNodeCliInspectArguments: false
   onlyLoadAppFromAsar: true
+  # The dashboard is served from app:// (ADR-0009), not file:.
+  grantFileProtocolExtraPrivileges: false
   # Left at their defaults (checked on the built app, brick C):
-  # - grantFileProtocolExtraPrivileges: turning it off makes loadFile() of the dashboard from the
-  #   asar fail with ERR_FILE_NOT_FOUND; it needs a custom protocol first.
   # - embeddedAsarIntegrityValidation: enforced on macOS/Windows only.
   # - cookieEncryption: no session, no cookies to protect.
 productName: dock-n-roll

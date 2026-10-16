@@ -1,51 +1,40 @@
-# Local review — dock-n-roll (PR 3, service logs view, UC7)
+# Local review — dock-n-roll (issue #19, dashboard served from app://)
 
 - Date: 2026-10-16
-- Commit: 1f50644 + review fixes
-- Scope: branch diff origin/main...feat/logs-view
+- Commit: 7b033a4
+- Scope: branch diff origin/main...feat/app-protocol
 - Checks run: design · docs · tests · security · correctness
-- Verdict: ship (all Must and Should applied) · Must 5 · Should 9 · Nice 8
+- Verdict: ship (all Should applied) · Must 0 · Should 6 · Nice 5
 
-## Pre-merge gate
+## Pre-merge gate (head SHA 7b033a4)
 | Step | Result |
 |---|---|
-| 1 Tests | ✅ 503 unit/integration (vitest), lint and `tsc --build` clean |
-| 2 Coverage | lines 98.3 % / branches 91.5 % / funcs 97.3 % (floors 90/85/90) |
-| 3 SonarQube | ✅ PASSED (new_coverage 96.8, duplication 0.0, new_violations 0). The S5852 hotspots on the linear regexes in `log-lines.ts` still need a review in the UI |
-| 4 Secrets | ✅ gitleaks clean (origin/main..HEAD), no tracked .env, diff read: nothing sensitive |
-| 5 QA pass | ✅ manual E2E on the built app: multiplexed and TTY logs, ANSI stripped, HTML kept as text, picker, autoscroll, stop leads to ended then Reopen, close and hide free the socket |
-- Gate: **GREEN** (once the Sonar hotspots are reviewed)
+| 1 Tests | ✅ 532 unit/integration (vitest) |
+| 2 Coverage | tests 97.03 % stmts / 91.6 % branches / 97.56 % funcs / 98.4 % lines (gate 90/85/90/90) · docs: every new export documented |
+| 3 SonarQube | ✅ PASSED (after fixing S7735 negated ternary, `src/main/index.ts:30`) |
+| 4 Secrets | ✅ gitleaks clean (main..HEAD) · no tracked .env · diff read: nothing sensitive |
+| 5 QA pass | ✅ built app (`dist/linux-unpacked`, fuse wire `000001001` = GrantFileProtocolExtraPrivileges off): page at `app://dashboard/index.html`, JS + CSS load, IPC `getState` OK, no CSP error; `../`, `..%2f`, `%252e` → 404, `file:///etc/passwd` blocked · screenshot: `docs/architecture/qa/2026-10-16-app-protocol-dashboard.png` |
+- Gate: **GREEN — merge authorised** (on owner approval)
 
-## 🔴 Must Have (all applied)
-- `src/main/index.ts` `[design|correctness]`: the panel froze after the dashboard hid. A null push now ends the panel with "Logs closed" and offers Reopen.
-- `src/main/adapters/docker-logs.test.ts` `[tests]`: the headers timeout had no test. Added.
-- `src/renderer/src/components/LogPanel.test.tsx` `[tests]`: autoscroll had no test. Added; `isFollowing` was extracted and tested.
-- `src/main/adapters/docker-logs.ts` `[docs]`: `followLogs` had no docstring. Added.
-- `docs/.../14-sequence-service-logs.md` `[docs]`: the call shapes were wrong and the hide/reload close was missing. Fixed.
+## 🔴 Must Have
+_None._
 
-## 🟡 Should Have (all applied)
-- `log-lines.ts`: frame size is bounded (1 MiB) and headers are validated; `cleanLogLine` cuts the line before running the regexes.
-- `LogPanel.tsx`: Reopen is also offered after "No container yet".
-- Tests strengthened: stop, split offset, the 500-line cap, and the partial line reset in `LogSession`.
-- `docker-logs.ts`: added a response error listener.
-- Docs: diagram 07 now uses LogStream and has the LogSessionDeps block; the "else first" docstrings and the lifecycle wording are aligned (14, 07, spec UC7); 500 lives in one constant.
+## 🟡 Should Have (all applied in 7b033a4)
+- `src/main/app-protocol.ts:61` `[security|tests]` · catch-all turned EACCES / broken asar into a silent 404 · log non-ENOENT/EISDIR errors, test added
+- `src/main/index.ts:235` `[security]` · `app://` handler registered in dev too · register only when serving the bundled page
+- `docs/architecture/diagrams/launcher/15-sequence-dashboard-load.md:33,53` `[docs]` · claimed `%2f`/`%5c` refused; the code decodes once and refuses leftover `%`, `\`, NUL, empty/`.`/`..` segments · notes rewritten
+- `src/main/trusted-sender.test.ts:35` `[tests]` · loop inside one `it` hides which URL fails · `it.each`
+- `docs/architecture/decisions/0009-custom-app-protocol.md:32` `[docs]` · wrong line count · removed
+- `src/main/index.ts:30` `[correctness]` · Sonar S7735 negated condition · flipped
 
-## 🔵 Nice to Have (to file as one backlog issue)
-- One decoder per stream.
-- `open()` on an unknown service publishes nothing.
-- Follow the logs across restarts, and refresh the stale containers list.
-- Handle `\r` progress bars.
-- Move the frame parser to adapters (owner's call).
-- Give `registerIpc` a params object.
-- Spec UC order.
-- Mention the tray in the CHANGELOG entry for Restart.
+## 🔵 Nice to Have
+- `src/main/app-protocol.ts:60` `[security]` · `nosniff` header (applied); CSP as a response header too (not applied: the meta tag is the single source)
+- `src/main/app-protocol.test.ts` `[tests]` · port in host (applied); `.` segment, case-variant host, directory URL rows (not applied, refused by code)
+- `src/main/app-protocol.ts:5` `[docs]` · `APP_HOST` has no doc comment (private const)
+- `src/main/app-protocol.test.ts:41` `[tests]` · MIME table rows borderline over-testing, kept (cheap)
 
 ## ⚪ Disagree / Intentional
-- `docker-logs.ts` `[correctness]`: TTY detection by Content-Type is safe, because the API is pinned at /v1.47 (≥ 1.42) by ADR-0005.
+- `src/main/app-protocol.test.ts:18` `[tests]` · `../` URLs resolve under the root rather than null · the WHATWG URL parser collapses dot segments before the handler; confinement is the invariant
 
 ## Per-dimension summary
-- Design: flat, with injected deps, proportional.
-- Docs: the diagrams are aligned with the code.
-- Tests: the boundary is the fake daemon, no domain mocks.
-- Security: only ids cross IPC, text-only rendering, bounded parsing.
-- Correctness: stale streams are ignored, and every path closes its stream.
+- Design: pure module, injected `readFile`, thin Electron wiring · Docs: ADR-0009 + diagram 15 match the code · Tests: real functions, only the FS boundary mocked · Security: confinement sound, minimal scheme privileges, exact trusted-sender URL, fuse off · Correctness: no regression on the dev-server path
