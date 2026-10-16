@@ -46,4 +46,6 @@ sequenceDiagram
 
 - The pending entry is swapped, never removed, between the two commands: a click or an event
   arriving between `stop` and `up` sees the service busy.
+- Like a plain Start, no `up` once the daemon is gone or the folder / a Compose file is
+  missing: the row shows that reason instead.
 - A failed `stop` skips the `up`: starting over a half-stopped stack would hide the error.

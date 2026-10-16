@@ -422,9 +422,8 @@ describe('restart — UC6, diagram 12', () => {
     f.snapshot([webStopped])
     f.runs[0]?.finish()
     await settle()
-    await Promise.race([controller.start(BLOG), settle()])
-    await Promise.race([controller.stop(BLOG), settle()])
-    await settle()
+    await controller.start(BLOG)
+    await controller.stop(BLOG)
 
     expect(f.runs.map((run) => run.args.at(-1))).toEqual(['stop', '--wait-timeout=180'])
     expect(f.runs).toHaveLength(2)
@@ -465,6 +464,37 @@ describe('restart — UC6, diagram 12', () => {
 
     expect(row(BLOG)?.status).toBe('starting')
     expect(f.scheduled).toHaveLength(1)
+  })
+
+  it('runs no `up` when the folder disappeared during the stop, and shows it missing', async () => {
+    const { f, controller, row } = await controllerWith()
+    f.snapshot([web])
+    await settle()
+
+    const done = controller.restart(BLOG)
+    await settle()
+    f.missing.add('/srv/blog')
+    f.snapshot([webStopped])
+    f.runs[0]?.finish()
+    await done
+    await settle()
+
+    expect(f.runs).toHaveLength(1)
+    expect(row(BLOG)).toMatchObject({ status: 'missing', reason: 'folder or compose file is missing' })
+  })
+
+  it('runs no `up` when Docker became unavailable during the stop', async () => {
+    const { f, controller } = await controllerWith()
+    f.snapshot([web])
+    await settle()
+
+    const done = controller.restart(BLOG)
+    await settle()
+    f.dockerDown('connect ENOENT')
+    f.runs[0]?.finish()
+    await done
+
+    expect(f.runs).toHaveLength(1)
   })
 
   it('runs no `up` when disposed during the stop', async () => {

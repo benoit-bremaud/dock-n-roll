@@ -334,6 +334,9 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     }
   }
 
+  /** Read through a call: both inputs can change during an await, which narrowing cannot see. */
+  const canUp = (service: Service): boolean => !isDisposed() && dockerAvailable && filesOk.get(service.id) !== false
+
   const run = async (id: string, request: keyof Controls): Promise<void> => {
     await chain
     const found = services.find((candidate) => candidate.id === id)
@@ -353,18 +356,22 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     let failure: string | null = null
     for (const operation of steps) {
       const previous = entry
-      const next: Pending = { workingDir: service.workingDir, projectName: name, operation }
-      pending = previous === null ? [...pending, next] : pending.map((candidate) => (candidate === previous ? next : candidate))
-      entry = next
-      if (operation === 'start' && request === 'restart') {
-        // Docker may never show the stack down between the two commands: re-gate the `up`.
+      if (previous !== null) {
+        // Second step of a restart. Like a plain Start, no `up` without the daemon or the files:
+        // the row then shows that reason. Docker may also never have shown the stack down, so
+        // the `up` is re-gated.
+        recompute()
+        await chain
+        if (!canUp(service)) break
         gates.delete(service.id)
         cancelProbe(service.id)
       }
+      const next: Pending = { workingDir: service.workingDir, projectName: name, operation }
+      pending = previous === null ? [...pending, next] : pending.map((candidate) => (candidate === previous ? next : candidate))
+      entry = next
       recompute()
       failure = await runOne(service, operation)
-      // Read through a call: the flag can flip during the await, which narrowing cannot see.
-      if (failure !== null || isDisposed()) break
+      if (failure !== null) break
     }
     pending = pending.filter((candidate) => candidate !== entry)
     if (failure !== null) {

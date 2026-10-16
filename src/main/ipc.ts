@@ -21,7 +21,7 @@ export function registerIpc(
   isTrusted: (event: IpcMainInvokeEvent) => boolean
 ): void {
   ipcMain.handle(IPC.getState, (event): ControllerState | null => (isTrusted(event) ? controller.state() : null))
-  const command = (channel: string, act: (id: string) => Promise<void>): void => {
+  const command = (channel: (typeof IPC)[keyof typeof IPC], act: (id: string) => Promise<void>): void => {
     ipcMain.handle(channel, async (event, id: unknown) => {
       const valid = asId(id)
       if (isTrusted(event) && valid !== null) await act(valid)
