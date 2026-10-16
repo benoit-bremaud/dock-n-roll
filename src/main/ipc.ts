@@ -12,7 +12,7 @@ function asId(value: unknown): string | null {
 /**
  * Registers the handlers of the channels in `IPC` (class diagram 07), once, at startup. Calls
  * from any frame other than the dashboard page are ignored (`isTrusted`), and so are invalid
- * ids: a refusal is silent, never an error sent back. `start` / `stop` resolve once the
+ * ids: a refusal is silent, never an error sent back. `start` / `stop` / `restart` resolve once the
  * command ends; the outcome is only visible in the next pushed state.
  */
 export function registerIpc(
@@ -21,14 +21,15 @@ export function registerIpc(
   isTrusted: (event: IpcMainInvokeEvent) => boolean
 ): void {
   ipcMain.handle(IPC.getState, (event): ControllerState | null => (isTrusted(event) ? controller.state() : null))
-  ipcMain.handle(IPC.start, async (event, id: unknown) => {
-    const valid = asId(id)
-    if (isTrusted(event) && valid !== null) await controller.start(valid)
-  })
-  ipcMain.handle(IPC.stop, async (event, id: unknown) => {
-    const valid = asId(id)
-    if (isTrusted(event) && valid !== null) await controller.stop(valid)
-  })
+  const command = (channel: (typeof IPC)[keyof typeof IPC], act: (id: string) => Promise<void>): void => {
+    ipcMain.handle(channel, async (event, id: unknown) => {
+      const valid = asId(id)
+      if (isTrusted(event) && valid !== null) await act(valid)
+    })
+  }
+  command(IPC.start, (id) => controller.start(id))
+  command(IPC.stop, (id) => controller.stop(id))
+  command(IPC.restart, (id) => controller.restart(id))
   ipcMain.handle(IPC.openUrl, async (event, id: unknown) => {
     const valid = asId(id)
     // `urlOf` only returns the pin's http/https URL (spec R6), never one from the renderer.

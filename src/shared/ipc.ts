@@ -44,7 +44,7 @@ export interface BackgroundView {
 
 /**
  * What the preload script exposes on `window.dockNRoll`. Subscribe with `onStateChanged`
- * before calling `getState`, or a push in between is missed. `start` / `stop` resolve once the
+ * before calling `getState`, or a push in between is missed. `start` / `stop` / `restart` resolve once the
  * command ends, also when refused: the outcome is only in the next pushed state.
  */
 export interface DockNRollApi {
@@ -52,6 +52,7 @@ export interface DockNRollApi {
   getState(): Promise<ControllerState | null>
   start(id: string): Promise<void>
   stop(id: string): Promise<void>
+  restart(id: string): Promise<void>
   openUrl(id: string): Promise<void>
   /** `null` when the main process refuses the caller. */
   listBackground(): Promise<BackgroundView | null>
@@ -63,6 +64,7 @@ export const IPC = {
   getState: 'dock-n-roll:get-state',
   start: 'dock-n-roll:start',
   stop: 'dock-n-roll:stop',
+  restart: 'dock-n-roll:restart',
   openUrl: 'dock-n-roll:open-url',
   listBackground: 'dock-n-roll:list-background',
   stateChanged: 'dock-n-roll:state-changed'

@@ -39,13 +39,14 @@ describe('preload', () => {
 
   it('exposes exactly the DockNRollApi on window.dockNRoll', () => {
     expect([...electron.exposed.keys()]).toEqual(['dockNRoll'])
-    expect(Object.keys(api).sort()).toEqual(['getState', 'listBackground', 'onStateChanged', 'openUrl', 'start', 'stop'])
+    expect(Object.keys(api).sort()).toEqual(['getState', 'listBackground', 'onStateChanged', 'openUrl', 'restart', 'start', 'stop'])
   })
 
   it.each([
     ['getState', () => api.getState(), [IPC.getState]],
     ['start', () => api.start('web'), [IPC.start, 'web']],
     ['stop', () => api.stop('web'), [IPC.stop, 'web']],
+    ['restart', () => api.restart('web'), [IPC.restart, 'web']],
     ['openUrl', () => api.openUrl('web'), [IPC.openUrl, 'web']],
     ['listBackground', () => api.listBackground(), [IPC.listBackground]]
   ] as const)('%s invokes its channel with the id only', async (_name, call, expected) => {

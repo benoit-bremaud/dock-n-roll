@@ -5,7 +5,7 @@ import type { PinFileStore } from '../adapters/pin-file-store'
 import { buildStopArgs, buildUpArgs } from '../domain/compose-args'
 import { allowedControls, deriveStatus } from '../domain/derive-status'
 import { buildServices } from '../domain/service-catalog'
-import type { ContainerSnapshot, HealthGate, PendingOperation, PinEntry, PinFileResult, Service, StatusInputs } from '../domain/types'
+import type { ContainerSnapshot, Controls, HealthGate, PendingOperation, PinEntry, PinFileResult, Service, StatusInputs } from '../domain/types'
 import type { ControllerState, ServiceView } from '../../shared/ipc'
 
 // Application layer of class diagram 07: orchestrates domain and adapters, holds no rule of
@@ -46,6 +46,8 @@ export interface ServiceController {
   start(id: string): Promise<void>
   /** Same contract as `start`. */
   stop(id: string): Promise<void>
+  /** UC6, same contract as `start`: a stop then an `up` under one pending entry; a failed stop skips the `up` (diagram 12). */
+  restart(id: string): Promise<void>
   /** The pin's validated URL (spec R6), never a URL from the caller. */
   urlOf(id: string): string | null
   /** Current containers, for the background view (UC4). */
@@ -57,7 +59,7 @@ export interface ServiceController {
 }
 
 /**
- * A pending start or stop, keyed by working dir and the project name the command runs under —
+ * A pending start or stop (a restart is one entry whose operation goes from stop to start), keyed by working dir and the project name the command runs under —
  * not by `Service.id`, which changes when a never-started pin gets its first container. A row
  * with no project name yet (never-started pin) matches any pending entry of its dir. Other
  * projects of the same dir stay independent (`-p qa1` / `-p qa2`).
@@ -84,7 +86,7 @@ function isHttpUrl(url: string): boolean {
   }
 }
 
-const NO_CONTROLS = { start: false, stop: false } as const
+const NO_CONTROLS = { start: false, stop: false, restart: false } as const
 
 function excerpt(text: string): string {
   const trimmed = text.trim()
@@ -128,6 +130,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   let currentJson = JSON.stringify(current)
   let chain = Promise.resolve()
   let disposed = false
+  const isDisposed = (): boolean => disposed
   /** Single flight: a resolution runs outside the chain, at most one at a time. */
   let resolving = false
   let cancelNameRetry: () => void = () => undefined
@@ -161,7 +164,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     const status = deriveStatus(inputs)
     const derived = allowedControls(status, inputs)
     // No command without the daemon it would act on, nor under a name that was not checked.
-    const controls = !dockerAvailable ? NO_CONTROLS : unresolved(service) ? { start: false, stop: derived.stop } : derived
+    const controls = !dockerAvailable ? NO_CONTROLS : unresolved(service) ? { ...derived, start: false } : derived
     return {
       id: service.id,
       displayName: service.displayName,
@@ -320,31 +323,57 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     recompute()
   }
 
-  const run = async (id: string, operation: PendingOperation): Promise<void> => {
+  /** Runs one command; returns the failure message, or `null` on success. */
+  const runOne = async (service: Service, operation: PendingOperation): Promise<string | null> => {
+    try {
+      const args = operation === 'start' ? buildUpArgs(service) : buildStopArgs(service)
+      const result = await deps.runCompose(args, { cwd: operation === 'start' ? service.workingDir : '/', socketPath: deps.socketPath })
+      return result.exitCode === 0 ? null : excerpt(result.stderr) || `docker compose exited with ${String(result.exitCode)}`
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error)
+    }
+  }
+
+  /** Read through a call: both inputs can change during an await, which narrowing cannot see. */
+  const canUp = (service: Service): boolean => !isDisposed() && dockerAvailable && filesOk.get(service.id) !== false
+
+  const run = async (id: string, request: keyof Controls): Promise<void> => {
     await chain
     const found = services.find((candidate) => candidate.id === id)
     const view = current.services.find((candidate) => candidate.id === id)
     // Checked synchronously before the pending entry is added: two clicks in the same tick
     // resume one after the other, and the second sees the first one's entry.
-    if (disposed || !dockerAvailable || found === undefined || view === undefined || !view.controls[operation]) return
+    if (disposed || !dockerAvailable || found === undefined || view === undefined || !view.controls[request]) return
     if (pendingFor(pending, found) !== null) return
     const name = found.projectName ?? resolvedNames.get(found.workingDir) ?? null
     const service: Service = { ...found, projectName: name }
     if (name === null) return
-    const entry: Pending = { workingDir: service.workingDir, projectName: name, operation }
-    pending = [...pending, entry]
+    // A restart is a stop then an `up` (diagram 12): the entry is swapped in place between the
+    // two, so nothing else can run on the service in between.
+    const steps: readonly PendingOperation[] = request === 'restart' ? ['stop', 'start'] : [request]
+    let entry: Pending | null = null
     lastError.delete(service.id)
-    recompute()
     let failure: string | null = null
-    try {
-      const args = operation === 'start' ? buildUpArgs(service) : buildStopArgs(service)
-      const result = await deps.runCompose(args, { cwd: operation === 'start' ? service.workingDir : '/', socketPath: deps.socketPath })
-      if (result.exitCode !== 0) failure = excerpt(result.stderr) || `docker compose exited with ${String(result.exitCode)}`
-    } catch (error) {
-      failure = error instanceof Error ? error.message : String(error)
-    } finally {
-      pending = pending.filter((candidate) => candidate !== entry)
+    for (const operation of steps) {
+      const previous = entry
+      if (previous !== null) {
+        // Second step of a restart. Like a plain Start, no `up` without the daemon or the files:
+        // the row then shows that reason. Docker may also never have shown the stack down, so
+        // the `up` is re-gated.
+        recompute()
+        await chain
+        if (!canUp(service)) break
+        gates.delete(service.id)
+        cancelProbe(service.id)
+      }
+      const next: Pending = { workingDir: service.workingDir, projectName: name, operation }
+      pending = previous === null ? [...pending, next] : pending.map((candidate) => (candidate === previous ? next : candidate))
+      entry = next
+      recompute()
+      failure = await runOne(service, operation)
+      if (failure !== null) break
     }
+    pending = pending.filter((candidate) => candidate !== entry)
     if (failure !== null) {
       // Keyed by the row the developer now sees: the id may have changed during the run.
       const row = services.find((candidate) => candidate.workingDir === service.workingDir && candidate.projectName === name)
@@ -379,6 +408,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     state: () => current,
     start: (id) => run(id, 'start'),
     stop: (id) => run(id, 'stop'),
+    restart: (id) => run(id, 'restart'),
     urlOf: (id) => {
       const url = services.find((service) => service.id === id)?.pin?.url ?? null
       // Validated by the pin file (spec R6) and checked again here, for every caller (tray and IPC).

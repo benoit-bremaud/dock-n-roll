@@ -37,6 +37,9 @@ export function ServiceRow({
         <button type="button" aria-label={`Stop ${name}`} disabled={!service.controls.stop} onClick={() => void api.stop(service.id)}>
           Stop
         </button>
+        <button type="button" aria-label={`Restart ${name}`} disabled={!service.controls.restart} onClick={() => void api.restart(service.id)}>
+          Restart
+        </button>
         {service.hasUrl && (
           <button type="button" aria-label={`Open ${name} in the browser`} onClick={() => void api.openUrl(service.id)}>
             Open ↗

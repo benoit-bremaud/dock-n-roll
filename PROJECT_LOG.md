@@ -271,3 +271,18 @@ Chronological operational logbook. Complements `git log` with the human context.
 - **README**: install, uninstall, pin file, troubleshooting (AppIndicator, AppArmor sandbox,
   Docker socket / rootless `DOCKER_HOST`).
 - **Diagrams 07/09**: plan step numbers replaced with the real PRs (#7, #9, #10).
+- **PR #28 merged** (`e92370f`) — Codex P2 (README install path for the CI artifact) fixed;
+  Codex then hit its usage limit → owner MCDA C (475): review-local on the delta, then merge.
+  CI green incl. the new `package` job; #16 closed; Nice filed as #27. Tag + GitHub release
+  `v1.0.0`.
+
+## 2026-10-16 — Features brick, PR 1: Restart
+
+- **Feature choice** (MCDA, owner picked A Restart 465 + B crash notifications 400 + C logs
+  view 345; D groups 285 left out): three sequential PRs, then v1.1.0.
+- **Restart (UC6)**: stop then `up` under one pending entry swapped in place (not
+  `compose restart`, which keeps the old config); failed stop skips the `up`; healthUrl gate
+  reset before the `up`. Allowed wherever Stop is, except `missing`. Tray, dashboard, IPC.
+  UML first: diagrams 01, 04, new 12; spec UC6 + Restart column. TDD.
+- **Pre-push review**: Must 2 · Should 6 · Nice 4 — all applied. 402 tests, coverage
+  96.5/90.7/97.3/98.2.

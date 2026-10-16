@@ -23,6 +23,7 @@ function makeController() {
   const spies = {
     start: vi.fn<(id: string) => Promise<void>>(() => Promise.resolve()),
     stop: vi.fn<(id: string) => Promise<void>>(() => Promise.resolve()),
+    restart: vi.fn<(id: string) => Promise<void>>(() => Promise.resolve()),
     urlOf: vi.fn((id: string) => (id === 'web' ? 'http://localhost:3000/' : null))
   }
   const controller: ServiceController = {
@@ -54,7 +55,7 @@ describe('registerIpc', () => {
 
   it('registers one handler per invoke channel', () => {
     expect([...electron.handlers.keys()].sort()).toEqual(
-      [IPC.getState, IPC.start, IPC.stop, IPC.openUrl, IPC.listBackground].sort()
+      [IPC.getState, IPC.start, IPC.stop, IPC.restart, IPC.openUrl, IPC.listBackground].sort()
     )
   })
 
@@ -66,14 +67,14 @@ describe('registerIpc', () => {
     expect(invoke(IPC.listBackground, UNTRUSTED)).toBeNull()
   })
 
-  it.each([IPC.start, IPC.stop] as const)('%s forwards a valid id from the dashboard', async (channel) => {
+  it.each([IPC.start, IPC.stop, IPC.restart] as const)('%s forwards a valid id from the dashboard', async (channel) => {
     await invoke(channel, TRUSTED, 'web')
 
-    const method = channel === IPC.start ? controller.start : controller.stop
+    const method = { [IPC.start]: controller.start, [IPC.stop]: controller.stop, [IPC.restart]: controller.restart }[channel]
     expect(method).toHaveBeenCalledWith('web')
   })
 
-  it.each([IPC.start, IPC.stop] as const)('%s silently refuses an untrusted caller or an invalid id', async (channel) => {
+  it.each([IPC.start, IPC.stop, IPC.restart] as const)('%s silently refuses an untrusted caller or an invalid id', async (channel) => {
     for (const [event, id] of [
       [UNTRUSTED, 'web'],
       [TRUSTED, ''],
@@ -87,6 +88,7 @@ describe('registerIpc', () => {
 
     expect(controller.start).not.toHaveBeenCalled()
     expect(controller.stop).not.toHaveBeenCalled()
+    expect(controller.restart).not.toHaveBeenCalled()
   })
 
   it('accepts the longest valid id', async () => {

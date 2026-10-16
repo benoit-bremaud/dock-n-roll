@@ -55,5 +55,8 @@ stateDiagram-v2
 - "Relevant", "ready" and "done" are defined in spec §3 (one-off containers ignored, exited-0
   jobs count as done, `healthUrl` gate).
 - Which controls each status allows is in the spec §4 table (stop stays allowed in `missing`).
+- A restart (UC6) holds one pending entry whose operation is `stop` then `start`: the row reads
+  `stopping` then `starting`, with no new status. Restart is allowed in `on`, `starting` and
+  `partial` when nothing is pending (never in `missing`: the `up` needs the files).
 - Docker daemon unreachable is an **app-level** condition (banner, rows greyed without badge),
   not a service status.

@@ -7,6 +7,11 @@ file format (`services.yaml`) and the installed package.
 
 ## [Unreleased]
 
+### Added
+
+- Restart action in the menu and the dashboard: a stop then an `up`, so edits to the Compose
+  file or `.env` apply.
+
 ## [1.0.0] - 2026-10-15
 
 First release.
