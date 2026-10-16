@@ -14,6 +14,8 @@ file format (`services.yaml`) and the installed package.
 - Desktop notification when a running container of a listed service crashes (exit code other
   than 0/130/137/143, out of memory, or restarting); silent for stops you asked for, at most
   one per service per minute.
+- Logs panel in the dashboard: the last 500 lines of a service's container, followed live, with
+  a container picker; text only (colour codes removed).
 
 ## [1.0.0] - 2026-10-15
 

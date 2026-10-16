@@ -26,6 +26,7 @@
   --actions-width: 152px;
 
   --font-family: system-ui, sans-serif;
+  --font-family-mono: ui-monospace, 'DejaVu Sans Mono', monospace;
   --font-size-small: 13px;
   --font-size-body: 14px;
   --font-size-title: 20px;

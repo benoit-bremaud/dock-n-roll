@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url'
 import { app, BrowserWindow, dialog, Menu, nativeImage, session, shell, Tray, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
 import { isAutostartEnabled, setAutostart } from './adapters/autostart'
 import { resolveProjectName, runCompose } from './adapters/compose-runner'
+import { followLogs } from './adapters/docker-logs'
 import { observeDocker } from './adapters/docker-observer'
 import { filesExist } from './adapters/file-probe'
 import { probeHealth } from './adapters/health-probe'
@@ -11,10 +12,11 @@ import { scanListeningPorts } from './adapters/port-scanner'
 import { createAutostartToggle, type AutostartToggle } from './controller/autostart-toggle'
 import { createBackgroundSource } from './controller/background-monitor'
 import { dockerSocketPath } from './controller/docker-socket'
+import { createLogSession, type LogSession } from './controller/log-session'
 import { createServiceController, type ServiceController } from './controller/service-controller'
 import { trayIconPath } from './controller/resources'
 import { buildTrayMenu, type MenuEntry } from './controller/tray-menu'
-import { pushStateTo, registerIpc } from './ipc'
+import { pushLogsTo, pushStateTo, registerIpc } from './ipc'
 import { showNotification } from './notifier'
 import { isTrustedSender, type DashboardOrigin } from './trusted-sender'
 import type { ControllerState } from '../shared/ipc'
@@ -31,6 +33,8 @@ let dashboard: BrowserWindow | null = null
 let tray: Tray | null = null
 // Set once the controller exists: a dashboard that finishes loading afterwards gets its state.
 let controller: ServiceController | null = null
+// Set with the controller: the dashboard closes the logs stream when it hides or reloads (diagram 14).
+let logs: LogSession | null = null
 // Set on any quit (tray item, logout, SIGTERM): lets the dashboard close for real instead of hiding.
 let isQuitting = false
 
@@ -56,7 +60,11 @@ function createDashboard(): BrowserWindow {
   // Defensive: a push sent while the page is still loading can be dropped, and `publish()` skips
   // unchanged states, so every freshly loaded page is handed the current state (diagram 11).
   window.webContents.on('did-finish-load', () => {
+    logs?.close()
     if (controller !== null) pushStateTo(() => window, controller.state())
+  })
+  window.on('hide', () => {
+    logs?.close()
   })
 
   // Closing hides the dashboard: the app lives in the top bar until "Quit".
@@ -129,6 +137,13 @@ function renderTray(trayIcon: Tray, controller: ServiceController, state: Contro
   trayIcon.setContextMenu(Menu.buildFromTemplate(toElectron(entries)))
 }
 
+function schedule(run: () => void, delayMs: number): () => void {
+  const timer = setTimeout(run, delayMs)
+  return () => {
+    clearTimeout(timer)
+  }
+}
+
 /** Composition root: real adapters into the controller, controller into IPC and the tray. */
 async function start(trayIcon: Tray): Promise<void> {
   const socketPath = dockerSocketPath(process.env)
@@ -143,12 +158,7 @@ async function start(trayIcon: Tray): Promise<void> {
     filesExist,
     probeHealth,
     notify: showNotification,
-    schedule: (run, delayMs) => {
-      const timer = setTimeout(run, delayMs)
-      return () => {
-        clearTimeout(timer)
-      }
-    }
+    schedule
   })
   // "Quit" from the starting tray fired `before-quit` before this listener existed.
   if (isQuitting) {
@@ -162,9 +172,22 @@ async function start(trayIcon: Tray): Promise<void> {
     renderTray(trayIcon, created, state)
     pushStateTo(() => dashboard, state)
   })
-  registerIpc(created, createBackgroundSource(() => created.containers(), scanListeningPorts), (event: IpcMainInvokeEvent) =>
-    // A destroyed window's `webContents` throws on access: a call landing during quit is refused.
-    isTrustedSender(event, dashboard !== null && !dashboard.isDestroyed() ? dashboard.webContents : null, DASHBOARD_ORIGIN)
+  const session = createLogSession({
+    containersOf: (id) => created.containersOf(id),
+    follow: (containerId, listener) => followLogs(socketPath, containerId, listener),
+    schedule
+  })
+  logs = session
+  session.onChange((state) => {
+    pushLogsTo(() => dashboard, state)
+  })
+  registerIpc(
+    created,
+    createBackgroundSource(() => created.containers(), scanListeningPorts),
+    (event: IpcMainInvokeEvent) =>
+      // A destroyed window's `webContents` throws on access: a call landing during quit is refused.
+      isTrustedSender(event, dashboard !== null && !dashboard.isDestroyed() ? dashboard.webContents : null, DASHBOARD_ORIGIN),
+    session
   )
   // A dashboard opened during startup read no state (no IPC yet), and `publish()` skips an
   // unchanged state: hand it the current one now (diagram 11).
@@ -194,6 +217,8 @@ if (!app.requestSingleInstanceLock()) {
   // flag first (the dashboard really closes), then stop every input, then remove the icon.
   app.on('before-quit', () => {
     isQuitting = true
+    logs?.close()
+    logs = null
     controller?.dispose()
     controller = null
     tray?.destroy()

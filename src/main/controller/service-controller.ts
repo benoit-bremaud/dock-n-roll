@@ -59,6 +59,8 @@ export interface ServiceController {
   urlOf(id: string): string | null
   /** Current containers, for the background view (UC4). */
   containers(): readonly ContainerSnapshot[]
+  /** Containers of one listed service, for its logs (UC7); `null` for an unknown id. */
+  containersOf(id: string): readonly ContainerSnapshot[] | null
   /** Returns the unsubscribe function. */
   onChange(listener: (state: ControllerState) => void): () => void
   /** Stops observing, closes the pin file, cancels probes and drops listeners. Final. */
@@ -460,6 +462,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
       return url !== null && isHttpUrl(url) ? url : null
     },
     containers: () => containers,
+    containersOf: (id) => services.find((service) => service.id === id)?.containers ?? null,
     onChange: (listener) => {
       listeners.add(listener)
       return () => listeners.delete(listener)

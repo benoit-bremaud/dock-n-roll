@@ -18,7 +18,7 @@ sequenceDiagram
   participant UI as LogPanel (renderer)
   participant IPC as ipc.ts (trusted sender, id check)
   participant LS as LogSession (main)
-  participant LF as parseLogFrames / toLogLines (domain)
+  participant LF as log-lines (domain)
   participant DL as DockerLogs (adapter)
   participant DE as Docker Engine
 
@@ -37,7 +37,7 @@ sequenceDiagram
       DL->>LF: parseLogFrames(leftover + chunk, multiplexed)
       LF-->>DL: payloads, leftover bytes
       DL-->>LS: onText(stdout or stderr text)
-      LS->>LF: toLogLines(text): ANSI and control chars removed, lines capped
+      LS->>LF: appendLogText(lines, partial, text): ANSI and control chars removed, lines capped
       LS->>LS: ring buffer, last 500 lines
       LS-->>UI: logsChanged(state), at most every 200 ms
     end

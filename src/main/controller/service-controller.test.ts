@@ -760,6 +760,15 @@ describe('inputs that need IO — spec §3, §4, §10 P1', () => {
     expect(controller.urlOf(BLOG)).toBe('http://localhost:8086/')
     expect(controller.urlOf('/other')).toBeNull()
   })
+
+  it('gives the containers of a listed service only (UC7)', async () => {
+    const { f, controller } = await controllerWith()
+    f.snapshot([web])
+    await settle()
+
+    expect(controller.containersOf(BLOG)?.map((c) => c.id)).toEqual(['w'])
+    expect(controller.containersOf('/other')).toBeNull()
+  })
 })
 
 describe('review fixes — races and failures', () => {
