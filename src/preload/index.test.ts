@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { IPC, type ControllerState, type DockNRollApi } from '../shared/ipc'
 
-type Listener = (event: unknown, state: ControllerState) => void
+type Listener = (event: unknown, state: ControllerState | null) => void
 
 // Electron is the boundary: the exposed API and the renderer-side IPC are captured.
 const electron = vi.hoisted(() => {
@@ -10,7 +10,7 @@ const electron = vi.hoisted(() => {
     exposed: new Map<string, unknown>(),
     listeners,
     invoke: vi.fn<(...args: unknown[]) => Promise<string>>(() => Promise.resolve('answer')),
-    emit: (channel: string, state: ControllerState): void => {
+    emit: (channel: string, state: ControllerState | null): void => {
       for (const listener of listeners.get(channel) ?? []) listener({}, state)
     }
   }

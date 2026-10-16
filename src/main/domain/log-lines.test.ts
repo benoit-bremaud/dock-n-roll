@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { appendLogText, cleanLogLine, MAX_LINE_CHARS, parseLogFrames } from './log-lines'
+import { appendLogText, cleanLogLine, MAX_FRAME_BYTES, MAX_LINE_CHARS, parseLogFrames } from './log-lines'
+
+const OVER_CAP = MAX_FRAME_BYTES + 1
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
@@ -22,6 +24,22 @@ describe('parseLogFrames — diagram 14', () => {
     expect(rest).toHaveLength(0)
   })
 
+  it('reads the size big-endian (cap check of the case below)', () => {
+    expect(new DataView(new Uint8Array([0x00, 0x10, 0x00, 0x01]).buffer).getUint32(0)).toBe(OVER_CAP)
+  })
+
+  it.each([
+    ['an unknown stream byte', [7, 0, 0, 0, 0, 0, 0, 1]],
+    ['non-zero padding', [1, 0, 9, 0, 0, 0, 0, 1]],
+    ['a frame over the cap', [1, 0, 0, 0, 0x00, 0x10, 0x00, 0x01]] // MAX_FRAME_BYTES + 1, big-endian
+  ])('flags %s as invalid, keeping the frames before it and buffering nothing', (_name, header) => {
+    const { payloads, rest, invalid } = parseLogFrames(new Uint8Array([...frame(1, 'ok\n'), ...header]))
+
+    expect(texts(payloads)).toEqual(['ok\n'])
+    expect(rest).toHaveLength(0)
+    expect(invalid).toBe(true)
+  })
+
   it('keeps a frame split across chunks, header or payload, for the next chunk', () => {
     const whole = frame(1, 'hello\n')
 
@@ -36,7 +54,7 @@ describe('parseLogFrames — diagram 14', () => {
   })
 
   it('returns nothing for an empty chunk', () => {
-    expect(parseLogFrames(new Uint8Array())).toEqual({ payloads: [], rest: new Uint8Array() })
+    expect(parseLogFrames(new Uint8Array())).toEqual({ payloads: [], rest: new Uint8Array(), invalid: false })
   })
 })
 

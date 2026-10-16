@@ -1,10 +1,9 @@
 import { request } from 'node:http'
-import { parseLogFrames } from '../domain/log-lines'
+import { MAX_LOG_LINES, parseLogFrames } from '../domain/log-lines'
 import { API_PREFIX } from './docker-observer'
 
 // Follows one container's logs over the Docker socket (ADR-0008, diagram 14).
 
-const TAIL_LINES = 500
 const HEADERS_TIMEOUT_MS = 5000
 
 export interface LogListener {
@@ -19,6 +18,12 @@ export interface LogStream {
   stop(): void
 }
 
+/**
+ * Follows one container's logs: the last `MAX_LOG_LINES`, then live. Never throws: every
+ * failure (non-200, socket error, invalid frame, no headers within `headersTimeoutMs`) reaches
+ * `listener.onEnd` exactly once. The timeout bounds the wait for headers only: a quiet
+ * container keeps its stream open.
+ */
 export function followLogs(socketPath: string, containerId: string, listener: LogListener, headersTimeoutMs = HEADERS_TIMEOUT_MS): LogStream {
   let stopped = false
   const end = (reason: string): void => {
@@ -27,7 +32,7 @@ export function followLogs(socketPath: string, containerId: string, listener: Lo
     clearTimeout(timer)
     listener.onEnd(reason)
   }
-  const path = `${API_PREFIX}/containers/${encodeURIComponent(containerId)}/logs?follow=1&stdout=1&stderr=1&tail=${String(TAIL_LINES)}`
+  const path = `${API_PREFIX}/containers/${encodeURIComponent(containerId)}/logs?follow=1&stdout=1&stderr=1&tail=${String(MAX_LOG_LINES)}`
   const call = request({ socketPath, path }, (response) => {
     clearTimeout(timer)
     if (response.statusCode !== 200) {
@@ -48,7 +53,17 @@ export function followLogs(socketPath: string, containerId: string, listener: Lo
       }
       const parsed = parseLogFrames(Buffer.concat([rest, chunk]))
       rest = parsed.rest
+      if (parsed.invalid) {
+        // Payloads before the bad header still count; nothing after it is trusted.
+        for (const payload of parsed.payloads) listener.onText(decoder.decode(payload, { stream: true }))
+        end('Unreadable log stream')
+        call.destroy()
+        return
+      }
       for (const payload of parsed.payloads) listener.onText(decoder.decode(payload, { stream: true }))
+    })
+    response.on('error', (error) => {
+      end(error.message)
     })
     response.on('close', () => {
       end('Log stream ended')

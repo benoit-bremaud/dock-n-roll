@@ -3,7 +3,8 @@ import type { LogListener } from '../adapters/docker-logs'
 import { container } from '../domain/test-fixtures'
 import type { ContainerSnapshot } from '../domain/types'
 import type { LogsState } from '../../shared/ipc'
-import { createLogSession, MAX_LINES, PUSH_EVERY_MS } from './log-session'
+import { MAX_LOG_LINES } from '../domain/log-lines'
+import { createLogSession, PUSH_EVERY_MS } from './log-session'
 
 interface Follow {
   readonly id: string
@@ -114,10 +115,10 @@ describe('createLogSession — UC7, diagram 14', () => {
     const { session, follows, flush, last } = setup({ blog: [web] })
     session.open('blog', null)
 
-    follows[0]?.listener.onText(Array.from({ length: MAX_LINES + 5 }, (_, i) => `l${String(i)}\n`).join(''))
+    follows[0]?.listener.onText(Array.from({ length: MAX_LOG_LINES + 5 }, (_, i) => `l${String(i)}\n`).join(''))
     flush()
 
-    expect(last()?.lines).toHaveLength(MAX_LINES)
+    expect(last()?.lines).toHaveLength(MAX_LOG_LINES)
     expect(last()?.lines[0]).toBe('l5')
   })
 
@@ -163,6 +164,39 @@ describe('createLogSession — UC7, diagram 14', () => {
     flush()
 
     expect(last()).toMatchObject({ serviceId: 'api', lines: [], ended: null })
+  })
+
+  it('never prefixes the next container\'s first line with the previous one\'s unfinished line', () => {
+    const { session, follows, flush, last } = setup({ blog: [web, db] })
+    session.open('blog', 'w')
+    follows[0]?.listener.onText('half')
+
+    session.open('blog', 'd')
+    follows[1]?.listener.onText('x\n')
+    flush()
+
+    expect(last()).toMatchObject({ containerId: 'd', lines: ['x'] })
+  })
+
+  it('cancels the pending push of the previous stream on reopen', () => {
+    const { session, follows, timers } = setup({ blog: [web] })
+    session.open('blog', null)
+    follows[0]?.listener.onText('x\n')
+
+    session.open('blog', null)
+
+    expect(timers[0]?.cancelled).toBe(true)
+  })
+
+  it('ignores text arriving after the stream ended', () => {
+    const { session, follows, flush, last } = setup({ blog: [web] })
+    session.open('blog', null)
+    follows[0]?.listener.onEnd('Log stream ended')
+
+    follows[0]?.listener.onText('late\n')
+    flush()
+
+    expect(last()).toMatchObject({ lines: [], ended: 'Log stream ended' })
   })
 
   it('drops its listeners on unsubscribe', () => {

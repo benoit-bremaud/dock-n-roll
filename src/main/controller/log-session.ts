@@ -1,11 +1,10 @@
 import type { LogListener, LogStream } from '../adapters/docker-logs'
-import { appendLogText } from '../domain/log-lines'
+import { appendLogText, MAX_LOG_LINES } from '../domain/log-lines'
 import type { ContainerSnapshot } from '../domain/types'
 import type { LogsState } from '../../shared/ipc'
 
 // UC7 (diagram 14): the one open logs panel — which container, its last lines, its stream.
 
-export const MAX_LINES = 500
 /** A chatty container is pushed at most this often, whole state, so IPC is never flooded. */
 export const PUSH_EVERY_MS = 200
 
@@ -18,7 +17,7 @@ export interface LogSessionDeps {
 }
 
 export interface LogSession {
-  /** `containerId` is used only if it belongs to the service; else its first running container. */
+  /** `containerId` is used only if it belongs to the service; else its first running container, else its first. */
   open(serviceId: string, containerId: string | null): void
   /** Stops the stream and pushes `null`; nothing when no panel is open. */
   close(): void
@@ -70,14 +69,14 @@ export function createLogSession(deps: LogSessionDeps): LogSession {
       const own: LogStream = deps.follow(chosen.id, {
         onText: (text) => {
           if (stream !== own || state === null) return
-          const next = appendLogText(state.lines, partial, text, MAX_LINES)
+          const next = appendLogText(state.lines, partial, text, MAX_LOG_LINES)
           partial = next.partial
           state = { ...state, lines: next.lines }
           cancelPush ??= deps.schedule(publish, PUSH_EVERY_MS)
         },
         onEnd: (reason) => {
           if (stream !== own || state === null) return
-          const lines = partial === '' ? state.lines : appendLogText(state.lines, partial, '\n', MAX_LINES).lines
+          const lines = partial === '' ? state.lines : appendLogText(state.lines, partial, '\n', MAX_LOG_LINES).lines
           state = { ...state, lines, ended: reason }
           stream = null
           partial = ''

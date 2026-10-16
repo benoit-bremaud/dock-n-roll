@@ -395,7 +395,7 @@ describe('App — logs panel (UC7, diagram 09)', () => {
 
     await userEvent.click(button('Logs of SonarQube'))
     expect(screen.queryByLabelText('Log lines of SonarQube')).toBeNull()
-    expect(fake.calls.filter((call) => call.includes('Logs'))).toEqual(['openLogs blog-id', 'closeLogs', 'openLogs sq', 'closeLogs'])
+    expect(fake.calls.filter((call) => /^(openLogs|closeLogs)/.test(call))).toEqual(['openLogs blog-id', 'closeLogs', 'openLogs sq', 'closeLogs'])
   })
 
   it('disables Logs while Docker is unavailable', async () => {

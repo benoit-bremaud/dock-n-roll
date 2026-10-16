@@ -153,8 +153,9 @@ Primary actor for all: **Developer**. Supporting actor: **Docker Engine**.
 - **Main success scenario**: Developer clicks Logs on a service row → system shows the last
   500 lines of one of its containers (first running, else first) and follows new lines until
   the panel closes. A service with several containers offers a container picker. Diagram 14.
-- **Extensions**: no container yet → "No container yet"; the container stops or the daemon
-  drops → stream ended, Reopen offered.
+- **Extensions**: no container yet → "No container yet", Reopen offered; the container stops
+  or the daemon drops → stream ended, Reopen offered; the dashboard is hidden or reloaded →
+  stream closed, lines kept, "Logs closed", Reopen offered.
 - **Note**: text only (no HTML, ANSI removed); only one panel open at a time; read-only.
 
 ### UC5 — Open a service in the browser

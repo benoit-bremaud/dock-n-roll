@@ -55,7 +55,7 @@ export interface LogsState {
   readonly containerId: string | null
   /** The service's containers, for the picker. */
   readonly containers: readonly LogContainer[]
-  /** Clean text lines, the last 500. */
+  /** Clean text lines, the last ones only (`MAX_LOG_LINES`). */
   readonly lines: readonly string[]
   /** Why the stream is not (or no longer) followed; `null` while it is. */
   readonly ended: string | null
@@ -79,7 +79,7 @@ export interface DockNRollApi {
   onStateChanged(callback: (state: ControllerState) => void): () => void
   /**
    * UC7: follows a container of the service (`containerId` only if it belongs to it, else the
-   * first running one). Subscribe with `onLogsChanged` first: the state only comes as a push.
+   * first running one, else the first). Subscribe with `onLogsChanged` first: the state only comes as a push.
    */
   openLogs(serviceId: string, containerId: string | null): Promise<void>
   closeLogs(): Promise<void>

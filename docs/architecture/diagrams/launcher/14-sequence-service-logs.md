@@ -34,17 +34,22 @@ sequenceDiagram
     DL->>DE: GET /containers/{id}/logs?follow=1&stdout=1&stderr=1&tail=500
     DE-->>DL: 200, Content-Type multiplexed-stream or raw-stream (TTY)
     loop each chunk
-      DL->>LF: parseLogFrames(leftover + chunk, multiplexed)
-      LF-->>DL: payloads, leftover bytes
+      opt multiplexed (no TTY), a TTY stream is decoded as is
+        DL->>LF: parseLogFrames(leftover + chunk)
+        LF-->>DL: payloads, leftover bytes (invalid header or frame over 1 MiB: stream dropped)
+      end
       DL-->>LS: onText(stdout or stderr text)
       LS->>LF: appendLogText(lines, partial, text): ANSI and control chars removed, lines capped
       LS->>LS: ring buffer, last 500 lines
       LS-->>UI: logsChanged(state), at most every 200 ms
     end
-    alt the developer closes the panel or the window
+    alt the developer closes the panel (or opens another one)
       UI->>IPC: closeLogs()
       IPC->>LS: close()
       LS->>DL: stop(): request destroyed
+    else the dashboard is hidden or reloaded (main process)
+      LS->>DL: stop(): request destroyed
+      LS-->>UI: logsChanged(null): lines kept, "Logs closed — Reopen"
     else the container stops or the daemon drops
       DE-->>DL: end of stream / error
       DL-->>LS: onEnd(reason)
@@ -66,8 +71,13 @@ sequenceDiagram
   parser returns the leftover bytes. With a TTY the stream is raw text. Docker tells which by
   the response `Content-Type` (API ≥ 1.42).
 - **No reconnect**: when the container stops (Stop, Restart, crash) the stream ends and the
-  panel offers Reopen. Following across restarts is backlog (YAGNI).
+  panel offers Reopen, also after "No container yet" (a reopen picks the container started since). Following across restarts is backlog (YAGNI).
 - **Push throttled** to one state every 200 ms, full state (like `stateChanged`), so a
   missed push loses nothing and a chatty container cannot flood IPC.
 - **Lifecycle**: the stream is destroyed on `closeLogs`, on a new `openLogs`, when the
-  dashboard window closes and on dispose.
+  dashboard window hides (closing it only hides it) or reloads, and on quit. A `null` push
+  ends an open panel ("Logs closed", Reopen); a panel ignores it before its first state, as it
+  is then the close of the panel it replaces.
+- **Bounded parsing**: a frame header that is not Docker's (stream byte above 2, non-zero
+  padding) or declares more than 1 MiB drops the stream ("Unreadable log stream") instead of
+  buffering; a line is cut before cleaning, so the work per line is bounded too.

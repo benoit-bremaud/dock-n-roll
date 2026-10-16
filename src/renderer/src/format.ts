@@ -16,3 +16,11 @@ export function runningSummary(statuses: readonly ServiceStatus[]): string | nul
   const on = statuses.filter((status) => status === 'on').length
   return `${String(on)} of ${String(statuses.length)} on`
 }
+
+/** How close to the bottom (px) still counts as following the logs: new lines then scroll into view. */
+const FOLLOW_SLACK_PX = 24
+
+/** UC7: the developer has not scrolled up to read, so new lines keep the view at the bottom. */
+export function isFollowing({ scrollHeight, scrollTop, clientHeight }: { readonly scrollHeight: number; readonly scrollTop: number; readonly clientHeight: number }): boolean {
+  return scrollHeight - scrollTop - clientHeight < FOLLOW_SLACK_PX
+}

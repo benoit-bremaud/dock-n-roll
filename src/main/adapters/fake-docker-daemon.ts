@@ -32,6 +32,10 @@ export class FakeDockerDaemon {
   inspectDelayMs = 0
   /** Containers whose logs are a raw stream (TTY); the others are multiplexed. */
   readonly ttyLogs = new Set<string>()
+  /** Next logs request is accepted but never answered, as a hung daemon would. */
+  hangNextLogs = false
+  /** Next logs request is answered with this HTTP status. */
+  nextLogsStatus: number | undefined
   /** Query strings of the log requests, in order. */
   readonly logQueries: string[] = []
   private server: Server | undefined
@@ -128,6 +132,18 @@ export class FakeDockerDaemon {
     const logs = /^\/v1\.47\/containers\/([^/]+)\/logs$/.exec(url.pathname)?.[1]
     if (logs !== undefined) {
       this.logQueries.push(url.search)
+      if (this.hangNextLogs) {
+        this.hangNextLogs = false
+        this.logStreams.add(response)
+        response.on('close', () => this.logStreams.delete(response))
+        return
+      }
+      const status = this.nextLogsStatus
+      this.nextLogsStatus = undefined
+      if (status !== undefined) {
+        json(status, { message: 'server error' })
+        return
+      }
       if (!this.containers.has(logs)) {
         json(404, { message: 'No such container' })
         return

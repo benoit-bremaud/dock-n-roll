@@ -57,10 +57,16 @@ classDiagram
     +string[] lines
     +string|null ended
   }
+  class LogSessionDeps {
+    <<injected>>
+    +containersOf(serviceId)
+    +follow(containerId, listener)
+    +schedule
+  }
   class LogSession {
     <<createLogSession(deps), one stream at a time>>
-    -stream DockerLogStream|null
-    -lines string[] (ring, 500)
+    -stream LogStream|null
+    -lines string[] (ring, MAX_LOG_LINES 500)
     +open(serviceId, containerId|null) void
     +close() void
     +onChange(listener) unsubscribe
@@ -127,6 +133,7 @@ classDiagram
   IpcHandlers ..> LogSession : delegates ids
   LogSession ..> ServiceController : containers of a service
   LogSession ..> LogsState : produces
+  LogSession ..> LogSessionDeps : uses
   DockNRollApi ..> LogsState
 ```
 
@@ -185,5 +192,5 @@ classDiagram
   from `ServiceController` views (a container id from the renderer is used only if it belongs
   to that service). Lines are cleaned and capped in the main process; `logsChanged` pushes the
   full `LogsState` at most every 200 ms. The stream closes on `closeLogs`, a new `openLogs`,
-  the dashboard closing and dispose.
+  the dashboard hiding or reloading, and quit.
 - `ContainerRow` = name, image, state, health, Compose project (UC4); built from the snapshot.

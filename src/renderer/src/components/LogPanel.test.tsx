@@ -63,15 +63,29 @@ describe('LogPanel — UC7, diagram 14', () => {
     expect(pre.querySelector('b')).toBeNull()
   })
 
-  it('ignores a push for another service and a null push', () => {
+  it('ignores a push for another service, and a null push before its first state', () => {
+    const fake = fakeLogsApi()
+    render(<LogPanel api={fake.api} serviceId="blog" name="Blog" />)
+    fake.push(null)
+    expect(screen.queryByRole('button', { name: 'Reopen' })).toBeNull()
+    fake.push(logs({ lines: ['mine'] }))
+
+    fake.push(logs({ serviceId: 'api', lines: ['theirs'] }))
+
+    expect(screen.getByLabelText('Log lines of Blog').textContent).toBe('mine')
+  })
+
+  it('keeps the lines and offers Reopen when the main process closes the session (window hidden)', async () => {
     const fake = fakeLogsApi()
     render(<LogPanel api={fake.api} serviceId="blog" name="Blog" />)
     fake.push(logs({ lines: ['mine'] }))
 
-    fake.push(logs({ serviceId: 'api', lines: ['theirs'] }))
     fake.push(null)
 
+    expect(screen.getByText('Logs closed')).toBeTruthy()
     expect(screen.getByLabelText('Log lines of Blog').textContent).toBe('mine')
+    await userEvent.click(screen.getByRole('button', { name: 'Reopen' }))
+    expect(fake.calls.at(-1)).toBe('open blog w')
   })
 
   it('offers a container picker for a multi-container service', async () => {
@@ -96,14 +110,15 @@ describe('LogPanel — UC7, diagram 14', () => {
     expect(fake.calls.at(-1)).toBe('open blog w')
   })
 
-  it('offers no Reopen when the service has no container yet', () => {
+  it('reopens a service that had no container yet, letting the main process pick the new one', async () => {
     const fake = fakeLogsApi()
     render(<LogPanel api={fake.api} serviceId="blog" name="Blog" />)
 
     fake.push(logs({ containerId: null, containers: [], ended: 'No container yet' }))
-
     expect(screen.getByText('No container yet')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Reopen' })).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Reopen' }))
+
+    expect(fake.calls.at(-1)).toBe('open blog null')
   })
 
   it('closes the stream and unsubscribes on unmount', () => {

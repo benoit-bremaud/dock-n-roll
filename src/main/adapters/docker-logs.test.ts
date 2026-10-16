@@ -28,14 +28,16 @@ describe('followLogs — diagram 14, ADR-0008', () => {
   let text: string
   let ends: string[]
 
-  const follow = (id: string): void => {
+  const follow = (id: string, headersTimeoutMs?: number): void => {
     stream = followLogs(daemon.socketPath, id, {
       onText: (chunk) => {
         text += chunk
       },
       onEnd: (reason) => ends.push(reason)
-    })
+    }, headersTimeoutMs)
   }
+  /** Lets late data arrive before a negative check: can only make it pass wrongly, never flake red. */
+  const quietFor = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
   beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), 'dock-n-roll-logs-'))
@@ -64,10 +66,11 @@ describe('followLogs — diagram 14, ADR-0008', () => {
     follow('web')
     await waitFor(() => daemon.openLogStreams === 1)
     const bytes = new Uint8Array([...frame(1, 'café\n'), ...frame(2, 'oops\n')])
+    const insideE = bytes.indexOf(0xc3) + 1
 
     daemon.writeLogs(bytes.slice(0, 3))
-    daemon.writeLogs(bytes.slice(3, 12))
-    daemon.writeLogs(bytes.slice(12))
+    daemon.writeLogs(bytes.slice(3, insideE))
+    daemon.writeLogs(bytes.slice(insideE))
 
     await waitFor(() => text === 'café\noops\n')
   })
@@ -77,9 +80,13 @@ describe('followLogs — diagram 14, ADR-0008', () => {
     follow('web')
     await waitFor(() => daemon.openLogStreams === 1)
 
-    daemon.writeLogs(encoder.encode('raw line\n'))
+    const bytes = encoder.encode('raw café\n')
+    const insideE = bytes.indexOf(0xc3) + 1
+    daemon.writeLogs(bytes.slice(0, insideE))
+    await quietFor(20)
+    daemon.writeLogs(bytes.slice(insideE))
 
-    await waitFor(() => text === 'raw line\n')
+    await waitFor(() => text === 'raw café\n')
   })
 
   it('reports the end of the stream once, when the container stops', async () => {
@@ -92,11 +99,41 @@ describe('followLogs — diagram 14, ADR-0008', () => {
     expect(ends).toEqual(['Log stream ended'])
   })
 
-  it('reports a refused stream with its HTTP status', async () => {
-    follow('gone')
+  it.each([
+    ['gone', undefined, 404],
+    ['web', 500, 500]
+  ] as const)('reports a refused stream once, with its HTTP status (%s)', async (id, status, expected) => {
+    daemon.nextLogsStatus = status
+    follow(id)
 
     await waitFor(() => ends.length > 0)
-    expect(ends).toEqual(['Docker refused the logs (HTTP 404)'])
+    await quietFor(30)
+    expect(ends).toEqual([`Docker refused the logs (HTTP ${String(expected)})`])
+  })
+
+  it('gives up when Docker sends no headers in time, but keeps a quiet open stream', async () => {
+    daemon.hangNextLogs = true
+    follow('web', 50)
+    await waitFor(() => ends.length > 0)
+    expect(ends).toEqual(['Docker did not answer the logs in time'])
+
+    stream?.stop()
+    ends = []
+    follow('web', 50)
+    await waitFor(() => daemon.openLogStreams === 1)
+    await quietFor(100)
+    expect(ends).toEqual([])
+  })
+
+  it('drops a stream whose frame header is not Docker\'s, after the valid frames', async () => {
+    follow('web')
+    await waitFor(() => daemon.openLogStreams === 1)
+
+    daemon.writeLogs(new Uint8Array([...frame(1, 'ok\n'), 9, 9, 9, 9, 0, 0, 0, 1]))
+
+    await waitFor(() => ends.length > 0)
+    expect(text).toBe('ok\n')
+    expect(ends).toEqual(['Unreadable log stream'])
   })
 
   it('reports an unreachable daemon', async () => {
@@ -114,8 +151,18 @@ describe('followLogs — diagram 14, ADR-0008', () => {
     stream?.stop()
     await waitFor(() => daemon.openLogStreams === 0)
     daemon.writeLogs(frame(1, 'late\n'))
+    await quietFor(30)
 
     expect(text).toBe('')
+    expect(ends).toEqual([])
+  })
+
+  it('reports nothing when stopped before the headers', async () => {
+    daemon.hangNextLogs = true
+    follow('web', 50)
+    stream?.stop()
+
+    await quietFor(100)
     expect(ends).toEqual([])
   })
 })

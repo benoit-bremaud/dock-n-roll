@@ -1,8 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { DockNRollApi, LogsState } from '../../../shared/ipc'
-
-/** How close to the bottom (px) still counts as "following": new lines then scroll into view. */
-const FOLLOW_SLACK_PX = 24
+import { isFollowing } from '../format'
 
 /**
  * UC7 (diagram 14): the logs of one service, under its row. Subscribes before opening (the state
@@ -24,8 +22,11 @@ export function LogPanel({
 
   useEffect(() => {
     const unsubscribe = api.onLogsChanged((next) => {
-      // Another panel's state, or the `null` of a close, is not this panel's.
-      if (next?.serviceId === serviceId) setLogs(next)
+      // `null`: the main process closed the session (dashboard hidden or reloaded), so this
+      // panel's stream is gone — say so and offer Reopen. Before its first state a panel
+      // ignores it: that is the close of the panel it replaces. Another service's state is not ours.
+      if (next === null) setLogs((previous) => (previous === null ? null : { ...previous, ended: previous.ended ?? 'Logs closed' }))
+      else if (next.serviceId === serviceId) setLogs(next)
     })
     void api.openLogs(serviceId, null)
     return () => {
@@ -60,7 +61,8 @@ export function LogPanel({
           </label>
         )}
         {logs?.ended != null && <span className="logs__ended">{logs.ended}</span>}
-        {logs?.ended != null && logs.containerId !== null && (
+        {/* Also for "No container yet": a reopen picks the container started since. */}
+        {logs?.ended != null && (
           <button type="button" onClick={() => { reopen(logs.containerId) }}>
             Reopen
           </button>
@@ -71,8 +73,7 @@ export function LogPanel({
         className="logs__lines"
         aria-label={`Log lines of ${name}`}
         onScroll={(event) => {
-          const element = event.currentTarget
-          following.current = element.scrollHeight - element.scrollTop - element.clientHeight < FOLLOW_SLACK_PX
+          following.current = isFollowing(event.currentTarget)
         }}
       >
         {logs?.lines.join('\n')}
