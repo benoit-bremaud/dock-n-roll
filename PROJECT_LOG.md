@@ -336,3 +336,19 @@ Owner MCDA (weights: value 30, risk 25, effort⁻¹ 20, debt 15, unblock 10):
 5. **B** Sonar legacy #30 + #22 (235) · 6. **H** test Nice #25 (215) · 7. **G** service groups (155).
 
 Sensitivity: C and A stay top two and G last under value 45 or effort 35; E passes D at value 45.
+
+## 2026-10-16 — Brick C: E2E smoke of the packaged app (PR #38)
+
+- `e2e/smoke.mjs` (`pnpm e2e:smoke`), run in the CI `package` job under `xvfb-run` after `pnpm dist`.
+  It launches `dist/linux-unpacked/dock-n-roll` with a scratch `XDG_CONFIG_HOME` and a CDP port, and opens
+  the dashboard through a second instance. It then asserts the `app://` URL, the title, the React root,
+  `getState()`, no console or CSP error, the 200 and 404 probes and the `GrantFileProtocolExtraPrivileges` fuse.
+  Docker is not required.
+- Owner MCDA (ADR-0010): `connectOverCDP` 430, raw CDP 370, `_electron.launch` 255. The last option is
+  blocked by the `enableNodeCliInspectArguments` fuse. Deployment diagram 10 gains a CI section.
+- The CI runner sets `kernel.apparmor_restrict_unprivileged_userns=0`, because the unpacked build has no
+  AppArmor profile.
+- `playwright-core` is pinned to 1.63.0 (1.64.1 was 2 days old).
+- Gate: the local review applied 2 Must and 2 Should. 532 tests, coverage 98.2 / 91.7 / 97.3, Sonar OK,
+  CI green with the smoke at 8/8 on the runner. Codex is out of quota.
+- Next: brick A+F (#20 #21 #23 #12, #13 #27).
