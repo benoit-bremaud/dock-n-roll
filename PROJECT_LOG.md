@@ -310,3 +310,7 @@ Chronological operational logbook. Complements `git log` with the human context.
   chars removed, 500 lines × 2000 chars, push throttled to 200 ms, one panel at a time, stream
   closed on close / reopen / window hide / quit. UML first: new diagram 14; 01/03/07/09, spec
   UC7. TDD. Manual test on the built app (multiplexed + TTY containers, end + Reopen, close).
+
+## 2026-10-16 — v1.1.0 release
+
+Restart (#29), crash notifications (#31) and logs view (#32) released as v1.1.0.

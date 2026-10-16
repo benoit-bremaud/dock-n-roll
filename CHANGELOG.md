@@ -7,15 +7,17 @@ file format (`services.yaml`) and the installed package.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-16
+
 ### Added
 
 - Restart action in the menu and the dashboard: a stop then an `up`, so edits to the Compose
-  file or `.env` apply.
+  file or `.env` apply (#29).
 - Desktop notification when a running container of a listed service crashes (exit code other
   than 0/130/137/143, out of memory, or restarting); silent for stops you asked for, at most
-  one per service per minute.
+  one per service per minute (#31).
 - Logs panel in the dashboard: the last 500 lines of a service's container, followed live, with
-  a container picker; text only (colour codes removed).
+  a container picker; text only (colour codes removed) (#32).
 
 ## [1.0.0] - 2026-10-15
 
@@ -49,5 +51,6 @@ First release.
 
 - `pnpm dist` no longer needs a `homepage` override (closes #16).
 
-[Unreleased]: https://github.com/benoit-bremaud/dock-n-roll/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/benoit-bremaud/dock-n-roll/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/benoit-bremaud/dock-n-roll/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/benoit-bremaud/dock-n-roll/releases/tag/v1.0.0
