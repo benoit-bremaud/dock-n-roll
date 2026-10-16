@@ -51,16 +51,16 @@ The status is a **pure function** of the relevant containers, the pending operat
 existence of the compose files and the conflict check. It is recomputed on every input
 change; it is not a state machine maintained by the app.
 
-| Status | Colour | Meaning | Start | Stop |
-|---|---|---|---|---|
-| `invalid` | grey | a container of the project carries Compose labels that fail the R4 checks — the reason is shown | disabled | disabled |
-| `conflict` | grey | same project name seen with ≥ 2 working dirs — both listed | disabled | disabled |
-| `missing` | grey | working dir or a `config_files` path no longer exists | disabled | allowed if containers run |
-| `stopping` | orange | stop pending | disabled | disabled |
-| `starting` | orange | start pending, or ≥ 1 container `health=starting`, or all running but the `healthUrl` gate not passed yet | disabled | allowed if no pending operation |
-| `on` | green | ≥ 1 relevant container, and all ready (or done) | disabled | allowed |
-| `off` | red | all relevant containers stopped (or none yet, pinned) | allowed | disabled |
-| `partial` | orange | anything else (some running, some stopped, or a container paused, restarting, removing or unhealthy) | allowed, except while a container is `restarting` or `removing` | allowed |
+| Status | Colour | Meaning | Start | Stop | Restart |
+|---|---|---|---|---|---|
+| `invalid` | grey | a container of the project carries Compose labels that fail the R4 checks — the reason is shown | disabled | disabled | disabled |
+| `conflict` | grey | same project name seen with ≥ 2 working dirs — both listed | disabled | disabled | disabled |
+| `missing` | grey | working dir or a `config_files` path no longer exists | disabled | allowed if containers run | disabled |
+| `stopping` | orange | stop pending | disabled | disabled | disabled |
+| `starting` | orange | start pending, or ≥ 1 container `health=starting`, or all running but the `healthUrl` gate not passed yet | disabled | allowed if no pending operation | allowed if no pending operation |
+| `on` | green | ≥ 1 relevant container, and all ready (or done) | disabled | allowed | allowed |
+| `off` | red | all relevant containers stopped (or none yet, pinned) | allowed | disabled | disabled |
+| `partial` | orange | anything else (some running, some stopped, or a container paused, restarting, removing or unhealthy) | allowed, except while a container is `restarting` or `removing` | allowed | allowed |
 
 **Precedence** — first match wins, top to bottom of the table:
 `invalid > conflict > missing > stopping > starting > on > off > partial`.
@@ -129,6 +129,16 @@ Primary actor for all: **Developer**. Supporting actor: **Docker Engine**.
   - listening TCP ports (address:port, process name + PID when visible, else the container
     publishing it, else "unknown (root process)").
 - Read-only in V1.
+
+### UC6 — Restart a service (v1.1)
+
+- **Precondition**: Stop is allowed (UC2) and the status is not `missing` (the `up` needs the files).
+- **Main success scenario**: UC2 steps 2–4, then UC1 from its step 2 under the same pending
+  entry (`stopping`, then `starting`), so edits to the Compose file or `.env` apply —
+  `docker compose restart` would keep the old container config. Diagram 12.
+- **Extensions**: the stop fails → no `up`, error shown as in UC2 3a; the `up` fails → as UC1.
+- **Note**: the `healthUrl` gate is reset before the `up`, even if Docker never showed the
+  stack down.
 
 ### UC5 — Open a service in the browser
 

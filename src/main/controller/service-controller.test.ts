@@ -409,7 +409,76 @@ describe('restart — UC6, diagram 12', () => {
     await settle()
 
     expect(f.runs).toHaveLength(1)
-    expect(row(BLOG)).toMatchObject({ status: 'on', reason: 'boom' })
+    expect(row(BLOG)).toMatchObject({ status: 'on', reason: 'boom', controls: { restart: true } })
+  })
+
+  it('refuses a start or stop clicked between the stop and the `up`', async () => {
+    const { f, controller } = await controllerWith()
+    f.snapshot([web])
+    await settle()
+
+    void controller.restart(BLOG)
+    await settle()
+    f.snapshot([webStopped])
+    f.runs[0]?.finish()
+    await settle()
+    await Promise.race([controller.start(BLOG), settle()])
+    await Promise.race([controller.stop(BLOG), settle()])
+    await settle()
+
+    expect(f.runs.map((run) => run.args.at(-1))).toEqual(['stop', '--wait-timeout=180'])
+    expect(f.runs).toHaveLength(2)
+  })
+
+  it('clears the pending restart and shows the error when the runner throws', async () => {
+    const { f, controller, row } = await controllerWith()
+    f.snapshot([web])
+    await settle()
+
+    f.rejectNextRun(new Error('socket gone'))
+    await controller.restart(BLOG)
+    await settle()
+
+    expect(f.runs).toEqual([])
+    expect(row(BLOG)).toMatchObject({ status: 'on', reason: 'socket gone', controls: { stop: true, restart: true } })
+  })
+
+  it('probes the healthUrl again after a restart, even when Docker never showed it down', async () => {
+    const { f, controller, row } = await controllerWith((setup) => {
+      setup.setInitialPins([pin({ workingDir: '/srv/blog', healthUrl: 'http://localhost/health' })])
+      setup.healthy.add('http://localhost/health')
+    })
+    f.snapshot([web])
+    await settle()
+    f.scheduled.shift()?.()
+    await settle()
+    expect(row(BLOG)?.status).toBe('on')
+
+    const done = controller.restart(BLOG)
+    await settle()
+    f.runs[0]?.finish()
+    await settle()
+    f.healthy.clear()
+    f.runs[1]?.finish()
+    await done
+    await settle()
+
+    expect(row(BLOG)?.status).toBe('starting')
+    expect(f.scheduled).toHaveLength(1)
+  })
+
+  it('runs no `up` when disposed during the stop', async () => {
+    const { f, controller } = await controllerWith()
+    f.snapshot([web])
+    await settle()
+
+    const done = controller.restart(BLOG)
+    await settle()
+    controller.dispose()
+    f.runs[0]?.finish()
+    await done
+
+    expect(f.runs).toHaveLength(1)
   })
 
   it('shows the stderr of a failed `up` after a successful stop', async () => {
@@ -438,10 +507,15 @@ describe('restart — UC6, diagram 12', () => {
 
     f.snapshot([web])
     await settle()
-    void controller.restart(BLOG)
+    const first = controller.restart(BLOG)
     void controller.restart(BLOG)
     await settle()
-    expect(f.runs).toHaveLength(1)
+    f.runs[0]?.finish()
+    await settle()
+    f.runs[1]?.finish()
+    await first
+    await settle()
+    expect(f.runs.map((run) => run.args.at(-1))).toEqual(['stop', '--wait-timeout=180'])
   })
 })
 

@@ -21,18 +21,15 @@ export function registerIpc(
   isTrusted: (event: IpcMainInvokeEvent) => boolean
 ): void {
   ipcMain.handle(IPC.getState, (event): ControllerState | null => (isTrusted(event) ? controller.state() : null))
-  ipcMain.handle(IPC.start, async (event, id: unknown) => {
-    const valid = asId(id)
-    if (isTrusted(event) && valid !== null) await controller.start(valid)
-  })
-  ipcMain.handle(IPC.stop, async (event, id: unknown) => {
-    const valid = asId(id)
-    if (isTrusted(event) && valid !== null) await controller.stop(valid)
-  })
-  ipcMain.handle(IPC.restart, async (event, id: unknown) => {
-    const valid = asId(id)
-    if (isTrusted(event) && valid !== null) await controller.restart(valid)
-  })
+  const command = (channel: string, act: (id: string) => Promise<void>): void => {
+    ipcMain.handle(channel, async (event, id: unknown) => {
+      const valid = asId(id)
+      if (isTrusted(event) && valid !== null) await act(valid)
+    })
+  }
+  command(IPC.start, (id) => controller.start(id))
+  command(IPC.stop, (id) => controller.stop(id))
+  command(IPC.restart, (id) => controller.restart(id))
   ipcMain.handle(IPC.openUrl, async (event, id: unknown) => {
     const valid = asId(id)
     // `urlOf` only returns the pin's http/https URL (spec R6), never one from the renderer.

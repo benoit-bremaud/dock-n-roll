@@ -109,13 +109,14 @@ describe('deriveStatus — spec §4 precedence', () => {
   })
 })
 
-describe('allowedControls — spec §4 Start / Stop columns', () => {
+describe('allowedControls — spec §4 Start / Stop / Restart columns', () => {
   it('allows restart wherever stop is allowed, except on missing (the `up` needs the files)', () => {
     expect(allowedControls('on', inputs()).restart).toBe(true)
     expect(allowedControls('partial', inputs({ containers: [running, stopped] })).restart).toBe(true)
     expect(allowedControls('off', inputs({ containers: [stopped] })).restart).toBe(false)
     expect(allowedControls('missing', inputs({ filesExist: false })).restart).toBe(false)
     expect(allowedControls('on', inputs({ pending: 'start' })).restart).toBe(false)
+    expect(allowedControls('starting', inputs({ containers: [booting] })).restart).toBe(true)
   })
 
   it('allows only start when off', () => {

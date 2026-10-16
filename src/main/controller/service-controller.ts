@@ -5,7 +5,7 @@ import type { PinFileStore } from '../adapters/pin-file-store'
 import { buildStopArgs, buildUpArgs } from '../domain/compose-args'
 import { allowedControls, deriveStatus } from '../domain/derive-status'
 import { buildServices } from '../domain/service-catalog'
-import type { ContainerSnapshot, HealthGate, PendingOperation, PinEntry, PinFileResult, Service, StatusInputs } from '../domain/types'
+import type { ContainerSnapshot, Controls, HealthGate, PendingOperation, PinEntry, PinFileResult, Service, StatusInputs } from '../domain/types'
 import type { ControllerState, ServiceView } from '../../shared/ipc'
 
 // Application layer of class diagram 07: orchestrates domain and adapters, holds no rule of
@@ -59,7 +59,7 @@ export interface ServiceController {
 }
 
 /**
- * A pending start or stop, keyed by working dir and the project name the command runs under —
+ * A pending start or stop (a restart is one entry whose operation goes from stop to start), keyed by working dir and the project name the command runs under —
  * not by `Service.id`, which changes when a never-started pin gets its first container. A row
  * with no project name yet (never-started pin) matches any pending entry of its dir. Other
  * projects of the same dir stay independent (`-p qa1` / `-p qa2`).
@@ -130,6 +130,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   let currentJson = JSON.stringify(current)
   let chain = Promise.resolve()
   let disposed = false
+  const isDisposed = (): boolean => disposed
   /** Single flight: a resolution runs outside the chain, at most one at a time. */
   let resolving = false
   let cancelNameRetry: () => void = () => undefined
@@ -333,7 +334,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     }
   }
 
-  const run = async (id: string, request: PendingOperation | 'restart'): Promise<void> => {
+  const run = async (id: string, request: keyof Controls): Promise<void> => {
     await chain
     const found = services.find((candidate) => candidate.id === id)
     const view = current.services.find((candidate) => candidate.id === id)
@@ -355,9 +356,15 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
       const next: Pending = { workingDir: service.workingDir, projectName: name, operation }
       pending = previous === null ? [...pending, next] : pending.map((candidate) => (candidate === previous ? next : candidate))
       entry = next
+      if (operation === 'start' && request === 'restart') {
+        // Docker may never show the stack down between the two commands: re-gate the `up`.
+        gates.delete(service.id)
+        cancelProbe(service.id)
+      }
       recompute()
       failure = await runOne(service, operation)
-      if (failure !== null) break
+      // Read through a call: the flag can flip during the await, which narrowing cannot see.
+      if (failure !== null || isDisposed()) break
     }
     pending = pending.filter((candidate) => candidate !== entry)
     if (failure !== null) {
