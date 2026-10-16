@@ -44,6 +44,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm dist
+      # E2E smoke of the unpacked build (ADR-0010); Docker may be absent, the app copes.
+      # The unpacked build has no AppArmor profile (the .deb installs one): allow user namespaces
+      # on this throwaway runner so the Chromium sandbox starts.
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: xvfb-run -a pnpm e2e:smoke
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dock-n-roll-deb
