@@ -296,4 +296,4 @@ Chronological operational logbook. Complements `git log` with the human context.
   Silent for a pending operation, 10 s after a Stop, on the first snapshot after an outage;
   at most one per service per minute. Electron `Notification`, body markup-escaped.
   UML first: new diagram 13; 01/03/05/07 and spec UC3 3b updated. TDD.
-- **Pre-push review**: Must 0 · Should 7 applied · Nice 5 applied, 1 dropped. 438 tests.
+- **Pre-push review**: Must 0 · Should 7 applied · Nice 4 applied, 2 dropped. 438 tests.

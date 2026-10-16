@@ -4,7 +4,7 @@
 - Commit: base cfb7e0a..HEAD (branch feat/crash-notifications)
 - Scope: branch diff main...HEAD (domain crash.ts, controller notifyCrashes, notifier.ts, oomKilled mapping, diagrams 01/03/05/07/13, spec UC3 3b, CHANGELOG)
 - Checks run: design · docs · tests · security · correctness
-- Verdict: ship after Should applied · Must 0 · Should 7 (applied) · Nice 6 (5 applied, 1 dropped)
+- Verdict: ship after Should applied · Must 0 · Should 7 (applied) · Nice 6 (4 applied, 2 dropped)
 
 ## 🔴 Must Have
 _None._
