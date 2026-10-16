@@ -36,6 +36,7 @@ function fakes() {
   const heldNames: { release: () => void }[] = []
   let holdNames = false
   let rejectNextRun: Error | undefined
+  let notifyFails = false
   let rejectNames = false
   const clock = { now: 0 }
 
@@ -98,6 +99,7 @@ function fakes() {
     },
     probeHealth: (url) => Promise.resolve(healthy.has(url)),
     notify: (title, body) => {
+      if (notifyFails) throw new Error('no notification server')
       notified.push([title, body])
     },
     now: () => clock.now,
@@ -141,6 +143,9 @@ function fakes() {
     },
     holdNames: (on: boolean) => {
       holdNames = on
+    },
+    failNotify: () => {
+      notifyFails = true
     },
     rejectNextRun: (error: Error) => {
       rejectNextRun = error
@@ -581,6 +586,66 @@ describe('crash notifications — UC3 extension 3b, diagram 13', () => {
     expect(f.notified).toEqual([])
   })
 
+  it('stays silent during a restart, between its stop and its `up`', async () => {
+    const { f, controller } = await controllerWith()
+    f.snapshot([web])
+    await settle()
+
+    void controller.restart(BLOG)
+    await settle()
+    f.runs[0]?.finish()
+    await settle()
+    f.snapshot([crashed])
+    await settle()
+
+    expect(f.runs).toHaveLength(2)
+    expect(f.notified).toEqual([])
+  })
+
+  it('stays silent for the late snapshot of a finished Stop, then notifies again after 10 s', async () => {
+    const { f, controller } = await controllerWith()
+    f.snapshot([web])
+    await settle()
+
+    const done = controller.stop(BLOG)
+    await settle()
+    f.runs[0]?.finish()
+    await done
+    f.snapshot([crashed])
+    await settle()
+    expect(f.notified).toEqual([])
+
+    f.snapshot([web])
+    f.clock.now = 10_000
+    f.snapshot([crashed])
+    await settle()
+    expect(f.notified).toHaveLength(1)
+  })
+
+  it('notifies a container whose row was not rebuilt yet', async () => {
+    const { f } = await controllerWith()
+    f.holdFiles(true)
+    f.snapshot([web])
+    f.snapshot([crashed])
+    f.holdFiles(false)
+    for (const held of f.heldFiles.splice(0)) held.release()
+    await settle()
+
+    expect(f.notified).toHaveLength(1)
+  })
+
+  it('keeps applying snapshots when the notification fails', async () => {
+    const { f, row } = await controllerWith()
+    f.snapshot([web])
+    await settle()
+
+    f.failNotify()
+    f.snapshot([crashed])
+    await settle()
+
+    expect(row(BLOG)?.status).toBe('off')
+  })
+
   it('stays silent on the first snapshot after Docker came back', async () => {
     const { f } = await controllerWith()
     f.snapshot([web])
@@ -607,7 +672,8 @@ describe('crash notifications — UC3 extension 3b, diagram 13', () => {
     f.snapshot([crashed])
     await settle()
 
-    expect(f.notified).toHaveLength(2)
+    const once = ['blog', 'app-web-1 exited with code 1']
+    expect(f.notified).toEqual([once, once])
   })
 
   it('ignores containers that belong to no listed service', async () => {

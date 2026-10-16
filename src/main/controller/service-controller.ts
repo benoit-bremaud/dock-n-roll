@@ -19,6 +19,8 @@ const MAX_REASON_CHARS = 500
 const NAME_RETRY_MS = 30_000
 /** At most one crash notification per service in this window, so a crash loop does not flood. */
 const NOTIFY_WINDOW_MS = 60_000
+/** After a Stop ends, its containers' late `die` snapshots are not crashes (apps exiting 1 on SIGTERM). */
+const STOP_QUIET_MS = 10_000
 
 /** The adapters, injected so the controller is tested with in-memory stand-ins. */
 export interface ControllerDeps {
@@ -131,6 +133,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   const probing = new Map<string, () => void>()
   const lastError = new Map<string, string>()
   const notifiedAt = new Map<string, number>()
+  const stoppedAt = new Map<string, number>()
   const listeners = new Set<(state: ControllerState) => void>()
   let current: ControllerState = { dockerAvailable, dockerReason, pinErrors, services: [], homeDir: deps.homeDir }
   let currentJson = JSON.stringify(current)
@@ -217,7 +220,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   /** Per-service state of services that no longer exist would leak, or resurface on an id change. */
   const prune = (): void => {
     const ids = new Set(services.map((service) => service.id))
-    for (const map of [filesOk, gates, lastError, notifiedAt]) {
+    for (const map of [filesOk, gates, lastError, notifiedAt, stoppedAt]) {
       for (const id of map.keys()) if (!ids.has(id)) map.delete(id)
     }
     for (const id of [...probing.keys()]) if (!ids.has(id)) cancelProbe(id)
@@ -380,6 +383,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
       if (failure !== null) break
     }
     pending = pending.filter((candidate) => candidate !== entry)
+    if (request === 'stop') stoppedAt.set(service.id, now())
     if (failure !== null) {
       // Keyed by the row the developer now sees: the id may have changed during the run.
       const row = services.find((candidate) => candidate.workingDir === service.workingDir && candidate.projectName === name)
@@ -391,16 +395,20 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
 
   /**
    * Diagram 13: compares with the previous snapshot of the same connection only — after an
-   * outage the gap is unknown, not a crash. The rows used are those of the previous snapshot,
-   * the ones the crashed containers belonged to.
+   * outage the gap is unknown, not a crash. The rows are built here from the previous
+   * snapshot, the one the crashed containers ran in: `services` may lag behind it (rebuilt in
+   * the chain).
    */
   const notifyCrashes = (next: readonly ContainerSnapshot[]): void => {
-    if (!dockerAvailable) return
-    for (const crashed of crashedContainers(containers, next)) {
-      const service = services.find((candidate) => candidate.containers.some((c) => c.id === crashed.id))
+    if (disposed || !dockerAvailable) return
+    const crashes = crashedContainers(containers, next)
+    if (crashes.length === 0) return
+    const rows = buildServices(containers, pins, resolvedNames)
+    const within = (map: ReadonlyMap<string, number>, id: string, windowMs: number): boolean => now() - (map.get(id) ?? -Infinity) < windowMs
+    for (const crashed of crashes) {
+      const service = rows.find((candidate) => candidate.containers.some((c) => c.id === crashed.id))
       if (service === undefined || pendingFor(pending, service) !== null) continue
-      const last = notifiedAt.get(service.id)
-      if (last !== undefined && now() - last < NOTIFY_WINDOW_MS) continue
+      if (within(stoppedAt, service.id, STOP_QUIET_MS) || within(notifiedAt, service.id, NOTIFY_WINDOW_MS)) continue
       notifiedAt.set(service.id, now())
       try {
         deps.notify(service.displayName, crashMessage(crashed))

@@ -23,6 +23,7 @@ export function crashedContainers(before: readonly ContainerSnapshot[], after: r
 export function crashMessage(container: ContainerSnapshot): string {
   if (container.oomKilled) return `${container.name} was killed: out of memory`
   if (container.state === 'restarting') return `${container.name} crashed and is restarting`
-  if (container.exitCode === null) return `${container.name} died`
+  if (container.state === 'dead') return `${container.name} died`
+  if (container.exitCode === null) return `${container.name} exited`
   return `${container.name} exited with code ${String(container.exitCode)}`
 }

@@ -1,6 +1,6 @@
 import { Notification } from 'electron'
 
-/** The notification server reads a subset of markup in the body (not the title). */
+/** The Linux notification server reads a subset of markup in the body (not the title); the app ships for Linux only. */
 export function escapeMarkup(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }

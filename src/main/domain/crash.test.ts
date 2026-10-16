@@ -28,12 +28,14 @@ describe('crashedContainers — spec UC3 extension 3b', () => {
     expect(crashedContainers([running, container({ id: 'b' })], [restarting, dead])).toEqual([restarting, dead])
   })
 
-  it('ignores containers that were not running before, are new or were removed', () => {
-    const wasExited = container({ id: 'a', state: 'exited', exitCode: 1 })
-
-    expect(crashedContainers([wasExited], [container({ id: 'a', state: 'exited', exitCode: 1 })])).toEqual([])
-    expect(crashedContainers([], [container({ id: 'n', state: 'exited', exitCode: 1 })])).toEqual([])
-    expect(crashedContainers([running], [])).toEqual([])
+  it.each([
+    ['was already exited', [container({ id: 'a', state: 'exited', exitCode: 1 })], [container({ id: 'a', state: 'exited', exitCode: 1 })]],
+    ['was restarting', [container({ id: 'a', state: 'restarting' })], [container({ id: 'a', state: 'exited', exitCode: 1 })]],
+    ['is new', [], [container({ id: 'n', state: 'exited', exitCode: 1 })]],
+    ['was removed', [running], []],
+    ['exited with no code', [running], [container({ id: 'a', state: 'exited', exitCode: null })]]
+  ])('ignores a container that %s', (_case, before, after) => {
+    expect(crashedContainers(before, after)).toEqual([])
   })
 })
 
@@ -42,7 +44,9 @@ describe('crashMessage', () => {
     [container({ name: 'web', state: 'exited', exitCode: 1 }), 'web exited with code 1'],
     [container({ name: 'web', state: 'exited', exitCode: 137, oomKilled: true }), 'web was killed: out of memory'],
     [container({ name: 'web', state: 'restarting' }), 'web crashed and is restarting'],
-    [container({ name: 'web', state: 'dead', exitCode: null }), 'web died']
+    [container({ name: 'web', state: 'dead', exitCode: null }), 'web died'],
+    [container({ name: 'web', state: 'dead', exitCode: 1 }), 'web died'],
+    [container({ name: 'web', state: 'exited', exitCode: null }), 'web exited']
   ])('describes the crash', (crashed, message) => {
     expect(crashMessage(crashed)).toBe(message)
   })

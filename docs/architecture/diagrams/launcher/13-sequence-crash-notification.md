@@ -37,12 +37,12 @@ sequenceDiagram
 
 ## Notes
 
-- **Crash rule** (owner MCDA A): `running` → `restarting`, or → `exited` / `dead` with
+- **Crash rule** (owner MCDA A): `running` → `restarting` or `dead`, or → `exited` with
   `OOMKilled` or an exit code outside {0, 130, 137, 143}. Signal exits are what `docker stop`
   and Ctrl-C produce from a terminal: notifying them would alert on every intentional stop.
   Missed on purpose: a non-OOM `kill -9` from the host, a SIGTERM from inside the container.
 - **No notification** for a service with a pending operation (its Stop, or the stop step of a
-  Restart), for containers outside the listed services (hidden, one-off, non-Compose), or on
+  Restart), in the 10 s after its Stop ended (late `die` of apps exiting 1 on SIGTERM), for containers outside the listed services (hidden, one-off, non-Compose), or on
   the first snapshot after Docker came back (the gap is unknown, not a crash).
 - **Rate limit**: one per service per 60 s, so a crash loop does not flood the desktop.
 - A container that crashes and restarts between two inspects may be seen running both

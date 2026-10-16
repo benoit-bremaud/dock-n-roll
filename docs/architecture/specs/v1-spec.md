@@ -122,9 +122,10 @@ Primary actor for all: **Developer**. Supporting actor: **Docker Engine**.
   reports it.
 - **Extension 3b (v1.1) — crash notification**: a running container of a listed service
   that stops on its own shows a desktop notification. A crash is a `running` container
-  becoming `restarting`, or `exited` / `dead` with `OOMKilled`, or with an exit code other
+  becoming `restarting` or `dead`, or `exited` with `OOMKilled` or an exit code other
   than 0, 130, 137 and 143 (signal exits: `docker stop` or Ctrl-C from a terminal — owner
-  MCDA A, 450/500). Never for a service with a pending operation (Stop, Restart), never on the
+  MCDA A, 450/500). Never for a service with a pending operation (Stop, Restart) or in the 10 s after its
+  Stop ended (apps that exit 1 on SIGTERM), never on the
   first snapshot after a (re)connection, at most one per service per minute. Diagram 13.
 
 ### UC4 — Inspect background activity
