@@ -23,6 +23,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "audit": "pnpm audit --audit-level=high",
+    "sonar": "vitest run --coverage && SONAR_TOKEN=\"$(cat \"$HOME/.config/sonar-tokens/dock-n-roll\")\" sonar-scanner",
     "dist": "electron-vite build && electron-builder --linux deb --publish never"
   },
   "dependencies": {

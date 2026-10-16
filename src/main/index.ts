@@ -15,6 +15,7 @@ import { createServiceController, type ServiceController } from './controller/se
 import { trayIconPath } from './controller/resources'
 import { buildTrayMenu, type MenuEntry } from './controller/tray-menu'
 import { pushStateTo, registerIpc } from './ipc'
+import { showNotification } from './notifier'
 import { isTrustedSender, type DashboardOrigin } from './trusted-sender'
 import type { ControllerState } from '../shared/ipc'
 
@@ -141,6 +142,7 @@ async function start(trayIcon: Tray): Promise<void> {
     resolveProjectName,
     filesExist,
     probeHealth,
+    notify: showNotification,
     schedule: (run, delayMs) => {
       const timer = setTimeout(run, delayMs)
       return () => {

@@ -1,32 +1,36 @@
-# Local review — dock-n-roll (features brick, PR 1 Restart)
+# Local review — dock-n-roll (features brick, PR 2 crash notifications)
 
 - Date: 2026-10-16
-- Commit: base e92370f..HEAD (branch feat/features-brick)
-- Scope: branch diff main...HEAD (Restart action UC6: controller, domain controls, tray, IPC, preload, renderer, diagrams 01/04/12, CHANGELOG, README)
+- Commit: base cfb7e0a..HEAD (branch feat/crash-notifications)
+- Scope: branch diff main...HEAD (domain crash.ts, controller notifyCrashes, notifier.ts, oomKilled mapping, diagrams 01/03/05/07/13, spec UC3 3b, CHANGELOG)
 - Checks run: design · docs · tests · security · correctness
-- Verdict: fix Must Have first · Must 2 · Should 6 · Nice 4
+- Verdict: ship after Should applied · Must 0 · Should 8 (applied) · Nice 6 (4 applied, 2 dropped)
 
 ## 🔴 Must Have
-- `src/main/controller/service-controller.test.ts` (restart describe) `[tests|correctness]` · No test that a Start/Stop clicked between the two steps is refused — the main promise of the in-place pending swap · finish the stop, click start and stop, assert only the `up` follows.
-- `src/main/controller/service-controller.test.ts` (restart describe) `[tests]` · No test of the runner throwing during a restart (new `runOne` catch) · reject the stop, assert the reason, no `up`, and a later control allowed.
+_None._
 
 ## 🟡 Should Have
-- `src/main/controller/service-controller.ts` (`run` step loop) `[correctness]` · The healthUrl gate stays `passed` if Docker never shows the containers down between stop and up: the row turns `on` without a new probe · reset the gate and cancel the probe before the `up` step; test it.
-- `src/main/controller/service-controller.ts` (`run` step loop) `[design|correctness]` · The `up` still runs after `dispose()` once the stop ends · break the loop when disposed.
-- `src/main/ipc.ts:32` `[design]` · Third copy of the id-command handler (Rule of Three) · local `command(channel, act)` helper.
-- `docs/architecture/specs/v1-spec.md` §4, §5 `[docs]` · Diagrams cite UC6 but the spec has no UC6 nor a Restart column · add both.
-- `src/main/controller/service-controller.test.ts` (double click) `[tests]` · Double-click check only counts runs before anything ends · finish both steps, assert exactly stop + up.
-- `src/main/controller/service-controller.test.ts` `[tests]` · Restart failing after an id change between steps not covered · covered by the existing id-change keying; add the failed-stop "controls.restart back" check instead (cheaper, same row path).
+- `src/main/controller/service-controller.ts` notifyCrashes `[correctness]` · `services` can lag behind `containers` (rebuilt in the chain): a container that dies before its row exists is missed · rows built synchronously from the previous snapshot with `buildServices`; test with held file checks. Applied.
+- `src/main/controller/service-controller.ts` run `[correctness]` · The late `die` snapshot of a finished Stop, for apps exiting 1 on SIGTERM, is reported as a crash · 10 s quiet window per service after a Stop (`stoppedAt`, pruned); test. Applied.
+- `src/main/domain/crash.ts` `[docs|correctness]` · `dead` counted always, but spec and diagram said dead needs OOM / exit code; `dead` with a code read "exited with code N" · docs say `dead` always counts; own message "died". Applied.
+- `src/main/notifier.ts` `[design]` · Escaping would show `&amp;` literally off Linux · Linux-only app: comment states it (no platform branch, YAGNI). Applied.
+- `service-controller.test.ts` `[tests]` · No test of a crash between the two restart steps · added. Applied.
+- `service-controller.test.ts` `[tests]` · `deps.notify` throwing not covered · added (snapshot still applied). Applied.
+- `service-controller.test.ts` `[tests]` · rate-limit test only counted calls · asserts exact title/body. Applied.
+
+- `service-controller.ts` run `[correctness]` · (2nd `/code-review`, Codex out of quota) a restart that skips its `up` set no quiet window, so its late `die` snapshot was notified · `stoppedAt` set when the last step run is a stop; test. Applied.
 
 ## 🔵 Nice to Have
-- `src/main/controller/service-controller.ts` (`run`) `[design]` · `request: keyof Controls` instead of `PendingOperation | 'restart'`.
-- `src/main/domain/derive-status.ts` docstring, `derive-status.test.ts` describe `[docs]` · still "Start / Stop columns".
-- `src/main/controller/service-controller.ts` `Pending` docstring `[docs]` · mention restart.
-- `src/main/domain/derive-status.test.ts` `[tests]` · `starting` (container-driven) allows restart case.
+- `service-controller.ts` notifyCrashes `[correctness]` · no `disposed` guard · added. Applied.
+- `src/main/index.ts` `[conventions]` · import order · moved. Applied.
+- `crash.test.ts` `[tests]` · split combined cases into `it.each`, add was-restarting and exited-without-code cases · applied.
+- `crash.ts` crashMessage `[docs]` · `dead` with code wording · "died". Applied.
+- `service-controller.test.ts` `[tests]` · prune of `notifiedAt` untested · dropped: same `prune` loop as the other per-service maps, already covered.
+- `notifier.ts` `[security]` · cap the body length · dropped: container names are Docker-bounded, messages short.
 
 ## ⚪ Disagree / Intentional
-- `src/main/controller/service-controller.ts` `unresolved` branch `[tests]` · `{ ...derived, start: false }` passes `restart` through, but an unresolved service has no container, so its status is `off` and `restart` is already false — no silent drop.
-- `src/main/domain/derive-status.ts` `startStop` + `Omit` `[design]` · one source of truth: restart = stop except on `missing`.
+- `crash.ts` SIGNAL_EXITS `[correctness]` · 130/137/143 ignored · owner MCDA A (450/500), OOM still reported.
+- `notifier.ts` outside `adapters/` `[design]` · adapters may not import Electron (lint rule); Electron glue lives next to `ipc.ts`.
 
 ## Per-dimension summary
-- Design: no over-engineering; IPC duplication and dispose check. · Docs: spec lacks UC6; two stale docstrings. · Tests: healthy pyramid; two missing restart behaviours. · Security: new IPC channel validated like start/stop; no injection path. · Correctness: health gate not reset on restart.
+- Design: pure domain diff + injected notifier, no over-engineering. · Docs: dead rule aligned. · Tests: restart, failure and lag cases added. · Security: body escaped for libnotify markup; title is plain text. · Correctness: lagging rows and post-Stop false alarm fixed.

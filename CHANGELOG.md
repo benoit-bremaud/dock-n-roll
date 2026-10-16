@@ -11,6 +11,9 @@ file format (`services.yaml`) and the installed package.
 
 - Restart action in the menu and the dashboard: a stop then an `up`, so edits to the Compose
   file or `.env` apply.
+- Desktop notification when a running container of a listed service crashes (exit code other
+  than 0/130/137/143, out of memory, or restarting); silent for stops you asked for, at most
+  one per service per minute.
 
 ## [1.0.0] - 2026-10-15
 

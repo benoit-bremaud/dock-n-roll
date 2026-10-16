@@ -286,3 +286,14 @@ Chronological operational logbook. Complements `git log` with the human context.
   UML first: diagrams 01, 04, new 12; spec UC6 + Restart column. TDD.
 - **Pre-push review**: Must 2 · Should 6 · Nice 4 — all applied. 402 tests, coverage
   96.5/90.7/97.3/98.2.
+
+## 2026-10-16 — Features brick, PR 1 merged; PR 2: crash notifications
+
+- **PR #29 merged** (`cfb7e0a`) — Codex out of quota → owner MCDA C (430): second local
+  `/code-review` (4 findings fixed: restart `up` re-checks daemon and files), then merge. CI green.
+- **Crash rule** (MCDA, owner choice A 450/500 vs C kill events 395, B any non-zero 360):
+  `running` → `restarting` / `dead`, or `exited` with OOM or exit ∉ {0, 130, 137, 143}.
+  Silent for a pending operation, 10 s after a Stop, on the first snapshot after an outage;
+  at most one per service per minute. Electron `Notification`, body markup-escaped.
+  UML first: new diagram 13; 01/03/05/07 and spec UC3 3b updated. TDD.
+- **Pre-push review**: Must 0 · Should 7 applied · Nice 4 applied, 2 dropped. 438 tests.

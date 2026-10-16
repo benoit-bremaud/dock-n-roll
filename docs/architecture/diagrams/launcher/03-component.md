@@ -22,11 +22,13 @@ flowchart LR
     Tray["TrayMenu"]
     SC["ServiceController (pending ops, guards)"]
     BM["BackgroundMonitor"]
+    NT["Notifier (Electron Notification)"]
     subgraph Domain ["domain (pure, no IO)"]
       Derive["status derivation (precedence)"]
       Ident["identity + conflict detection"]
       Merge["pin-file merge + validation"]
       Join["port join (ss x Docker bindings)"]
+      Crash["crash detection (snapshot diff)"]
     end
     subgraph Adapters ["adapters (IO, src/main/adapters)"]
       DO["DockerObserver (node:http, unix socket)"]
@@ -58,6 +60,8 @@ flowchart LR
   FP -->|"stat"| Disk[/"working dirs and compose files"/]
   PF -->|"read + watch dir"| YAML[/"~/.config/dock-n-roll/services.yaml"/]
   SC -->|"shell.openExternal http or https"| Browser[["default browser"]]
+  SC -->|"notify on crash"| NT
+  NT -->|"libnotify, body escaped"| Desk[["GNOME notifications"]]
   Tray -->|"StatusNotifierItem"| GNOME[["GNOME top bar"]]
   Autostart[/"~/.config/autostart/dock-n-roll.desktop"/] -.->|"launches at login"| Main
 ```

@@ -10,6 +10,7 @@ export function container(overrides: Partial<ContainerSnapshot> = {}): Container
     image: 'app-web',
     state: 'running',
     exitCode: null,
+    oomKilled: false,
     health: null,
     labels: {},
     publishedPorts: [],

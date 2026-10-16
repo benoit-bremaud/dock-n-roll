@@ -47,4 +47,6 @@ flowchart LR
 - Editing the pin file is done by hand outside the app in V1 — not a use case of the system.
 - UC6 (v1.1) restarts a running service so edits to its Compose file or `.env` apply: a
   stop then an `up`, see `12-sequence-restart-service.md`.
+- Crash notifications (v1.1) are not a use case: they are UC3's extension 3b, the system
+  telling the developer about a status change they did not ask for (`13-sequence-crash-notification.md`).
 - Backlog goals (view logs, start a profile, clean exited containers) are deliberately absent.

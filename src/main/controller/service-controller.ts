@@ -4,6 +4,7 @@ import type { ProbeOptions } from '../adapters/health-probe'
 import type { PinFileStore } from '../adapters/pin-file-store'
 import { buildStopArgs, buildUpArgs } from '../domain/compose-args'
 import { allowedControls, deriveStatus } from '../domain/derive-status'
+import { crashedContainers, crashMessage } from '../domain/crash'
 import { buildServices } from '../domain/service-catalog'
 import type { ContainerSnapshot, Controls, HealthGate, PendingOperation, PinEntry, PinFileResult, Service, StatusInputs } from '../domain/types'
 import type { ControllerState, ServiceView } from '../../shared/ipc'
@@ -16,6 +17,10 @@ const HEALTH_TIMEOUT_MS = 1500
 const MAX_REASON_CHARS = 500
 /** A failed `docker compose config` (slow daemon at boot, file mid-edit) is retried after this. */
 const NAME_RETRY_MS = 30_000
+/** At most one crash notification per service in this window, so a crash loop does not flood. */
+const NOTIFY_WINDOW_MS = 60_000
+/** After a Stop ends, its containers' late `die` snapshots are not crashes (apps exiting 1 on SIGTERM). */
+const STOP_QUIET_MS = 10_000
 
 /** The adapters, injected so the controller is tested with in-memory stand-ins. */
 export interface ControllerDeps {
@@ -30,6 +35,8 @@ export interface ControllerDeps {
   resolveProjectName(workingDir: string, options: Omit<RunOptions, 'cwd'>): Promise<string | null>
   filesExist(workingDir: string, configFiles: readonly string[]): Promise<boolean>
   probeHealth(url: string, options: ProbeOptions): Promise<boolean>
+  /** Shows a desktop notification; both texts are plain (the adapter escapes them). */
+  notify(title: string, body: string): void
   /** Clock for retrying failed name resolutions; overridable for tests. */
   readonly now?: () => number
   /** Schedules a health probe and returns its cancel function. */
@@ -125,6 +132,8 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   const gates = new Map<string, HealthGate>()
   const probing = new Map<string, () => void>()
   const lastError = new Map<string, string>()
+  const notifiedAt = new Map<string, number>()
+  const stoppedAt = new Map<string, number>()
   const listeners = new Set<(state: ControllerState) => void>()
   let current: ControllerState = { dockerAvailable, dockerReason, pinErrors, services: [], homeDir: deps.homeDir }
   let currentJson = JSON.stringify(current)
@@ -164,7 +173,9 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     const status = deriveStatus(inputs)
     const derived = allowedControls(status, inputs)
     // No command without the daemon it would act on, nor under a name that was not checked.
-    const controls = !dockerAvailable ? NO_CONTROLS : unresolved(service) ? { ...derived, start: false } : derived
+    let controls: Controls = derived
+    if (!dockerAvailable) controls = NO_CONTROLS
+    else if (unresolved(service)) controls = { ...derived, start: false }
     return {
       id: service.id,
       displayName: service.displayName,
@@ -211,7 +222,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   /** Per-service state of services that no longer exist would leak, or resurface on an id change. */
   const prune = (): void => {
     const ids = new Set(services.map((service) => service.id))
-    for (const map of [filesOk, gates, lastError]) {
+    for (const map of [filesOk, gates, lastError, notifiedAt, stoppedAt]) {
       for (const id of map.keys()) if (!ids.has(id)) map.delete(id)
     }
     for (const id of [...probing.keys()]) if (!ids.has(id)) cancelProbe(id)
@@ -337,17 +348,23 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   /** Read through a call: both inputs can change during an await, which narrowing cannot see. */
   const canUp = (service: Service): boolean => !isDisposed() && dockerAvailable && filesOk.get(service.id) !== false
 
-  const run = async (id: string, request: keyof Controls): Promise<void> => {
-    await chain
+  /** The service a request may act on, under the name its command runs with; `null` when refused. */
+  const claim = (id: string, request: keyof Controls): { service: Service; name: string } | null => {
     const found = services.find((candidate) => candidate.id === id)
     const view = current.services.find((candidate) => candidate.id === id)
-    // Checked synchronously before the pending entry is added: two clicks in the same tick
-    // resume one after the other, and the second sees the first one's entry.
-    if (disposed || !dockerAvailable || found === undefined || view === undefined || !view.controls[request]) return
-    if (pendingFor(pending, found) !== null) return
+    if (disposed || !dockerAvailable || found === undefined || view?.controls[request] !== true) return null
+    if (pendingFor(pending, found) !== null) return null
     const name = found.projectName ?? resolvedNames.get(found.workingDir) ?? null
-    const service: Service = { ...found, projectName: name }
-    if (name === null) return
+    return name === null ? null : { service: { ...found, projectName: name }, name }
+  }
+
+  const run = async (id: string, request: keyof Controls): Promise<void> => {
+    await chain
+    // Claimed synchronously before the pending entry is added: two clicks in the same tick
+    // resume one after the other, and the second sees the first one's entry.
+    const claimed = claim(id, request)
+    if (claimed === null) return
+    const { service, name } = claimed
     // A restart is a stop then an `up` (diagram 12): the entry is swapped in place between the
     // two, so nothing else can run on the service in between.
     const steps: readonly PendingOperation[] = request === 'restart' ? ['stop', 'start'] : [request]
@@ -374,6 +391,8 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
       if (failure !== null) break
     }
     pending = pending.filter((candidate) => candidate !== entry)
+    // Last step run was a stop: a plain Stop, or a restart that skipped its `up`.
+    if (entry?.operation === 'stop') stoppedAt.set(service.id, now())
     if (failure !== null) {
       // Keyed by the row the developer now sees: the id may have changed during the run.
       const row = services.find((candidate) => candidate.workingDir === service.workingDir && candidate.projectName === name)
@@ -383,11 +402,37 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     await chain
   }
 
+  /**
+   * Diagram 13: compares with the previous snapshot of the same connection only — after an
+   * outage the gap is unknown, not a crash. The rows are built here from the previous
+   * snapshot, the one the crashed containers ran in: `services` may lag behind it (rebuilt in
+   * the chain).
+   */
+  const notifyCrashes = (next: readonly ContainerSnapshot[]): void => {
+    if (disposed || !dockerAvailable) return
+    const crashes = crashedContainers(containers, next)
+    if (crashes.length === 0) return
+    const rows = buildServices(containers, pins, resolvedNames)
+    const within = (map: ReadonlyMap<string, number>, id: string, windowMs: number): boolean => now() - (map.get(id) ?? -Infinity) < windowMs
+    for (const crashed of crashes) {
+      const service = rows.find((candidate) => candidate.containers.some((c) => c.id === crashed.id))
+      if (service === undefined || pendingFor(pending, service) !== null) continue
+      if (within(stoppedAt, service.id, STOP_QUIET_MS) || within(notifiedAt, service.id, NOTIFY_WINDOW_MS)) continue
+      notifiedAt.set(service.id, now())
+      try {
+        deps.notify(service.displayName, crashMessage(crashed))
+      } catch (error) {
+        console.error('dock-n-roll: notification failed', error)
+      }
+    }
+  }
+
   const store = await deps.openPinFileStore(deps.pinFilePath, applyPins)
   const observer = deps.observeDocker(
     { socketPath: deps.socketPath },
     {
       onSnapshot: (snapshot) => {
+        notifyCrashes(snapshot)
         containers = snapshot
         dockerAvailable = true
         dockerReason = null
