@@ -44,6 +44,21 @@ async function connect(endpoint) {
   }
 }
 
+/** Stops a child process and waits for it, so its files are closed before cleanup. */
+async function stop(child) {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return
+  const exited = once(child, 'exit')
+  child.kill()
+  await exited
+}
+
+/** Rejects as soon as the app exits, so a crash fails fast with its exit code. */
+function failOnExit(child) {
+  return once(child, 'exit').then(([code, signal]) => {
+    throw new Error(`smoke: the app exited early (code ${code}, signal ${signal})`)
+  })
+}
+
 async function main() {
   const fuses = await getCurrentFuseWire(BINARY)
   check(fuses[FuseV1Options.GrantFileProtocolExtraPrivileges] === FuseState.DISABLE, 'fuse GrantFileProtocolExtraPrivileges is off')
@@ -52,14 +67,17 @@ async function main() {
   const env = { ...process.env, XDG_CONFIG_HOME: configHome }
   const port = await freePort()
   const first = spawn(BINARY, [`--remote-debugging-port=${port}`, '--remote-debugging-address=127.0.0.1'], { env, stdio: 'inherit' })
+  const crashed = failOnExit(first)
+  crashed.catch(() => undefined)
   let browser
+  let second
   try {
-    browser = await connect(`http://127.0.0.1:${port}`)
+    browser = await Promise.race([connect(`http://127.0.0.1:${port}`), crashed])
     const context = browser.contexts()[0]
     const opened = context.waitForEvent('page', { timeout: TIMEOUT_MS })
     // A second launch hits the single-instance lock: the first one opens the dashboard.
-    const second = spawn(BINARY, [], { env, stdio: 'inherit' })
-    const page = await opened
+    second = spawn(BINARY, [], { env, stdio: 'inherit' })
+    const page = await Promise.race([opened, crashed])
 
     const errors = []
     page.on('console', (message) => {
@@ -72,24 +90,27 @@ async function main() {
     check(page.url() === DASHBOARD_URL, `page URL is ${DASHBOARD_URL}`)
     check((await page.title()) === 'dock-n-roll', 'title is dock-n-roll')
     await page.locator('#root > *').first().waitFor({ timeout: TIMEOUT_MS })
-    check(true, 'React root renders')
+    console.log('ok - React root renders')
     const state = await page.evaluate(() => window.dockNRoll.getState().then(() => 'answered'))
     check(state === 'answered', 'window.dockNRoll.getState() answers (Docker may be unavailable)')
     // Checked before the 404 probe, which Chromium logs as a failed resource.
     check(errors.length === 0, `no console or CSP error${errors.length ? `: ${errors.join(' | ')}` : ''}`)
-    const status = await page.evaluate((url) => fetch(url).then((response) => response.status), TRAVERSAL_URL)
-    check(status === 404, `${TRAVERSAL_URL} answers 404`)
-    second.kill()
+    const statusOf = (url) => page.evaluate((target) => fetch(target).then((response) => response.status), url)
+    // A served page answering 200 proves the 404 below comes from the handler, not a failed fetch.
+    check((await statusOf(DASHBOARD_URL)) === 200, `${DASHBOARD_URL} answers 200`)
+    check((await statusOf(TRAVERSAL_URL)) === 404, `${TRAVERSAL_URL} answers 404`)
   } finally {
     await browser?.close().catch(() => undefined)
     // The app writes to its config dir until it exits: remove it afterwards.
-    if (first.exitCode === null && first.signalCode === null) {
-      const exited = once(first, 'exit')
-      first.kill()
-      await exited
-    }
+    await stop(second)
+    await stop(first)
     await rm(configHome, { recursive: true, force: true })
   }
 }
 
+// A hang anywhere (evaluate, reload) fails the job instead of waiting for the CI timeout.
+setTimeout(() => {
+  console.error('smoke: global timeout')
+  process.exit(1)
+}, 3 * TIMEOUT_MS).unref()
 await main()

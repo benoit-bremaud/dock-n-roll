@@ -50,6 +50,6 @@ export default tseslint.config(
   {
     // Node script; the page callbacks it passes to evaluate() run in the dashboard.
     files: ['e2e/*.mjs'],
-    languageOptions: { globals: { process: 'readonly', console: 'readonly', window: 'readonly', fetch: 'readonly' } }
+    languageOptions: { globals: { process: 'readonly', console: 'readonly', window: 'readonly', fetch: 'readonly', setTimeout: 'readonly' } }
   }
 )
