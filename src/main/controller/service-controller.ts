@@ -173,7 +173,9 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     const status = deriveStatus(inputs)
     const derived = allowedControls(status, inputs)
     // No command without the daemon it would act on, nor under a name that was not checked.
-    const controls = !dockerAvailable ? NO_CONTROLS : unresolved(service) ? { ...derived, start: false } : derived
+    let controls: Controls = derived
+    if (!dockerAvailable) controls = NO_CONTROLS
+    else if (unresolved(service)) controls = { ...derived, start: false }
     return {
       id: service.id,
       displayName: service.displayName,
@@ -346,17 +348,23 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   /** Read through a call: both inputs can change during an await, which narrowing cannot see. */
   const canUp = (service: Service): boolean => !isDisposed() && dockerAvailable && filesOk.get(service.id) !== false
 
-  const run = async (id: string, request: keyof Controls): Promise<void> => {
-    await chain
+  /** The service a request may act on, under the name its command runs with; `null` when refused. */
+  const claim = (id: string, request: keyof Controls): { service: Service; name: string } | null => {
     const found = services.find((candidate) => candidate.id === id)
     const view = current.services.find((candidate) => candidate.id === id)
-    // Checked synchronously before the pending entry is added: two clicks in the same tick
-    // resume one after the other, and the second sees the first one's entry.
-    if (disposed || !dockerAvailable || found === undefined || view === undefined || !view.controls[request]) return
-    if (pendingFor(pending, found) !== null) return
+    if (disposed || !dockerAvailable || found === undefined || view?.controls[request] !== true) return null
+    if (pendingFor(pending, found) !== null) return null
     const name = found.projectName ?? resolvedNames.get(found.workingDir) ?? null
-    const service: Service = { ...found, projectName: name }
-    if (name === null) return
+    return name === null ? null : { service: { ...found, projectName: name }, name }
+  }
+
+  const run = async (id: string, request: keyof Controls): Promise<void> => {
+    await chain
+    // Claimed synchronously before the pending entry is added: two clicks in the same tick
+    // resume one after the other, and the second sees the first one's entry.
+    const claimed = claim(id, request)
+    if (claimed === null) return
+    const { service, name } = claimed
     // A restart is a stop then an `up` (diagram 12): the entry is swapped in place between the
     // two, so nothing else can run on the service in between.
     const steps: readonly PendingOperation[] = request === 'restart' ? ['stop', 'start'] : [request]
