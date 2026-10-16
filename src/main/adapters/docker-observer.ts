@@ -4,7 +4,7 @@ import { containerIds, parseDockerEvent, toContainerSnapshot, type DockerEvent }
 
 // Docker Engine API over its Unix socket, without SDK (ADR-0005). Follows sequence diagram 06.
 
-const API_PREFIX = '/v1.47'
+export const API_PREFIX = '/v1.47'
 const REQUEST_TIMEOUT_MS = 5000
 const EVENTS_HEADERS_TIMEOUT_MS = 5000
 const EVENTS_PATH = `/events?filters=${encodeURIComponent(JSON.stringify({ type: ['container'] }))}`

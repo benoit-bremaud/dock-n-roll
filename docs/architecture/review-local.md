@@ -1,36 +1,51 @@
-# Local review — dock-n-roll (features brick, PR 2 crash notifications)
+# Local review — dock-n-roll (PR 3, service logs view, UC7)
 
 - Date: 2026-10-16
-- Commit: base cfb7e0a..HEAD (branch feat/crash-notifications)
-- Scope: branch diff main...HEAD (domain crash.ts, controller notifyCrashes, notifier.ts, oomKilled mapping, diagrams 01/03/05/07/13, spec UC3 3b, CHANGELOG)
+- Commit: 1f50644 + review fixes
+- Scope: branch diff origin/main...feat/logs-view
 - Checks run: design · docs · tests · security · correctness
-- Verdict: ship after Should applied · Must 0 · Should 8 (applied) · Nice 6 (4 applied, 2 dropped)
+- Verdict: ship (all Must and Should applied) · Must 5 · Should 9 · Nice 8
 
-## 🔴 Must Have
-_None._
+## Pre-merge gate
+| Step | Result |
+|---|---|
+| 1 Tests | ✅ 503 unit/integration (vitest), lint and `tsc --build` clean |
+| 2 Coverage | lines 98.3 % / branches 91.5 % / funcs 97.3 % (floors 90/85/90) |
+| 3 SonarQube | ✅ PASSED (new_coverage 96.8, duplication 0.0, new_violations 0). The S5852 hotspots on the linear regexes in `log-lines.ts` still need a review in the UI |
+| 4 Secrets | ✅ gitleaks clean (origin/main..HEAD), no tracked .env, diff read: nothing sensitive |
+| 5 QA pass | ✅ manual E2E on the built app: multiplexed and TTY logs, ANSI stripped, HTML kept as text, picker, autoscroll, stop leads to ended then Reopen, close and hide free the socket |
+- Gate: **GREEN** (once the Sonar hotspots are reviewed)
 
-## 🟡 Should Have
-- `src/main/controller/service-controller.ts` notifyCrashes `[correctness]` · `services` can lag behind `containers` (rebuilt in the chain): a container that dies before its row exists is missed · rows built synchronously from the previous snapshot with `buildServices`; test with held file checks. Applied.
-- `src/main/controller/service-controller.ts` run `[correctness]` · The late `die` snapshot of a finished Stop, for apps exiting 1 on SIGTERM, is reported as a crash · 10 s quiet window per service after a Stop (`stoppedAt`, pruned); test. Applied.
-- `src/main/domain/crash.ts` `[docs|correctness]` · `dead` counted always, but spec and diagram said dead needs OOM / exit code; `dead` with a code read "exited with code N" · docs say `dead` always counts; own message "died". Applied.
-- `src/main/notifier.ts` `[design]` · Escaping would show `&amp;` literally off Linux · Linux-only app: comment states it (no platform branch, YAGNI). Applied.
-- `service-controller.test.ts` `[tests]` · No test of a crash between the two restart steps · added. Applied.
-- `service-controller.test.ts` `[tests]` · `deps.notify` throwing not covered · added (snapshot still applied). Applied.
-- `service-controller.test.ts` `[tests]` · rate-limit test only counted calls · asserts exact title/body. Applied.
+## 🔴 Must Have (all applied)
+- `src/main/index.ts` `[design|correctness]`: the panel froze after the dashboard hid. A null push now ends the panel with "Logs closed" and offers Reopen.
+- `src/main/adapters/docker-logs.test.ts` `[tests]`: the headers timeout had no test. Added.
+- `src/renderer/src/components/LogPanel.test.tsx` `[tests]`: autoscroll had no test. Added; `isFollowing` was extracted and tested.
+- `src/main/adapters/docker-logs.ts` `[docs]`: `followLogs` had no docstring. Added.
+- `docs/.../14-sequence-service-logs.md` `[docs]`: the call shapes were wrong and the hide/reload close was missing. Fixed.
 
-- `service-controller.ts` run `[correctness]` · (2nd `/code-review`, Codex out of quota) a restart that skips its `up` set no quiet window, so its late `die` snapshot was notified · `stoppedAt` set when the last step run is a stop; test. Applied.
+## 🟡 Should Have (all applied)
+- `log-lines.ts`: frame size is bounded (1 MiB) and headers are validated; `cleanLogLine` cuts the line before running the regexes.
+- `LogPanel.tsx`: Reopen is also offered after "No container yet".
+- Tests strengthened: stop, split offset, the 500-line cap, and the partial line reset in `LogSession`.
+- `docker-logs.ts`: added a response error listener.
+- Docs: diagram 07 now uses LogStream and has the LogSessionDeps block; the "else first" docstrings and the lifecycle wording are aligned (14, 07, spec UC7); 500 lives in one constant.
 
-## 🔵 Nice to Have
-- `service-controller.ts` notifyCrashes `[correctness]` · no `disposed` guard · added. Applied.
-- `src/main/index.ts` `[conventions]` · import order · moved. Applied.
-- `crash.test.ts` `[tests]` · split combined cases into `it.each`, add was-restarting and exited-without-code cases · applied.
-- `crash.ts` crashMessage `[docs]` · `dead` with code wording · "died". Applied.
-- `service-controller.test.ts` `[tests]` · prune of `notifiedAt` untested · dropped: same `prune` loop as the other per-service maps, already covered.
-- `notifier.ts` `[security]` · cap the body length · dropped: container names are Docker-bounded, messages short.
+## 🔵 Nice to Have (to file as one backlog issue)
+- One decoder per stream.
+- `open()` on an unknown service publishes nothing.
+- Follow the logs across restarts, and refresh the stale containers list.
+- Handle `\r` progress bars.
+- Move the frame parser to adapters (owner's call).
+- Give `registerIpc` a params object.
+- Spec UC order.
+- Mention the tray in the CHANGELOG entry for Restart.
 
 ## ⚪ Disagree / Intentional
-- `crash.ts` SIGNAL_EXITS `[correctness]` · 130/137/143 ignored · owner MCDA A (450/500), OOM still reported.
-- `notifier.ts` outside `adapters/` `[design]` · adapters may not import Electron (lint rule); Electron glue lives next to `ipc.ts`.
+- `docker-logs.ts` `[correctness]`: TTY detection by Content-Type is safe, because the API is pinned at /v1.47 (≥ 1.42) by ADR-0005.
 
 ## Per-dimension summary
-- Design: pure domain diff + injected notifier, no over-engineering. · Docs: dead rule aligned. · Tests: restart, failure and lag cases added. · Security: body escaped for libnotify markup; title is plain text. · Correctness: lagging rows and post-Stop false alarm fixed.
+- Design: flat, with injected deps, proportional.
+- Docs: the diagrams are aligned with the code.
+- Tests: the boundary is the fake daemon, no domain mocks.
+- Security: only ids cross IPC, text-only rendering, bounded parsing.
+- Correctness: stale streams are ignored, and every path closes its stream.

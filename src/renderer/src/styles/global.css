@@ -115,6 +115,7 @@ button:focus-visible {
 
 .service {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-2);
@@ -221,4 +222,39 @@ button:focus-visible {
 
 .running td {
   font-variant-numeric: tabular-nums;
+}
+
+/* UC7 logs panel: full width under its row, text only. */
+.logs {
+  flex-basis: 100%;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.logs__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-small);
+}
+
+.logs__bar:empty {
+  display: none;
+}
+
+.logs__ended {
+  color: var(--color-muted);
+}
+
+.logs__lines {
+  margin: 0;
+  max-height: 300px;
+  overflow: auto;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--color-hover);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-small);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

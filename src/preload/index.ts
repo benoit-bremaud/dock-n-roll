@@ -1,7 +1,7 @@
 // Runs in the renderer process, isolated from the page (contextIsolation + sandbox). Exposes the
 // narrow API of class diagram 07 — ids in, views out; nothing else from Node or Electron.
 import { contextBridge, ipcRenderer } from 'electron'
-import { IPC, type ControllerState, type DockNRollApi } from '../shared/ipc'
+import { IPC, type ControllerState, type DockNRollApi, type LogsState } from '../shared/ipc'
 
 const api: DockNRollApi = {
   getState: () => ipcRenderer.invoke(IPC.getState) as Promise<ControllerState | null>,
@@ -17,6 +17,17 @@ const api: DockNRollApi = {
     ipcRenderer.on(IPC.stateChanged, listener)
     return () => {
       ipcRenderer.removeListener(IPC.stateChanged, listener)
+    }
+  },
+  openLogs: (serviceId, containerId) => ipcRenderer.invoke(IPC.openLogs, serviceId, containerId) as Promise<void>,
+  closeLogs: () => ipcRenderer.invoke(IPC.closeLogs) as Promise<void>,
+  onLogsChanged: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: LogsState | null): void => {
+      callback(state)
+    }
+    ipcRenderer.on(IPC.logsChanged, listener)
+    return () => {
+      ipcRenderer.removeListener(IPC.logsChanged, listener)
     }
   }
 }

@@ -23,12 +23,14 @@ flowchart LR
     SC["ServiceController (pending ops, guards)"]
     BM["BackgroundMonitor"]
     NT["Notifier (Electron Notification)"]
+    LS["LogSession (one stream, ring buffer)"]
     subgraph Domain ["domain (pure, no IO)"]
       Derive["status derivation (precedence)"]
       Ident["identity + conflict detection"]
       Merge["pin-file merge + validation"]
       Join["port join (ss x Docker bindings)"]
       Crash["crash detection (snapshot diff)"]
+      Logs["log frames + line cleaning"]
     end
     subgraph Adapters ["adapters (IO, src/main/adapters)"]
       DO["DockerObserver (node:http, unix socket)"]
@@ -37,12 +39,19 @@ flowchart LR
       FP["FileProbe (fs.stat)"]
       PS["PortScanner (execFile ss)"]
       PF["PinFileStore (yaml + dir watch)"]
+      DL["DockerLogs (node:http, follow stream)"]
     end
   end
   Preload -->|"ipcRenderer.invoke"| SC
   Preload -->|"ipcRenderer.invoke listBackground"| BM
   SC -->|"statusChanged push"| Preload
   SC -->|"statusChanged"| Tray
+  Preload -->|"openLogs / closeLogs"| LS
+  LS -->|"logsChanged push, 200 ms"| Preload
+  LS --> SC
+  LS --> Logs
+  LS --> DL
+  DL -->|"/var/run/docker.sock"| Docker
   Tray --> SC
   SC --> Domain
   BM --> Join

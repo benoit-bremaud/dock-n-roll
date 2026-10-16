@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { runningSummary, shortenPath } from './format'
+import { isFollowing, runningSummary, shortenPath } from './format'
 
 describe('shortenPath — home folder shown as ~', () => {
   it.each([
@@ -22,5 +22,17 @@ describe('runningSummary — header line', () => {
 
   it('says nothing when there is no service', () => {
     expect(runningSummary([])).toBeNull()
+  })
+})
+
+describe('isFollowing — UC7 logs autoscroll', () => {
+  it.each([
+    [1000, 900, 100, true],
+    [1000, 880, 100, true],
+    [1000, 870, 100, false],
+    [1000, 0, 100, false],
+    [100, 0, 100, true]
+  ])('height %i, top %i, client %i → %s', (scrollHeight, scrollTop, clientHeight, expected) => {
+    expect(isFollowing({ scrollHeight, scrollTop, clientHeight })).toBe(expected)
   })
 })

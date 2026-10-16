@@ -24,6 +24,7 @@ flowchart LR
     subgraph Observe ["Observation"]
       UC3(("UC3 Consult services status"))
       UC4(("UC4 Inspect background activity"))
+      UC7(("UC7 Read a service's logs"))
     end
   end
   Developer --> UC1
@@ -32,11 +33,13 @@ flowchart LR
   Developer --> UC4
   Developer --> UC5
   Developer --> UC6
+  Developer --> UC7
   UC1 --- DockerEngine
   UC2 --- DockerEngine
   UC3 --- DockerEngine
   UC4 --- DockerEngine
   UC6 --- DockerEngine
+  UC7 --- DockerEngine
 ```
 
 ## Notes
@@ -49,4 +52,6 @@ flowchart LR
   stop then an `up`, see `12-sequence-restart-service.md`.
 - Crash notifications (v1.1) are not a use case: they are UC3's extension 3b, the system
   telling the developer about a status change they did not ask for (`13-sequence-crash-notification.md`).
-- Backlog goals (view logs, start a profile, clean exited containers) are deliberately absent.
+- UC7 (v1.1) follows the logs of one container of a service in a dashboard panel, see
+  `14-sequence-service-logs.md`.
+- Backlog goals (start a profile, clean exited containers) are deliberately absent.

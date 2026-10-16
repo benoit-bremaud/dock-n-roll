@@ -42,6 +42,25 @@ export interface BackgroundView {
   readonly ports: readonly BackgroundPort[]
 }
 
+/** A container the logs panel can follow (UC7). */
+export interface LogContainer {
+  readonly id: string
+  readonly name: string
+}
+
+/** The open logs panel (UC7, diagram 14), pushed whole. */
+export interface LogsState {
+  readonly serviceId: string
+  /** The followed container; `null` when the service has none yet. */
+  readonly containerId: string | null
+  /** The service's containers, for the picker. */
+  readonly containers: readonly LogContainer[]
+  /** Clean text lines, the last ones only (`MAX_LOG_LINES`). */
+  readonly lines: readonly string[]
+  /** Why the stream is not (or no longer) followed; `null` while it is. */
+  readonly ended: string | null
+}
+
 /**
  * What the preload script exposes on `window.dockNRoll`. Subscribe with `onStateChanged`
  * before calling `getState`, or a push in between is missed. `start` / `stop` / `restart` resolve once the
@@ -58,6 +77,14 @@ export interface DockNRollApi {
   listBackground(): Promise<BackgroundView | null>
   /** Returns the unsubscribe function. */
   onStateChanged(callback: (state: ControllerState) => void): () => void
+  /**
+   * UC7: follows a container of the service (`containerId` only if it belongs to it, else the
+   * first running one, else the first). Subscribe with `onLogsChanged` first: the state only comes as a push.
+   */
+  openLogs(serviceId: string, containerId: string | null): Promise<void>
+  closeLogs(): Promise<void>
+  /** `null` once the panel is closed. Returns the unsubscribe function. */
+  onLogsChanged(callback: (state: LogsState | null) => void): () => void
 }
 
 export const IPC = {
@@ -67,5 +94,8 @@ export const IPC = {
   restart: 'dock-n-roll:restart',
   openUrl: 'dock-n-roll:open-url',
   listBackground: 'dock-n-roll:list-background',
-  stateChanged: 'dock-n-roll:state-changed'
+  stateChanged: 'dock-n-roll:state-changed',
+  openLogs: 'dock-n-roll:open-logs',
+  closeLogs: 'dock-n-roll:close-logs',
+  logsChanged: 'dock-n-roll:logs-changed'
 } as const

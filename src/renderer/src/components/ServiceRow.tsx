@@ -1,5 +1,6 @@
 import type { DockNRollApi, ServiceView } from '../../../shared/ipc'
 import { shortenPath } from '../format'
+import { LogPanel } from './LogPanel'
 
 /**
  * One service. Buttons mirror the controls the controller derived (the main process re-checks
@@ -11,12 +12,17 @@ export function ServiceRow({
   service,
   api,
   dockerAvailable,
-  homeDir
+  homeDir,
+  logsOpen,
+  onToggleLogs
 }: {
   readonly service: ServiceView
   readonly api: DockNRollApi
   readonly dockerAvailable: boolean
   readonly homeDir: string
+  /** UC7: this row's logs panel is the open one. */
+  readonly logsOpen: boolean
+  readonly onToggleLogs: () => void
 }): React.JSX.Element {
   const name = service.displayName
   return (
@@ -40,12 +46,16 @@ export function ServiceRow({
         <button type="button" aria-label={`Restart ${name}`} disabled={!service.controls.restart} onClick={() => void api.restart(service.id)}>
           Restart
         </button>
+        <button type="button" aria-label={`Logs of ${name}`} aria-expanded={logsOpen} disabled={!dockerAvailable && !logsOpen} onClick={onToggleLogs}>
+          Logs
+        </button>
         {service.hasUrl && (
           <button type="button" aria-label={`Open ${name} in the browser`} onClick={() => void api.openUrl(service.id)}>
             Open ↗
           </button>
         )}
       </div>
+      {logsOpen && <LogPanel api={api} serviceId={service.id} name={name} />}
     </li>
   )
 }

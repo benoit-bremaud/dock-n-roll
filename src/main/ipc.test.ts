@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BrowserWindow, IpcMainInvokeEvent } from 'electron'
-import { IPC, type BackgroundView, type ControllerState } from '../shared/ipc'
+import { IPC, type BackgroundView, type ControllerState, type LogsState } from '../shared/ipc'
+import type { LogSession } from './controller/log-session'
 import type { ServiceController } from './controller/service-controller'
-import { pushStateTo, registerIpc } from './ipc'
+import { pushLogsTo, pushStateTo, registerIpc } from './ipc'
 
 type Handler = (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown
 
@@ -30,6 +31,7 @@ function makeController() {
     ...spies,
     state: () => STATE,
     containers: () => [],
+    containersOf: () => null,
     onChange: () => () => undefined,
     dispose: () => undefined
   }
@@ -44,19 +46,41 @@ function invoke(channel: string, event: IpcMainInvokeEvent, ...args: unknown[]):
 
 describe('registerIpc', () => {
   let controller: ReturnType<typeof makeController>['spies']
+  let logs: { open: ReturnType<typeof vi.fn<LogSession['open']>>; close: ReturnType<typeof vi.fn<LogSession['close']>> }
 
   beforeEach(() => {
     electron.handlers.clear()
     electron.openExternal.mockClear()
     const made = makeController()
     controller = made.spies
-    registerIpc(made.controller, () => Promise.resolve(BACKGROUND), (event) => event === TRUSTED)
+    logs = { open: vi.fn<LogSession['open']>(), close: vi.fn<LogSession['close']>() }
+    const session: LogSession = { ...logs, onChange: () => () => undefined }
+    registerIpc(made.controller, () => Promise.resolve(BACKGROUND), (event) => event === TRUSTED, session)
   })
 
   it('registers one handler per invoke channel', () => {
     expect([...electron.handlers.keys()].sort()).toEqual(
-      [IPC.getState, IPC.start, IPC.stop, IPC.restart, IPC.openUrl, IPC.listBackground].sort()
+      [IPC.getState, IPC.start, IPC.stop, IPC.restart, IPC.openUrl, IPC.listBackground, IPC.openLogs, IPC.closeLogs].sort()
     )
+  })
+
+  it('opens the logs of a valid service id, with a valid container id or none (UC7)', async () => {
+    await invoke(IPC.openLogs, TRUSTED, 'web', 'c1')
+    await invoke(IPC.openLogs, TRUSTED, 'web', null)
+    await invoke(IPC.openLogs, TRUSTED, 'web', 42)
+
+    expect(logs.open.mock.calls).toEqual([['web', 'c1'], ['web', null], ['web', null]])
+  })
+
+  it('refuses logs to an untrusted caller or for an invalid service id, and closes for the dashboard only', async () => {
+    await invoke(IPC.openLogs, UNTRUSTED, 'web', null)
+    await invoke(IPC.openLogs, TRUSTED, '', null)
+    await invoke(IPC.closeLogs, UNTRUSTED)
+    expect(logs.open).not.toHaveBeenCalled()
+    expect(logs.close).not.toHaveBeenCalled()
+
+    await invoke(IPC.closeLogs, TRUSTED)
+    expect(logs.close).toHaveBeenCalledOnce()
   })
 
   it('answers state and background to the dashboard, null to anyone else', async () => {
@@ -109,6 +133,20 @@ describe('registerIpc', () => {
 
     expect(controller.urlOf).not.toHaveBeenCalled()
     expect(electron.openExternal).not.toHaveBeenCalled()
+  })
+})
+
+describe('pushLogsTo', () => {
+  it('sends the logs state, or null, on the logs-changed channel', () => {
+    const send = vi.fn()
+    const window = { isDestroyed: () => false, webContents: { send } } as unknown as BrowserWindow
+    const logs: LogsState = { serviceId: 'web', containerId: null, containers: [], lines: [], ended: 'No container yet' }
+
+    pushLogsTo(() => window, logs)
+    pushLogsTo(() => window, null)
+    pushLogsTo(() => null, null)
+
+    expect(send.mock.calls).toEqual([[IPC.logsChanged, logs], [IPC.logsChanged, null]])
   })
 })
 

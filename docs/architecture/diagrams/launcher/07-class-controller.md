@@ -45,6 +45,31 @@ classDiagram
     +openUrl(id) Promise~void~
     +listBackground() Promise~BackgroundView~
     +onStateChanged(callback) unsubscribe
+    +openLogs(serviceId, containerId|null) Promise~void~
+    +closeLogs() Promise~void~
+    +onLogsChanged(callback) unsubscribe
+  }
+  class LogsState {
+    <<shared/ipc.ts, crosses IPC>>
+    +string serviceId
+    +string|null containerId
+    +LogContainer[] containers
+    +string[] lines
+    +string|null ended
+  }
+  class LogSessionDeps {
+    <<injected>>
+    +containersOf(serviceId)
+    +follow(containerId, listener)
+    +schedule
+  }
+  class LogSession {
+    <<createLogSession(deps), one stream at a time>>
+    -stream LogStream|null
+    -lines string[] (ring, MAX_LOG_LINES 500)
+    +open(serviceId, containerId|null) void
+    +close() void
+    +onChange(listener) unsubscribe
   }
   class ServiceController {
     <<createServiceController(deps)>>
@@ -90,7 +115,7 @@ classDiagram
   }
   class IpcHandlers {
     <<registerIpc(controller, listBackground, isTrusted)>>
-    +getState / start / stop / openUrl / listBackground
+    +getState / start / stop / restart / openUrl / listBackground / openLogs / closeLogs
   }
   class TrustedSender {
     <<isTrustedSender(event, dashboard, origin), pure>>
@@ -105,6 +130,11 @@ classDiagram
   DockNRollApi ..> IpcHandlers : invokes
   IpcHandlers ..> TrustedSender : checks every call
   IpcHandlers ..> ServiceController : delegates ids
+  IpcHandlers ..> LogSession : delegates ids
+  LogSession ..> ServiceController : containers of a service
+  LogSession ..> LogsState : produces
+  LogSession ..> LogSessionDeps : uses
+  DockNRollApi ..> LogsState
 ```
 
 ## Notes
@@ -158,4 +188,9 @@ classDiagram
 - Factory functions with injected dependencies, no classes: the controller is unit-tested
   with in-memory fakes of the adapters (the adapters themselves are already tested against
   their real boundaries). `src/main/index.ts` stays the composition root.
+- **Logs (UC7, diagram 14)**: `LogSession` follows one container of a listed service, chosen
+  from `ServiceController` views (a container id from the renderer is used only if it belongs
+  to that service). Lines are cleaned and capped in the main process; `logsChanged` pushes the
+  full `LogsState` at most every 200 ms. The stream closes on `closeLogs`, a new `openLogs`,
+  the dashboard hiding or reloading, and quit.
 - `ContainerRow` = name, image, state, health, Compose project (UC4); built from the snapshot.

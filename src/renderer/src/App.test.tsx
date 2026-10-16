@@ -59,7 +59,16 @@ function fakeApi(initial: ControllerState, backgrounds: (BackgroundView | Error)
       return () => {
         unsubscribed = true
       }
-    }
+    },
+    openLogs: (serviceId) => {
+      calls.push(`openLogs ${serviceId}`)
+      return Promise.resolve()
+    },
+    closeLogs: () => {
+      calls.push('closeLogs')
+      return Promise.resolve()
+    },
+    onLogsChanged: () => () => undefined
   }
   return {
     api,
@@ -367,5 +376,32 @@ describe('Root — preload API missing (packaging risk)', () => {
     render(<Root api={undefined} />)
 
     expect(screen.getByRole('alert').textContent).toBe('dock-n-roll could not connect to its main process (preload API missing).')
+  })
+})
+
+describe('App — logs panel (UC7, diagram 09)', () => {
+  it('opens one logs panel at a time, and closes it on a second click', async () => {
+    const fake = fakeApi(state({ services: [view(), view({ id: 'sq', displayName: 'SonarQube', status: 'on' })] }))
+    render(<App api={fake.api} />)
+    await rowOf('Blog')
+
+    await userEvent.click(button('Logs of Blog'))
+    expect(screen.getByLabelText('Log lines of Blog')).toBeTruthy()
+    expect(button('Logs of Blog').getAttribute('aria-expanded')).toBe('true')
+
+    await userEvent.click(button('Logs of SonarQube'))
+    expect(screen.queryByLabelText('Log lines of Blog')).toBeNull()
+    expect(screen.getByLabelText('Log lines of SonarQube')).toBeTruthy()
+
+    await userEvent.click(button('Logs of SonarQube'))
+    expect(screen.queryByLabelText('Log lines of SonarQube')).toBeNull()
+    expect(fake.calls.filter((call) => /^(openLogs|closeLogs)/.test(call))).toEqual(['openLogs blog-id', 'closeLogs', 'openLogs sq', 'closeLogs'])
+  })
+
+  it('disables Logs while Docker is unavailable', async () => {
+    render(<App api={fakeApi(state({ dockerAvailable: false, dockerReason: 'down' })).api} />)
+    await rowOf('Blog')
+
+    expect(button('Logs of Blog').disabled).toBe(true)
   })
 })

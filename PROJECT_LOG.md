@@ -297,3 +297,16 @@ Chronological operational logbook. Complements `git log` with the human context.
   at most one per service per minute. Electron `Notification`, body markup-escaped.
   UML first: new diagram 13; 01/03/05/07 and spec UC3 3b updated. TDD.
 - **Pre-push review**: Must 0 · Should 7 applied · Nice 4 applied, 2 dropped. 438 tests.
+
+## 2026-10-16 — Features brick, PR 2 merged; PR 3: logs view
+
+- **PR #31 merged** (`09545d8`) — Codex out of quota again → owner MCDA A (415): second local
+  `/code-review` found a false crash alert after a restart that skipped its `up` (fixed
+  `e3e929a`). Private-repo Actions blocked by billing → repo made **public** at owner request
+  (gitleaks full history clean), CI then green.
+- **Logs view (UC7)** — MCDA: source Docker API 440 vs `compose logs` CLI 330 (no child
+  process, ADR-0005 fit); display dashboard panel 435 vs dedicated window 315. ADR-0008.
+  `GET /containers/{id}/logs?follow`, frame parser (`Content-Type` tells TTY), ANSI and control
+  chars removed, 500 lines × 2000 chars, push throttled to 200 ms, one panel at a time, stream
+  closed on close / reopen / window hide / quit. UML first: new diagram 14; 01/03/07/09, spec
+  UC7. TDD. Manual test on the built app (multiplexed + TTY containers, end + Reopen, close).

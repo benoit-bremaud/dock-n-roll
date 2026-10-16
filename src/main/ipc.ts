@@ -1,5 +1,6 @@
 import { ipcMain, shell, type BrowserWindow, type IpcMainInvokeEvent } from 'electron'
-import { IPC, type BackgroundView, type ControllerState } from '../shared/ipc'
+import { IPC, type BackgroundView, type ControllerState, type LogsState } from '../shared/ipc'
+import type { LogSession } from './controller/log-session'
 import type { ServiceController } from './controller/service-controller'
 
 // The renderer is untrusted input (contextIsolation, sandbox): every handler validates its
@@ -18,7 +19,8 @@ function asId(value: unknown): string | null {
 export function registerIpc(
   controller: ServiceController,
   listBackground: () => Promise<BackgroundView>,
-  isTrusted: (event: IpcMainInvokeEvent) => boolean
+  isTrusted: (event: IpcMainInvokeEvent) => boolean,
+  logs: LogSession
 ): void {
   ipcMain.handle(IPC.getState, (event): ControllerState | null => (isTrusted(event) ? controller.state() : null))
   const command = (channel: (typeof IPC)[keyof typeof IPC], act: (id: string) => Promise<void>): void => {
@@ -37,10 +39,27 @@ export function registerIpc(
     if (url !== null) await shell.openExternal(url)
   })
   ipcMain.handle(IPC.listBackground, (event) => (isTrusted(event) ? listBackground() : null))
+  // UC7: the session checks the service exists and the container belongs to it.
+  ipcMain.handle(IPC.openLogs, (event, serviceId: unknown, containerId: unknown) => {
+    const valid = asId(serviceId)
+    if (isTrusted(event) && valid !== null) logs.open(valid, asId(containerId))
+  })
+  ipcMain.handle(IPC.closeLogs, (event) => {
+    if (isTrusted(event)) logs.close()
+  })
+}
+
+function sendTo(window: () => BrowserWindow | null, channel: string, payload: unknown): void {
+  const target = window()
+  if (target !== null && !target.isDestroyed()) target.webContents.send(channel, payload)
 }
 
 /** Pushes every new state to the dashboard window, when it exists. */
 export function pushStateTo(window: () => BrowserWindow | null, state: ControllerState): void {
-  const target = window()
-  if (target !== null && !target.isDestroyed()) target.webContents.send(IPC.stateChanged, state)
+  sendTo(window, IPC.stateChanged, state)
+}
+
+/** Pushes the logs panel state (UC7), `null` once closed, to the dashboard window. */
+export function pushLogsTo(window: () => BrowserWindow | null, state: LogsState | null): void {
+  sendTo(window, IPC.logsChanged, state)
 }

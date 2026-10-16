@@ -17,6 +17,8 @@ type Tab = (typeof TABS)[number]['key']
 export function App({ api }: { readonly api: DockNRollApi }): React.JSX.Element {
   const { state, error } = useControllerState(api)
   const [tab, setTab] = useState<Tab>('services')
+  // UC7: one logs panel at a time; opening another closes the first.
+  const [logsFor, setLogsFor] = useState<string | null>(null)
   const summary = state?.dockerAvailable === true ? runningSummary(state.services.map((service) => service.status)) : null
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
 
@@ -70,7 +72,17 @@ export function App({ api }: { readonly api: DockNRollApi }): React.JSX.Element 
         ) : (
           <ul className="services">
             {state.services.map((service) => (
-              <ServiceRow key={service.id} service={service} api={api} dockerAvailable={state.dockerAvailable} homeDir={state.homeDir} />
+              <ServiceRow
+                key={service.id}
+                service={service}
+                api={api}
+                dockerAvailable={state.dockerAvailable}
+                homeDir={state.homeDir}
+                logsOpen={logsFor === service.id}
+                onToggleLogs={() => {
+                  setLogsFor((open) => (open === service.id ? null : service.id))
+                }}
+              />
             ))}
           </ul>
         )}
