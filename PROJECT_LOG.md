@@ -314,3 +314,14 @@ Chronological operational logbook. Complements `git log` with the human context.
 ## 2026-10-16 — v1.1.0 release
 
 Restart (#29), crash notifications (#31) and logs view (#32) released as v1.1.0.
+
+## 2026-10-16 — #19 dashboard served from app://, file: fuse off
+
+- **PR #35 merged** (`e664613`, closes #19) — the packaged dashboard loads from a privileged
+  `app://dashboard/` scheme instead of `loadFile()`; `grantFileProtocolExtraPrivileges` fuse off
+  (checked in the built binary: wire `000001001`). MCDA: `fs.readFile` + closed MIME table 485 vs
+  `net.fetch` 375. ADR-0009, diagram 15. Confinement: WHATWG parser collapses dot segments, then
+  decode once, refuse leftover `%` / `\` / NUL / empty, `.`, `..` segments, containment check.
+  Trusted sender matches `app://dashboard/index.html` exactly. TDD, 532 tests, coverage 97/91.6.
+- Review: Must 0, Should 6 applied. Codex and Copilot unavailable → owner gate: local tests +
+  SonarQube green (new violations 0), CI green, then merge.
