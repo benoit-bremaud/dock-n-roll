@@ -30,7 +30,7 @@ I want a small desktop tool, always reachable from the GNOME top bar, that:
 ### Out of V1 (backlog)
 
 - Shell-command services (`npm run dev`, …) and `systemd --user` units.
-- Live logs, profiles/groups ("QA mode"), cleanup of exited containers, CPU/RAM stats.
+- Live logs (done in v1.1, UC7), profiles/groups ("QA mode"), cleanup of exited containers, CPU/RAM stats.
 - Any UI for editing the pin file (it is edited by hand).
 - Packaging for other users / other OSes.
 
@@ -146,6 +146,16 @@ Primary actor for all: **Developer**. Supporting actor: **Docker Engine**.
 - **Extensions**: the stop fails → no `up`, error shown as in UC2 3a; the `up` fails → as UC1.
 - **Note**: the `healthUrl` gate is reset before the `up`, even if Docker never showed the
   stack down.
+
+### UC7 — Read a service's logs (v1.1)
+
+- **Precondition**: the service is listed in the dashboard (not in the tray).
+- **Main success scenario**: Developer clicks Logs on a service row → system shows the last
+  500 lines of one of its containers (first running, else first) and follows new lines until
+  the panel closes. A service with several containers offers a container picker. Diagram 14.
+- **Extensions**: no container yet → "No container yet"; the container stops or the daemon
+  drops → stream ended, Reopen offered.
+- **Note**: text only (no HTML, ANSI removed); only one panel open at a time; read-only.
 
 ### UC5 — Open a service in the browser
 

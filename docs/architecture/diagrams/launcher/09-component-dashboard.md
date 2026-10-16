@@ -20,7 +20,8 @@ flowchart TB
     Format["format.ts — shortenPath, runningSummary (pure)"]
     Hook["useControllerState(api) — subscribe, then getState"]
     Banners["Banners — Docker unavailable, pin-file errors"]
-    Row["ServiceRow — badge, name, dir, reason, Start / Stop / Open"]
+    Row["ServiceRow — badge, name, dir, reason, Start / Stop / Restart / Logs / Open"]
+    LogPanel["LogPanel — container picker, pre of lines, Reopen"]
     Running["RunningTab — containers and ports, refresh"]
     Css[/"styles/global.css — status to colour mapping"/]
     Tokens[/"styles/tokens.css — design tokens"/]
@@ -36,6 +37,8 @@ flowchart TB
   Hook --> Api
   Row -->|"start(id) / stop(id) / openUrl(id)"| Api
   Running -->|"listBackground()"| Api
+  Row -->|"Logs toggles"| LogPanel
+  LogPanel -->|"onLogsChanged, openLogs(id, container) / closeLogs()"| Api
   Row --> Css
   Css --> Tokens
 ```
@@ -54,7 +57,11 @@ flowchart TB
 │ ● happihub-docker-audit      ~/…/happihub          [Start]    │  red
 │ ● SonarQube                  ~/…/sonarqube-stack   (greyed)   │  grey
 │     project name also used by ~/…/dev-infra/sonarqube         │  ← reason line
-│ ● Blog                       ~/…/blog   [Stop] [Open ↗]       │  orange while starting
+│ ● Blog              ~/…/blog   [Stop] [Restart] [Logs] [Open ↗]│  orange while starting
+│   ┌ Logs — app-web-1 ▾ ──────────────────────────────────────┐ │  ← one panel at a time
+│   │ listening on :3000                                        │ │  ← text only, last 500 lines
+│   │ GET / 200                                                 │ │
+│   └───────────────────────────────────────────────────────────┘ │
 └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -85,4 +92,8 @@ flowchart TB
 - **Visual hierarchy** (PR #10): the one allowed Start is the filled button; disabled buttons stay
   in place (aligned columns, spec UC2) but quiet — borderless, muted, still `disabled`. Banners
   are a tinted block, no side stripe.
+- **LogPanel (UC7, diagram 14)**: subscribes with `onLogsChanged` before `openLogs`; one panel
+  open at a time (opening another closes the first); lines in a `<pre>` as text, scrolled to
+  the bottom unless the developer scrolled up; a picker when the service has several
+  containers; "Stream ended — Reopen" when the stream ends; `closeLogs` on close and unmount.
 - Text from Docker and the pin file is rendered as React text (escaped), never as HTML.
