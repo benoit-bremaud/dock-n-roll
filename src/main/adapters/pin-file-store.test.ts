@@ -1,9 +1,10 @@
+import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PinFileResult } from '../domain/types'
-import { openPinFileStore, parsePinFileText, type PinFileStore } from './pin-file-store'
+import { MAX_PIN_FILE_BYTES, openPinFileStore, parsePinFileText, type PinFileStore } from './pin-file-store'
 
 const VALID = 'services:\n  - workingDir: /srv/app\n    name: App\n'
 const VALID_ENTRY = { workingDir: '/srv/app', name: 'App', pinned: false, hidden: false }
@@ -138,7 +139,7 @@ describe('openPinFileStore — spec §9 Q1 (watched file)', () => {
   it('accepts a file of exactly the size cap', async () => {
     mkdirSync(dirname(path), { recursive: true })
     const text = `${VALID}#`
-    writeFileSync(path, text.padEnd(64 * 1024 - 1, 'x') + '\n')
+    writeFileSync(path, text.padEnd(MAX_PIN_FILE_BYTES - 1, 'x') + '\n')
 
     store = await openPinFileStore(path, (result) => seen.push(result))
 
@@ -150,11 +151,20 @@ describe('openPinFileStore — spec §9 Q1 (watched file)', () => {
     writeFileSync(path, VALID)
     await waitFor(() => store?.current().entries.length === 1)
 
-    writeFileSync(path, `${VALID}#${'x'.repeat(64 * 1024)}\n`)
+    writeFileSync(path, `${VALID}#${'x'.repeat(MAX_PIN_FILE_BYTES)}\n`)
 
     await waitFor(() => store?.current().errors.length === 1)
-    expect(store.current().errors[0]).toMatch(/too large/)
+    expect(store.current().errors[0]).toMatch(/too large \(65 KiB, max 64 KiB\)/)
     expect(store.current().entries).toEqual([VALID_ENTRY])
+  })
+
+  it('refuses a non-regular file at once instead of waiting for the read timeout', async () => {
+    mkdirSync(dirname(path), { recursive: true })
+    execFileSync('mkfifo', [path])
+
+    store = await openPinFileStore(path, (result) => seen.push(result))
+
+    expect(store.current()).toEqual({ entries: [], errors: ['services.yaml: not a regular file'] })
   })
 
   it('drops every pin when the file is deleted', async () => {

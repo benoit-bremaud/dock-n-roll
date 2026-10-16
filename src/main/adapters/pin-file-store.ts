@@ -13,7 +13,8 @@ const FS_TIMEOUT_MS = 5000
 /** A re-arm that failed (directory not creatable, mount hung) is tried again after this. */
 const REARM_RETRY_MS = 5000
 /** A hand-written pin list is a few KiB: anything far larger is a mistake, not pins. */
-const MAX_PIN_FILE_BYTES = 64 * 1024
+export const MAX_PIN_FILE_BYTES = 64 * 1024
+const KIB = 1024
 
 export interface PinFileStore {
   /** Latest pins, with the errors of the latest read. */
@@ -50,8 +51,13 @@ async function readPinFile(path: string): Promise<string | null> {
   try {
     // Checked before reading, so a huge file is refused unread (ADR-0005). Best effort: a file
     // growing between stat and read is not caught — acceptable for the user's own config.
-    const { size } = await withTimeout(stat(path), FS_TIMEOUT_MS, `stat ${path}`)
-    if (size > MAX_PIN_FILE_BYTES) throw new Error(`file too large (${String(size)} bytes, max ${String(MAX_PIN_FILE_BYTES)})`)
+    const stats = await withTimeout(stat(path), FS_TIMEOUT_MS, `stat ${path}`)
+    // A FIFO or device reports size 0 and would only fail at the read timeout.
+    if (!stats.isFile()) throw new Error('not a regular file')
+    if (stats.size > MAX_PIN_FILE_BYTES) {
+      // Rounded up, so a file just over the cap never reads as "64 KiB".
+      throw new Error(`file too large (${String(Math.ceil(stats.size / KIB))} KiB, max ${String(MAX_PIN_FILE_BYTES / KIB)} KiB)`)
+    }
     return await withTimeout(readFile(path, 'utf8'), FS_TIMEOUT_MS, `read ${path}`)
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return null

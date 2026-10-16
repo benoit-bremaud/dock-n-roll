@@ -17,7 +17,7 @@ const hang = (): Promise<never> => new Promise<never>(() => undefined)
 
 vi.mock('node:fs/promises', () => ({
   mkdir: () => (fsState.hangMkdir ? hang() : fsState.failMkdir ? Promise.reject(new Error('EACCES')) : Promise.resolve(undefined)),
-  stat: () => Promise.resolve({ ino: fsState.ino }),
+  stat: () => Promise.resolve({ ino: fsState.ino, size: 0, isFile: () => true }),
   readFile: () => (fsState.hangRead ? hang() : Promise.resolve(fsState.text))
 }))
 
