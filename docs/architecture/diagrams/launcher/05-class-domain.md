@@ -20,6 +20,7 @@ classDiagram
     +string image
     +ContainerState state
     +number|null exitCode
+    +boolean oomKilled
     +Health|null health
     +Record~string,string~ labels
     +PortBinding[] publishedPorts

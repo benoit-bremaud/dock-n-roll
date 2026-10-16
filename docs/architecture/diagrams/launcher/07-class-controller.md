@@ -41,6 +41,7 @@ classDiagram
     +getState() Promise~ControllerState~
     +start(id) Promise~void~
     +stop(id) Promise~void~
+    +restart(id) Promise~void~
     +openUrl(id) Promise~void~
     +listBackground() Promise~BackgroundView~
     +onStateChanged(callback) unsubscribe
@@ -55,10 +56,12 @@ classDiagram
     -filesOk Map~serviceId, boolean~
     -lastError Map~serviceId, string~
     -nameCache Map~workingDir, name~
+    -notifiedAt Map~serviceId, time~
     +state() ControllerState
     +containers() ContainerSnapshot[]
     +start(id) Promise~void~
     +stop(id) Promise~void~
+    +restart(id) Promise~void~
     +urlOf(id) string|null
     +onChange(listener) unsubscribe
     +dispose() void
@@ -70,6 +73,7 @@ classDiagram
     +resolveProjectName
     +filesExist
     +probeHealth
+    +notify
     +openPinFileStore
     +socketPath
     +pinFilePath
