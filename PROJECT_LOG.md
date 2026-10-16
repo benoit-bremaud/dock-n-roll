@@ -271,3 +271,7 @@ Chronological operational logbook. Complements `git log` with the human context.
 - **README**: install, uninstall, pin file, troubleshooting (AppIndicator, AppArmor sandbox,
   Docker socket / rootless `DOCKER_HOST`).
 - **Diagrams 07/09**: plan step numbers replaced with the real PRs (#7, #9, #10).
+- **PR #28 merged** (`e92370f`) — Codex P2 (README install path for the CI artifact) fixed;
+  Codex then hit its usage limit → owner MCDA C (475): review-local on the delta, then merge.
+  CI green incl. the new `package` job; #16 closed; Nice filed as #27. Tag + GitHub release
+  `v1.0.0`.
