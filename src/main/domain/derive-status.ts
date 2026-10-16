@@ -68,9 +68,14 @@ export function deriveStatus(inputs: StatusInputs): ServiceStatus {
 
 /**
  * Which buttons the status allows (spec §4 Start / Stop columns). Any pending operation
- * disables both: stopping during a pending start would race `stop` with `up` (spec UC2).
+ * disables all: stopping during a pending start would race `stop` with `up` (spec UC2).
  */
 export function allowedControls(status: ServiceStatus, inputs: StatusInputs): Controls {
+  const { start, stop } = startStop(status, inputs)
+  return { start, stop, restart: stop && status !== 'missing' }
+}
+
+function startStop(status: ServiceStatus, inputs: StatusInputs): Omit<Controls, 'restart'> {
   const idle = inputs.pending === null
   switch (status) {
     case 'invalid':

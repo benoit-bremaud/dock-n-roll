@@ -12,7 +12,7 @@ function asId(value: unknown): string | null {
 /**
  * Registers the handlers of the channels in `IPC` (class diagram 07), once, at startup. Calls
  * from any frame other than the dashboard page are ignored (`isTrusted`), and so are invalid
- * ids: a refusal is silent, never an error sent back. `start` / `stop` resolve once the
+ * ids: a refusal is silent, never an error sent back. `start` / `stop` / `restart` resolve once the
  * command ends; the outcome is only visible in the next pushed state.
  */
 export function registerIpc(
@@ -28,6 +28,10 @@ export function registerIpc(
   ipcMain.handle(IPC.stop, async (event, id: unknown) => {
     const valid = asId(id)
     if (isTrusted(event) && valid !== null) await controller.stop(valid)
+  })
+  ipcMain.handle(IPC.restart, async (event, id: unknown) => {
+    const valid = asId(id)
+    if (isTrusted(event) && valid !== null) await controller.restart(valid)
   })
   ipcMain.handle(IPC.openUrl, async (event, id: unknown) => {
     const valid = asId(id)

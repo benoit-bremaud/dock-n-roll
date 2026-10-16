@@ -118,6 +118,8 @@ export type ServiceStatus = 'invalid' | 'conflict' | 'missing' | 'stopping' | 's
 export interface Controls {
   readonly start: boolean
   readonly stop: boolean
+  /** UC6: a stop then an `up`, so never where `up` cannot run (`missing`). */
+  readonly restart: boolean
 }
 
 export interface ProcessRef {

@@ -240,7 +240,7 @@ describe('createServiceController — one way in, one way out (diagram 07)', () 
       displayName: 'Blog',
       workingDir: '/srv/blog',
       status: 'on',
-      controls: { start: false, stop: true },
+      controls: { start: false, stop: true, restart: true },
       hasUrl: true,
       reason: null
     })
@@ -368,6 +368,79 @@ describe('start / stop — spec UC1, UC2, ADR-0002', () => {
     // Same row, new id, still starting: Start stays disabled, no second `up` is possible.
     expect(controller.state().services[0]).toMatchObject({ id: BLOG, status: 'starting', controls: { start: false, stop: false } })
     await controller.start(BLOG)
+    expect(f.runs).toHaveLength(1)
+  })
+})
+
+describe('restart — UC6, diagram 12', () => {
+  it('stops, then ups the service under one pending entry: stopping, then starting, then on', async () => {
+    const { f, controller, row } = await controllerWith()
+    f.snapshot([web])
+    await settle()
+
+    const done = controller.restart(BLOG)
+    await settle()
+    expect(row(BLOG)?.status).toBe('stopping')
+    expect(f.runs.map((run) => run.args)).toEqual([['compose', '--project-name=blog', 'stop']])
+
+    f.snapshot([webStopped])
+    f.runs[0]?.finish()
+    await settle()
+    expect(row(BLOG)).toMatchObject({ status: 'starting', controls: { start: false, stop: false, restart: false } })
+    expect(f.runs[1]?.args).toEqual(['compose', '--project-name=blog', '--project-directory=/srv/blog', '--file=/srv/blog/compose.yaml', 'up', '-d', '--wait', '--wait-timeout=180'])
+    expect(f.runs[1]?.options).toMatchObject({ cwd: '/srv/blog', socketPath: SOCKET })
+
+    f.snapshot([web])
+    f.runs[1]?.finish()
+    await done
+    await settle()
+    expect(row(BLOG)?.status).toBe('on')
+  })
+
+  it('skips the `up` when the stop fails, and shows its stderr', async () => {
+    const { f, controller, row } = await controllerWith()
+    f.snapshot([web])
+    await settle()
+
+    const done = controller.restart(BLOG)
+    await settle()
+    f.runs[0]?.finish({ exitCode: 1, stderr: 'boom' })
+    await done
+    await settle()
+
+    expect(f.runs).toHaveLength(1)
+    expect(row(BLOG)).toMatchObject({ status: 'on', reason: 'boom' })
+  })
+
+  it('shows the stderr of a failed `up` after a successful stop', async () => {
+    const { f, controller, row } = await controllerWith()
+    f.snapshot([web])
+    await settle()
+
+    const done = controller.restart(BLOG)
+    await settle()
+    f.snapshot([webStopped])
+    f.runs[0]?.finish()
+    await settle()
+    f.runs[1]?.finish({ exitCode: 1, stderr: 'port is already allocated' })
+    await done
+    await settle()
+
+    expect(row(BLOG)).toMatchObject({ status: 'off', reason: 'port is already allocated' })
+  })
+
+  it('refuses a restart of a stopped service, and runs a single one on a double click', async () => {
+    const { f, controller } = await controllerWith()
+    f.snapshot([webStopped])
+    await settle()
+    await controller.restart(BLOG)
+    expect(f.runs).toEqual([])
+
+    f.snapshot([web])
+    await settle()
+    void controller.restart(BLOG)
+    void controller.restart(BLOG)
+    await settle()
     expect(f.runs).toHaveLength(1)
   })
 })
@@ -642,7 +715,7 @@ describe('review fixes — races and failures', () => {
     f.dockerDown('Docker event stream closed')
     await settle()
 
-    expect(controller.state().services[0]?.controls).toEqual({ start: false, stop: false })
+    expect(controller.state().services[0]?.controls).toEqual({ start: false, stop: false, restart: false })
     await controller.stop(BLOG)
     expect(f.runs).toEqual([])
   })
@@ -652,7 +725,7 @@ describe('review fixes — races and failures', () => {
       setup.setInitialPins([pin({ workingDir: '/srv/blog', pinned: true })])
     })
 
-    expect(controller.state().services[0]?.controls).toEqual({ start: false, stop: false })
+    expect(controller.state().services[0]?.controls).toEqual({ start: false, stop: false, restart: false })
   })
 
   it('refuses to start a never-started pin whose Compose name could not be resolved', async () => {

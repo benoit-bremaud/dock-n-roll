@@ -7,6 +7,7 @@ const api: DockNRollApi = {
   getState: () => ipcRenderer.invoke(IPC.getState) as Promise<ControllerState | null>,
   start: (id) => ipcRenderer.invoke(IPC.start, id) as Promise<void>,
   stop: (id) => ipcRenderer.invoke(IPC.stop, id) as Promise<void>,
+  restart: (id) => ipcRenderer.invoke(IPC.restart, id) as Promise<void>,
   openUrl: (id) => ipcRenderer.invoke(IPC.openUrl, id) as Promise<void>,
   listBackground: () => ipcRenderer.invoke(IPC.listBackground) as ReturnType<DockNRollApi['listBackground']>,
   onStateChanged: (callback) => {

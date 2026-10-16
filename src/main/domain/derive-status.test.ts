@@ -110,45 +110,53 @@ describe('deriveStatus — spec §4 precedence', () => {
 })
 
 describe('allowedControls — spec §4 Start / Stop columns', () => {
+  it('allows restart wherever stop is allowed, except on missing (the `up` needs the files)', () => {
+    expect(allowedControls('on', inputs()).restart).toBe(true)
+    expect(allowedControls('partial', inputs({ containers: [running, stopped] })).restart).toBe(true)
+    expect(allowedControls('off', inputs({ containers: [stopped] })).restart).toBe(false)
+    expect(allowedControls('missing', inputs({ filesExist: false })).restart).toBe(false)
+    expect(allowedControls('on', inputs({ pending: 'start' })).restart).toBe(false)
+  })
+
   it('allows only start when off', () => {
-    expect(allowedControls('off', inputs({ containers: [stopped] }))).toEqual({ start: true, stop: false })
+    expect(allowedControls('off', inputs({ containers: [stopped] }))).toEqual({ start: true, stop: false, restart: false })
   })
 
   it('allows only stop when on', () => {
-    expect(allowedControls('on', inputs({ containers: [running] }))).toEqual({ start: false, stop: true })
+    expect(allowedControls('on', inputs({ containers: [running] }))).toEqual({ start: false, stop: true, restart: true })
   })
 
   it('allows both when partial', () => {
-    expect(allowedControls('partial', inputs({ containers: [running, stopped] }))).toEqual({ start: true, stop: true })
+    expect(allowedControls('partial', inputs({ containers: [running, stopped] }))).toEqual({ start: true, stop: true, restart: true })
   })
 
   it('allows nothing on invalid', () => {
-    expect(allowedControls('invalid', inputs({ invalid: true }))).toEqual({ start: false, stop: false })
+    expect(allowedControls('invalid', inputs({ invalid: true }))).toEqual({ start: false, stop: false, restart: false })
   })
 
   it('allows nothing on conflict', () => {
-    expect(allowedControls('conflict', inputs({ conflict: true }))).toEqual({ start: false, stop: false })
+    expect(allowedControls('conflict', inputs({ conflict: true }))).toEqual({ start: false, stop: false, restart: false })
   })
 
   it('allows stop on missing only while containers still run', () => {
-    expect(allowedControls('missing', inputs({ filesExist: false, containers: [running, stopped] }))).toEqual({ start: false, stop: true })
-    expect(allowedControls('missing', inputs({ filesExist: false, containers: [stopped] }))).toEqual({ start: false, stop: false })
+    expect(allowedControls('missing', inputs({ filesExist: false, containers: [running, stopped] }))).toEqual({ start: false, stop: true, restart: false })
+    expect(allowedControls('missing', inputs({ filesExist: false, containers: [stopped] }))).toEqual({ start: false, stop: false, restart: false })
   })
 
   it('allows nothing on missing while an operation is pending', () => {
-    expect(allowedControls('missing', inputs({ filesExist: false, containers: [running], pending: 'start' }))).toEqual({ start: false, stop: false })
+    expect(allowedControls('missing', inputs({ filesExist: false, containers: [running], pending: 'start' }))).toEqual({ start: false, stop: false, restart: false })
   })
 
   it.each(['restarting', 'removing'] as const)('disables start on partial while a container is %s', (state) => {
-    expect(allowedControls('partial', inputs({ containers: [running, container({ id: 'x', state })] }))).toEqual({ start: false, stop: true })
+    expect(allowedControls('partial', inputs({ containers: [running, container({ id: 'x', state })] }))).toEqual({ start: false, stop: true, restart: true })
   })
 
   it('allows stop on a container-driven starting, not on a pending start', () => {
-    expect(allowedControls('starting', inputs({ containers: [booting] }))).toEqual({ start: false, stop: true })
-    expect(allowedControls('starting', inputs({ containers: [running], pending: 'start' }))).toEqual({ start: false, stop: false })
+    expect(allowedControls('starting', inputs({ containers: [booting] }))).toEqual({ start: false, stop: true, restart: true })
+    expect(allowedControls('starting', inputs({ containers: [running], pending: 'start' }))).toEqual({ start: false, stop: false, restart: false })
   })
 
   it('allows nothing while stopping', () => {
-    expect(allowedControls('stopping', inputs({ pending: 'stop' }))).toEqual({ start: false, stop: false })
+    expect(allowedControls('stopping', inputs({ pending: 'stop' }))).toEqual({ start: false, stop: false, restart: false })
   })
 })

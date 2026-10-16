@@ -14,6 +14,7 @@ export interface MenuEntry {
 export interface TrayActions {
   start(id: string): void
   stop(id: string): void
+  restart(id: string): void
   openUrl(id: string): void
   openDashboard(): void
   quit(): void
@@ -54,7 +55,8 @@ export function menuLabel(text: string): string {
 function serviceEntry(service: ServiceView, actions: TrayActions): MenuEntry {
   const submenu: MenuEntry[] = [
     { label: 'Start', enabled: service.controls.start, click: () => { actions.start(service.id) } },
-    { label: 'Stop', enabled: service.controls.stop, click: () => { actions.stop(service.id) } }
+    { label: 'Stop', enabled: service.controls.stop, click: () => { actions.stop(service.id) } },
+    { label: 'Restart', enabled: service.controls.restart, click: () => { actions.restart(service.id) } }
   ]
   if (service.hasUrl) submenu.push({ label: 'Open in browser', enabled: true, click: () => { actions.openUrl(service.id) } })
   if (service.reason !== null) submenu.push({ label: menuLabel(service.reason), enabled: false })

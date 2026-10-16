@@ -10,7 +10,7 @@ function view(overrides: Partial<ServiceView> = {}): ServiceView {
     displayName: 'Blog',
     workingDir: '/srv/blog',
     status: 'off',
-    controls: { start: true, stop: false },
+    controls: { start: true, stop: false, restart: false },
     hasUrl: false,
     reason: null,
     ...overrides
@@ -27,6 +27,7 @@ function recordingActions(): TrayActions & { calls: string[] } {
     calls,
     start: (id) => calls.push(`start ${id}`),
     stop: (id) => calls.push(`stop ${id}`),
+    restart: (id) => calls.push(`restart ${id}`),
     openUrl: (id) => calls.push(`open ${id}`),
     openDashboard: () => calls.push('dashboard'),
     quit: () => calls.push('quit'),
@@ -45,20 +46,22 @@ describe('buildTrayMenu — every action reachable from the menu (spec R5)', () 
 
   it('offers only the controls the derived status allows, and the URL when there is one', () => {
     const actions = recordingActions()
-    const [entry] = buildTrayMenu(state({ services: [view({ status: 'on', controls: { start: false, stop: true }, hasUrl: true })] }), actions)
+    const [entry] = buildTrayMenu(state({ services: [view({ status: 'on', controls: { start: false, stop: true, restart: true }, hasUrl: true })] }), actions)
 
     expect(entry?.submenu?.map((item) => [item.label, item.enabled])).toEqual([
       ['Start', false],
       ['Stop', true],
+      ['Restart', true],
       ['Open in browser', true]
     ])
     entry?.submenu?.[1]?.click?.()
     entry?.submenu?.[2]?.click?.()
-    expect(actions.calls).toEqual(['stop /srv/blog\0blog', 'open /srv/blog\0blog'])
+    entry?.submenu?.[3]?.click?.()
+    expect(actions.calls).toEqual(['stop /srv/blog\0blog', 'restart /srv/blog\0blog', 'open /srv/blog\0blog'])
   })
 
   it('shows the reason of a greyed row as a disabled line', () => {
-    const [entry] = buildTrayMenu(state({ services: [view({ status: 'conflict', controls: { start: false, stop: false }, reason: 'project name also used by /x' })] }), recordingActions())
+    const [entry] = buildTrayMenu(state({ services: [view({ status: 'conflict', controls: { start: false, stop: false, restart: false }, reason: 'project name also used by /x' })] }), recordingActions())
 
     expect(entry?.label).toBe('⚪ Blog')
     expect(entry?.submenu?.at(-1)).toEqual({ label: 'project name also used by /x', enabled: false })

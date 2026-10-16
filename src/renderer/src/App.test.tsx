@@ -10,7 +10,7 @@ function view(overrides: Partial<ServiceView> = {}): ServiceView {
     displayName: 'Blog',
     workingDir: '/srv/blog',
     status: 'off',
-    controls: { start: true, stop: false },
+    controls: { start: true, stop: false, restart: false },
     hasUrl: false,
     reason: null,
     ...overrides
@@ -38,6 +38,10 @@ function fakeApi(initial: ControllerState, backgrounds: (BackgroundView | Error)
     },
     stop: (id) => {
       calls.push(`stop ${id}`)
+      return Promise.resolve()
+    },
+    restart: (id) => {
+      calls.push(`restart ${id}`)
       return Promise.resolve()
     },
     openUrl: (id) => {
@@ -149,27 +153,29 @@ describe('App — services tab (spec §4, UC1–UC3, UC5)', () => {
   })
 
   it('offers Start only when allowed, and sends the id', async () => {
-    const fake = fakeApi(state({ services: [view({ controls: { start: true, stop: false } })] }))
+    const fake = fakeApi(state({ services: [view({ controls: { start: true, stop: false, restart: false } })] }))
     render(<App api={fake.api} />)
     await rowOf('Blog')
 
     expect(button('Stop Blog').disabled).toBe(true)
+    expect(button('Restart Blog').disabled).toBe(true)
     await userEvent.setup().click(button('Start Blog'))
 
     expect(fake.calls).toContain('start blog-id')
   })
 
   it('offers Stop and Open only when allowed, and sends the id', async () => {
-    const fake = fakeApi(state({ services: [view({ status: 'on', controls: { start: false, stop: true }, hasUrl: true })] }))
+    const fake = fakeApi(state({ services: [view({ status: 'on', controls: { start: false, stop: true, restart: true }, hasUrl: true })] }))
     render(<App api={fake.api} />)
     const user = userEvent.setup()
     await rowOf('Blog')
 
     expect(button('Start Blog').disabled).toBe(true)
     await user.click(button('Stop Blog'))
+    await user.click(button('Restart Blog'))
     await user.click(button('Open Blog in the browser'))
 
-    expect(fake.calls).toEqual(expect.arrayContaining(['stop blog-id', 'open blog-id']))
+    expect(fake.calls).toEqual(expect.arrayContaining(['stop blog-id', 'restart blog-id', 'open blog-id']))
   })
 
   it('has no Open button when the pin has no URL', async () => {
@@ -180,14 +186,14 @@ describe('App — services tab (spec §4, UC1–UC3, UC5)', () => {
   })
 
   it('shows the reason of a greyed row, with both controls disabled', async () => {
-    render(<App api={fakeApi(state({ services: [view({ status: 'conflict', controls: { start: false, stop: false }, reason: 'project name also used by /x' })] })).api} />)
+    render(<App api={fakeApi(state({ services: [view({ status: 'conflict', controls: { start: false, stop: false, restart: false }, reason: 'project name also used by /x' })] })).api} />)
 
     expect(within(await rowOf('Blog')).getByText('project name also used by /x')).toBeTruthy()
-    expect([button('Start Blog').disabled, button('Stop Blog').disabled]).toEqual([true, true])
+    expect([button('Start Blog').disabled, button('Stop Blog').disabled, button('Restart Blog').disabled]).toEqual([true, true, true])
   })
 
   it('greys rows without badge or status while Docker is unavailable (spec §4)', async () => {
-    render(<App api={fakeApi(state({ dockerAvailable: false, services: [view({ status: 'on', controls: { start: false, stop: false } })] })).api} />)
+    render(<App api={fakeApi(state({ dockerAvailable: false, services: [view({ status: 'on', controls: { start: false, stop: false, restart: false } })] })).api} />)
 
     const row = await rowOf('Blog')
     expect(row.querySelector('[data-status]')).toBeNull()
