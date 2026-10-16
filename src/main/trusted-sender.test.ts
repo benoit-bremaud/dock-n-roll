@@ -32,11 +32,12 @@ describe('isTrustedSender', () => {
     expect(isTrustedSender(event({ senderFrame: { parent: top, url: PAGE_URL } }), dashboard, packaged)).toBe(false)
   })
 
-  it('refuses any other URL, including one that only starts like the page', () => {
-    for (const url of [`${PAGE_URL}.evil.html`, 'app://dashboard/other.html', 'file:///tmp/index.html', 'https://example.com/']) {
+  it.each([`${PAGE_URL}.evil.html`, 'app://dashboard/other.html', 'file:///tmp/index.html', 'https://example.com/'])(
+    'refuses %s, even one that only starts like the page',
+    (url) => {
       expect(isTrustedSender(event({ senderFrame: { parent: null, url } }), dashboard, packaged)).toBe(false)
     }
-  })
+  )
 
   it('accepts any page of the dev server in development, and nothing else', () => {
     const dev = { kind: 'devServer', url: 'http://localhost:5173' } as const

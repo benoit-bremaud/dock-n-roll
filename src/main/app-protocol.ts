@@ -57,8 +57,11 @@ export function createAppProtocolHandler(rootDir: string, readFile: ReadFile): (
     if (file === null) return new Response(null, { status: 404 })
     try {
       const bytes = await readFile(file)
-      return new Response(bytes, { status: 200, headers: { 'content-type': mimeTypeOf(file) } })
-    } catch {
+      return new Response(bytes, { status: 200, headers: { 'content-type': mimeTypeOf(file), 'x-content-type-options': 'nosniff' } })
+    } catch (error: unknown) {
+      // A missing file is a plain 404; anything else (permissions, broken asar) is logged.
+      const code = (error as { code?: unknown } | null)?.code
+      if (code !== 'ENOENT' && code !== 'EISDIR') console.error('dock-n-roll: cannot serve', file, error)
       return new Response(null, { status: 404 })
     }
   }

@@ -29,4 +29,4 @@ Owner MCDA, 2026-10-16: **`fs.readFile` + MIME table (485/500)** over `net.fetch
 
 - Good: `grantFileProtocolExtraPrivileges` off; one origin `app://dashboard`, matched exactly
   by the trusted-sender check; path traversal refused before any read.
-- Bad: ~40 lines of handler and a MIME table to extend if the renderer gains a new asset type.
+- Bad: a handler module of our own and a MIME table to extend if the renderer gains a new asset type.

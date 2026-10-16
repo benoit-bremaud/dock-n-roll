@@ -27,7 +27,7 @@ const RENDERER_DIR = join(__dirname, '../renderer')
 const DEV_SERVER_URL = !app.isPackaged ? process.env['ELECTRON_RENDERER_URL'] : undefined
 
 const DASHBOARD_ORIGIN: DashboardOrigin =
-  DEV_SERVER_URL !== undefined ? { kind: 'devServer', url: DEV_SERVER_URL } : { kind: 'app', url: APP_PAGE_URL }
+  DEV_SERVER_URL === undefined ? { kind: 'app', url: APP_PAGE_URL } : { kind: 'devServer', url: DEV_SERVER_URL }
 
 // The bundled page is served from app:// (ADR-0009, diagram 15), so the file: protocol needs no
 // extra privileges (fuse off). Must run before ready.
@@ -232,7 +232,7 @@ if (!app.requestSingleInstanceLock()) {
       callback(false)
     })
     session.defaultSession.setPermissionCheckHandler(() => false)
-    protocol.handle(APP_SCHEME, createAppProtocolHandler(RENDERER_DIR, readFile))
+    if (DASHBOARD_ORIGIN.kind === 'app') protocol.handle(APP_SCHEME, createAppProtocolHandler(RENDERER_DIR, readFile))
     // A hidden default menu still opens with Alt (Reload, Toggle DevTools): remove it in builds.
     if (app.isPackaged) {
       Menu.setApplicationMenu(null)

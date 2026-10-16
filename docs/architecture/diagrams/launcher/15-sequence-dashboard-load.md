@@ -30,7 +30,7 @@ sequenceDiagram
     W->>P: GET app://dashboard/<path>
     P->>H: handler(request)
     H->>H: resolveRendererFile(url, rendererDir)
-    alt other host, "..", encoded separator, NUL, or outside rendererDir
+    alt other host, ".." after decoding, leftover %, backslash, NUL, or outside rendererDir
       H-->>W: 404
     else
       H->>FS: readFile(path)
@@ -50,9 +50,11 @@ sequenceDiagram
 
 - **Origin**: `app` is registered `standard` and `secure`, so `app://dashboard` is a real
   origin; the page CSP `default-src 'self'` covers its own assets unchanged.
-- **Confinement**: the path is percent-decoded once, rejected if it holds `..`, `\`, `%2f`,
-  `%5c` or NUL, then joined and normalised; it must stay under `rendererDir`. `/` serves
-  `index.html`. Only the host `dashboard` is accepted.
+- **Confinement**: the URL parser already collapses literal and `%2e` dot segments; the path is
+  then decoded once and refused if it holds a leftover `%` (double encoding), `\`, NUL, or an
+  empty, `.` or `..` segment; the normalised result must stay under `rendererDir`. `/` serves
+  `index.html`. Only the host `dashboard` (no port) is accepted.
+- **Errors**: a missing file is a 404; any other read error is logged, then a 404.
 - **MIME**: a closed table (`html`, `js`, `css`, `svg`, `png`, `ico`, `woff2`, `json`);
   any other extension is `application/octet-stream`.
 - **Fuse**: with the custom scheme in place, `grantFileProtocolExtraPrivileges` is off in

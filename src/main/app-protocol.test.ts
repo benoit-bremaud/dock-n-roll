@@ -29,6 +29,7 @@ describe('resolveRendererFile', () => {
     'app://dashboard/%252e%252e/etc',
     'app://dashboard//etc/passwd',
     'app://other/index.html',
+    'app://dashboard:80/index.html',
     'file:///etc/passwd',
     'http://dashboard/index.html',
     'not a url'
@@ -59,6 +60,7 @@ describe('createAppProtocolHandler', () => {
     expect(readFile).toHaveBeenCalledWith(join(ROOT, 'index.html'))
     expect(response.status).toBe(200)
     expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8')
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff')
     expect(await response.text()).toBe('<html></html>')
   })
 
@@ -73,5 +75,14 @@ describe('createAppProtocolHandler', () => {
     const readFile = vi.fn().mockRejectedValue(Object.assign(new Error('nope'), { code: 'ENOENT' }))
     const response = await createAppProtocolHandler(ROOT, readFile)(new Request('app://dashboard/missing.js'))
     expect(response.status).toBe(404)
+  })
+
+  it('answers 404 and logs an unexpected read error', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const readFile = vi.fn().mockRejectedValue(Object.assign(new Error('denied'), { code: 'EACCES' }))
+    const response = await createAppProtocolHandler(ROOT, readFile)(new Request(APP_PAGE_URL))
+    expect(response.status).toBe(404)
+    expect(log).toHaveBeenCalledOnce()
+    log.mockRestore()
   })
 })
