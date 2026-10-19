@@ -22,10 +22,14 @@ files:
 extraResources:
   - from: resources/tray-icon.png
     to: tray-icon.png
+  - from: resources/icons/256x256.png
+    to: app-icon.png
 linux:
   target: deb
   executableName: dock-n-roll
   category: Development
+  # Launcher icon (#47), exported from resources/icon.svg; installed under hicolor/<N>x<N>/apps.
+  icon: resources/icons/
   # A Debian Maintainer needs an email (lintian); the GitHub noreply address keeps it private.
   maintainer: Benoît Bremaud <130740257+benoit-bremaud@users.noreply.github.com>
   synopsis: Start and stop local Docker Compose projects from the GNOME top bar
