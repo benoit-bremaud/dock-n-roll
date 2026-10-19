@@ -18,6 +18,10 @@ file format (`services.yaml`) and the installed package.
 
 ### Changed
 
+- Start at login: the entry is written atomically with its mode always set; an unreadable entry
+  hides the checkbox instead of showing it as off (#13).
+- Package: Debian maintainer with an email (no lintian warning), `desktopName` set, README
+  warning on where to get the `.deb` (#13, #27).
 - Docker events are published once per burst (at least every 50 events) instead of once per event:
   a `compose up` no longer rebuilds the tray menu dozens of times. A container that stops or crashes
   is still published at once (#12).

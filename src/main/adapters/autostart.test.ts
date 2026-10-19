@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -64,13 +64,15 @@ describe('setAutostart / isAutostartEnabled', () => {
     expect(await isAutostartEnabled(file)).toBe(true)
   })
 
-  it('replaces an existing entry', async () => {
+  it('replaces an existing entry atomically, with the mode fixed and no temporary file left', async () => {
     mkdirSync(join(home, '.config', 'autostart'), { recursive: true })
-    writeFileSync(file, 'stale')
+    writeFileSync(file, 'stale', { mode: 0o600 })
 
     await setAutostart(file, true, '/opt/dock-n-roll/dock-n-roll')
 
     expect(readFileSync(file, 'utf8')).toBe(autostartEntry('/opt/dock-n-roll/dock-n-roll'))
+    expect(statSync(file).mode & 0o777).toBe(0o644)
+    expect(readdirSync(join(home, '.config', 'autostart'))).toEqual(['dock-n-roll.desktop'])
   })
 
   it('removes the entry', async () => {
@@ -88,6 +90,32 @@ describe('setAutostart / isAutostartEnabled', () => {
 
   it('is off when the path is a directory, not an entry', async () => {
     mkdirSync(file, { recursive: true })
+
+    expect(await isAutostartEnabled(file)).toBe(false)
+  })
+
+  // Root ignores permissions: the EACCES case is only meaningful for a normal user.
+  it.skipIf(process.getuid?.() === 0)('reports an unreadable autostart directory instead of reading it as off', async () => {
+    const directory = join(home, '.config', 'autostart')
+    mkdirSync(directory, { recursive: true })
+    chmodSync(directory, 0o000)
+
+    try {
+      await expect(isAutostartEnabled(file)).rejects.toThrow(/EACCES/)
+    } finally {
+      chmodSync(directory, 0o755)
+    }
+  })
+
+  it('leaves no temporary file when the entry cannot be replaced', async () => {
+    mkdirSync(join(file, 'blocker'), { recursive: true })
+
+    await expect(setAutostart(file, true, '/opt/dock-n-roll/dock-n-roll')).rejects.toThrow()
+    expect(readdirSync(join(home, '.config', 'autostart'))).toEqual(['dock-n-roll.desktop'])
+  })
+
+  it('is off when a parent of the entry is a file', async () => {
+    writeFileSync(join(home, '.config'), 'not a directory')
 
     expect(await isAutostartEnabled(file)).toBe(false)
   })
