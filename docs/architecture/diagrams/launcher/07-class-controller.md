@@ -78,7 +78,7 @@ classDiagram
     -resolvedNames ResolvedNames
     -pending Pending[]
     -gates Map~serviceId, HealthGate~
-    -filesOk Map~serviceId, boolean~
+    -missingPaths Map~serviceId, MissingPath|null~
     -lastError Map~serviceId, string~
     -nameCache Map~workingDir, name~
     -notifiedAt Map~serviceId, time~

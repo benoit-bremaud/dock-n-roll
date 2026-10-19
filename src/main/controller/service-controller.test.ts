@@ -24,6 +24,8 @@ function fakes() {
   const resolved = new Map<string, string>()
   const resolveCalls: string[] = []
   const missing = new Set<string>()
+  /** Working dir → its config file that is gone. */
+  const missingFiles = new Map<string, string>()
   const healthy = new Set<string>()
   const scheduled: (() => void)[] = []
   const delays: number[] = []
@@ -88,7 +90,8 @@ function fakes() {
     },
     findMissingPath: (dir) => {
       counters.filesChecks += 1
-      const found = missing.has(dir) ? { kind: 'folder' as const, path: dir } : null
+      const file = missingFiles.get(dir)
+      const found = missing.has(dir) ? { kind: 'folder' as const, path: dir } : file === undefined ? null : { kind: 'compose file' as const, path: file }
       if (!holdFiles) return Promise.resolve(found)
       return new Promise((resolve) => {
         heldFiles.push({
@@ -128,6 +131,7 @@ function fakes() {
     resolved,
     resolveCalls,
     missing,
+    missingFiles,
     healthy,
     scheduled,
     delays,
@@ -1088,6 +1092,16 @@ describe('review fixes — state publication', () => {
     await settle()
     expect(seen).toBe(1)
     errors.mockRestore()
+  })
+
+  it('names the compose file that is gone', async () => {
+    const { f, controller } = await controllerWith((setup) => {
+      setup.missingFiles.set('/srv/blog', '/srv/blog/compose.yaml')
+    })
+    f.snapshot([web])
+    await settle()
+
+    expect(controller.state().services[0]).toMatchObject({ status: 'missing', reason: 'compose file /srv/blog/compose.yaml is missing' })
   })
 
   it('keeps the last state when a probe fails, and recomputes on the next input', async () => {

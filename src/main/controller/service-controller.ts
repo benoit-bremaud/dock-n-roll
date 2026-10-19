@@ -132,6 +132,8 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   let pending: Pending[] = []
   /** `null` when every file is there; no entry before the first check. */
   const missingPaths = new Map<string, MissingPath | null>()
+  /** Status, reason and `canUp` all read this one map, so they cannot disagree. */
+  const isMissing = (id: string): boolean => (missingPaths.get(id) ?? null) !== null
   const gates = new Map<string, HealthGate>()
   const probing = new Map<string, () => void>()
   const lastError = new Map<string, string>()
@@ -156,7 +158,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     return {
       containers: service.containers,
       pending: pendingFor(pending, service),
-      filesExist: (missingPaths.get(service.id) ?? null) === null,
+      filesExist: !isMissing(service.id),
       conflict: service.conflictingDirs.length > 0,
       invalid: service.invalidReason !== null,
       healthGate: gate
@@ -350,7 +352,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   }
 
   /** Read through a call: both inputs can change during an await, which narrowing cannot see. */
-  const canUp = (service: Service): boolean => !isDisposed() && dockerAvailable && (missingPaths.get(service.id) ?? null) === null
+  const canUp = (service: Service): boolean => !isDisposed() && dockerAvailable && !isMissing(service.id)
 
   /** The service a request may act on, under the name its command runs with; `null` when refused. */
   const claim = (id: string, request: keyof Controls): { service: Service; name: string } | null => {

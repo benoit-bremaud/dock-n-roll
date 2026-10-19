@@ -261,12 +261,12 @@ describe('observeDocker — sequence diagram 06', () => {
   it('publishes once per burst of events instead of once per event', async () => {
     start()
     await waitFor(() => snapshots.length === 1)
-    // A slow inspect lets the whole burst queue up behind the first event.
-    daemon.inspectDelayMs = 50
+    const db = daemon.containers.get('db')
+    if (db !== undefined) db.status = 'running'
 
-    for (let i = 0; i < 5; i += 1) daemon.emit('start', i % 2 === 0 ? 'web' : 'db')
+    daemon.emitBurst([['create', 'web'], ['start', 'web'], ['create', 'db'], ['start', 'db'], ['health_status', 'web']])
 
-    await waitFor(() => daemon.answered.filter((path) => path.endsWith('/json') && !path.includes('containers/json')).length >= 2 + 5)
+    await waitFor(() => stateOf('db') === 'running')
     await quietFor(100)
     expect(snapshots).toHaveLength(2)
   })
@@ -274,11 +274,12 @@ describe('observeDocker — sequence diagram 06', () => {
   it('still publishes during a long burst, at least every maxBatch events', async () => {
     start({ maxBatch: 3 })
     await waitFor(() => snapshots.length === 1)
-    daemon.inspectDelayMs = 50
+    const db = daemon.containers.get('db')
+    if (db !== undefined) db.status = 'running'
 
-    for (let i = 0; i < 6; i += 1) daemon.emit('start', 'web')
+    daemon.emitBurst([['start', 'web'], ['start', 'web'], ['start', 'web'], ['start', 'web'], ['start', 'web'], ['start', 'db']])
 
-    await waitFor(() => daemon.answered.filter((path) => path.endsWith('/web/json')).length >= 1 + 6)
+    await waitFor(() => stateOf('db') === 'running')
     await quietFor(100)
     expect(snapshots).toHaveLength(3)
   })
