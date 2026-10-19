@@ -381,3 +381,18 @@ Sensitivity: C and A stay top two and G last under value 45 or effort 35; E pass
   Sonar OK (new coverage 97.4 %, 0 bugs or vulnerabilities, 29 legacy smells → #30), E2E smoke 8/8,
   CI green. Merged as `b36df79`.
 - Next: PR 3, packaging and autostart polish (#13 #27).
+
+## 2026-10-19 — Brick A+F, PR 3: packaging and autostart polish (PR #48), brick closed
+
+- The autostart entry is written to a temporary file, set to mode 0644, then renamed into place. A
+  stale or planted `.tmp` is removed first and never followed. An unreadable entry hides the
+  "Start at login" checkbox instead of showing it as off (ADR-0006, diagram 11).
+- The Debian maintainer field now carries the owner's GitHub noreply email (owner MCDA 420), which
+  removes the lintian warning. `desktopName` is set, and the README warns about where to get the
+  `.deb`. The app icon is deferred to #47 (owner MCDA 415, to do with #14).
+- Gate: the local review found 0 Must; the Should items were applied. 545 tests, Sonar OK (new
+  coverage 97.5 %), E2E smoke 8/8, CI green, and Codex completed with no findings. Merged `36e6a37`.
+  #13 and #27 are closed.
+- **Brick A+F done**: #40, #45 and #48 close #12, #13, #20, #21, #23 and #27. New backlog: #41 (stop
+  all), #43, #44 and #47.
+- Next: brick D, major upgrades (TS7 / Vite 8 / electron-vite 6 / @types/node 26).
