@@ -366,3 +366,18 @@ Sensitivity: C and A stay top two and G last under value 45 or effort 35; E pass
   Codex is out of quota and Copilot returned 422. Merged as `74cf1ab`.
 - Backlog: #41 "Stop all", an owner request, to be modelled in UML first.
 - Next: PR 2, adapter robustness (#12).
+
+## 2026-10-19 — Brick A+F, PR 2: adapter robustness (PR #45)
+
+- The Docker observer publishes once per drained burst of events, and at least every 50. A container
+  leaving `running` still publishes at once. Codex P1 on #45: a `die` then `start` in one burst hid the
+  crash from notifications and health gates.
+- `findMissingPath` replaces `filesExist`. The reason names the missing folder or compose file.
+- #12 is closed. Items 2 and 5 were already done (`composeEnv`, #17). Item 1, absolute paths for
+  `docker` and `ss`, is won't do (owner MCDA 410): `PATH` is the user's own, and a fixed path breaks
+  snap and rootless installs.
+- Gate: local review applied 1 Must (flaky burst tests, made deterministic with `emitBurst`) and
+  5 Should. The Nice items are filed as #43 (time-based flush) and #44 (truncate paths). 541 tests,
+  Sonar OK (new coverage 97.4 %, 0 bugs or vulnerabilities, 29 legacy smells → #30), E2E smoke 8/8,
+  CI green. Merged as `b36df79`.
+- Next: PR 3, packaging and autostart polish (#13 #27).
