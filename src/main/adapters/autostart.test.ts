@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -107,11 +107,25 @@ describe('setAutostart / isAutostartEnabled', () => {
     }
   })
 
-  it('leaves no temporary file when the entry cannot be replaced', async () => {
+  it('leaves no temporary file when the rename over the entry fails', async () => {
     mkdirSync(join(file, 'blocker'), { recursive: true })
 
     await expect(setAutostart(file, true, '/opt/dock-n-roll/dock-n-roll')).rejects.toThrow()
     expect(readdirSync(join(home, '.config', 'autostart'))).toEqual(['dock-n-roll.desktop'])
+  })
+
+  it('replaces a temporary file left by a crash, even a symlink, without following it', async () => {
+    const directory = join(home, '.config', 'autostart')
+    const target = join(home, 'target')
+    mkdirSync(directory, { recursive: true })
+    writeFileSync(target, 'untouched', { mode: 0o600 })
+    symlinkSync(target, `${file}.tmp`)
+
+    await setAutostart(file, true, '/opt/dock-n-roll/dock-n-roll')
+
+    expect(readFileSync(target, 'utf8')).toBe('untouched')
+    expect(statSync(target).mode & 0o777).toBe(0o600)
+    expect(readdirSync(directory)).toEqual(['dock-n-roll.desktop'])
   })
 
   it('is off when a parent of the entry is a file', async () => {

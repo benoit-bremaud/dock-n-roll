@@ -45,6 +45,8 @@ present, `~/.config/autostart` exists.
   `chrome-sandbox` 0755, profile loaded, renderer sandboxed); standard install and removal; no
   repository needed at runtime.
 - Limitation: "Start at login" reads only whether our entry exists; an entry disabled by another
-  tool (`Hidden=true`) still shows as on.
+  tool (`Hidden=true`) still shows as on. An entry that cannot be read (EACCES…) is never shown as
+  off: the checkbox is not offered. The entry is written aside then renamed, so GNOME never reads
+  half of it.
 - Bad: installing needs `sudo apt install ./dock-n-roll_<version>_amd64.deb`; updates are a new
   `.deb` (no auto-update — YAGNI for a personal tool).

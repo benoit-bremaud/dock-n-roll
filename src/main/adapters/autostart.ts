@@ -55,14 +55,16 @@ export async function setAutostart(entryPath: string, enabled: boolean, executab
   if (enabled) {
     await mkdir(dirname(entryPath), { recursive: true })
     // Written aside then renamed: GNOME never reads half an entry, and the mode is applied even
-    // when the entry already exists (`writeFile` only sets it on creation).
+    // when the entry already exists (`writeFile` only sets it on creation). GNOME ignores the
+    // temporary file (no `.desktop` suffix); one left by a crash is replaced, never followed.
     const temporary = `${entryPath}.tmp`
+    await rm(temporary, { force: true, recursive: true })
     try {
-      await writeFile(temporary, autostartEntry(executablePath))
+      await writeFile(temporary, autostartEntry(executablePath), { flag: 'wx' })
       await chmod(temporary, 0o644)
       await rename(temporary, entryPath)
     } catch (error) {
-      await rm(temporary, { force: true })
+      await rm(temporary, { force: true, recursive: true })
       throw error
     }
   } else {

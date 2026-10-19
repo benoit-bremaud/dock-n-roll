@@ -27,8 +27,8 @@ extracted archive, so run `sudo apt install ./dock-n-roll_*_amd64.deb` from that
 
 > [!WARNING]
 > Install only a `.deb` you built yourself or downloaded from a CI run of this repository. The
-> package runs as root during installation (it installs an AppArmor profile) and the app starts at
-> every login.
+> package runs as root during installation (it installs an AppArmor profile), and once **Start at
+> login** is ticked the app runs at every login.
 
 Launch **dock-n-roll** from the app grid (press the Super key and type its name). The icon shows
 up in the top bar; its menu lists one entry per project (🟢 ON, 🔴 OFF, 🟠 starting, stopping or
