@@ -1,37 +1,39 @@
-# Local review — dock-n-roll (fix/pin-file-checks)
+# Local review — dock-n-roll (fix/adapters-robustness)
 
-- Date: 2026-10-16
-- Commit: 066509e (review run on 8b9ba04; findings applied in 73ff290 and 066509e)
-- Scope: branch diff origin/main...HEAD (pin-file-store.ts, its two test files, CHANGELOG.md)
+- Date: 2026-10-19
+- Commit: review run on 8b185a0; findings applied in the next commit
+- Scope: branch diff origin/main...HEAD (docker-observer, file-probe, service-controller, MissingPath type, diagrams 05–08, CHANGELOG)
 - Checks run: design · docs · tests · security · correctness
-- Verdict: ship. Must 0 · Should 4 (applied) · Nice 4 (3 applied, 1 Disagree)
+- Verdict: ship. Must 1 (applied) · Should 5 (applied) · Nice 5 (2 applied, 2 filed, 1 Disagree)
 
-## Pre-merge gate (head SHA 066509e)
+## Pre-merge gate (head SHA after the fixes)
 | Step | Result |
 |---|---|
-| 1 Tests | ✅ 537 unit/integration · ✅ 8/8 E2E smoke (`pnpm e2e:smoke` on the packaged app) |
-| 2 Coverage | tests 96.9 % stmts / 91.4 % branches / 97.6 % funcs / 98.3 % lines (floor 80; runner gate 90/85/90/90) · docs: new export documented |
-| 3 SonarQube | ✅ PASSED (new coverage 97.2 %, 0 new violations, 0 % duplication) |
+| 1 Tests | ✅ 540 unit/integration (burst tests 3/3 stable) · ✅ 8/8 E2E smoke on the packaged app |
+| 2 Coverage | tests 97.1 % stmts / 92.0 % branches / 97.6 % funcs / 98.4 % lines (floor 80; runner gate 90/85/90/90) · docs: new type and function documented |
+| 3 SonarQube | ✅ PASSED (new coverage 97.6 %, 0 new violations, 0 % duplication) |
 | 4 Secrets | ✅ gitleaks clean (origin/main..HEAD) · no tracked .env · diff read: nothing sensitive |
-| 5 QA pass | ✅ E2E smoke on the packaged binary (ADR-0010): dashboard loads, console and CSP clean, app:// containment holds |
+| 5 QA pass | ✅ E2E smoke on the packaged binary (ADR-0010) |
 - Gate: **GREEN — merge authorised** once CI is green
 
 ## 🔴 Must Have
-_None._
+- `src/main/adapters/docker-observer.test.ts` `[tests]` · The burst tests relied on a 50 ms inspect delay, so a slow runner could publish twice and go red · **Applied**: `FakeDockerDaemon.emitBurst` sends the burst in one write. The observer queues every event in one data callback, so the test no longer depends on timing.
 
 ## 🟡 Should Have
-- `src/main/adapters/pin-file-store.ts:60` `[security|correctness]` · A stat/read race let a file swapped for a FIFO or grown past the cap through, and a hung FIFO read pinned a libuv thread · **Applied**: open with `O_NONBLOCK`, then stat and read at most cap + 1 bytes from the same handle.
-- `src/main/adapters/pin-file-store.test.ts` `[tests]` · No test showed that a FIFO replacing a valid file keeps the last pins · **Applied**.
-- `src/main/adapters/pin-file-store.test.ts` `[tests|security|design]` · `mkfifo` is POSIX only · **Applied**: `it.skipIf(process.platform === 'win32')`.
-- `CHANGELOG.md:9` `[docs]` · The error text a user can see changed · **Applied**: a Fixed entry under Unreleased.
+- `docker-observer.test.ts` `[tests]` · Only the number of snapshots was checked · **Applied**: the test waits for the final state (`db` running).
+- `docker-observer.test.ts` `[tests]` · The expected count `2 + 5` was a magic number · **Applied**: removed by the rewrite.
+- `service-controller.test.ts` `[tests]` · The compose-file reason was never tested through the controller · **Applied**: `missingFiles` fixture plus a test.
+- `docs/architecture/diagrams/launcher/07-class-controller.md:81` `[docs]` · The diagram still showed `filesOk` · **Applied**: now `missingPaths`.
+- `docs/architecture/diagrams/launcher/05-class-domain.md` `[docs]` · `MissingPath` was missing · **Applied**.
 
 ## 🔵 Nice to Have
-- `pin-file-store.ts:16` `[design]` · The cap repeated `1024` · **Applied**: `64 * KIB`.
-- `pin-file-store.test.ts` `[tests]` · The oversize test did not pin the rounding · **Applied**: exactly one byte over the cap.
-- `pin-file-store.test.ts` `[tests]` · Directory case · **Applied**.
+- `service-controller.ts` `[design|correctness]` · The `?? null === null` check was duplicated and the shared source was implicit · **Applied**: `isMissing` helper with a comment.
+- `docker-observer.ts` `[correctness]` · A time-based flush would cap UI lag during a long burst on a hung daemon · **Filed as #43**.
+- Dashboard `[security]` · Truncate long paths in the reason and show the full path in a tooltip · **Filed as #44**.
 
 ## ⚪ Disagree / Intentional
-- `docs/architecture/diagrams/launcher/08-sequence-pin-file-change.md:26` `[docs]` · Suggestion to add "regular files only". The diagram shows the flow, not each validation; the docstring and the CHANGELOG carry the rule.
+- `src/main/domain/types.ts` `[design]` · The `kind` values double as the words shown to the user. That is kept on purpose (KISS): changing the wording means changing the type.
+- #12 item 1 (absolute paths for `docker` and `ss`) · Not done, by owner MCDA (410, against 345 for resolving at startup and 340 for a fixed list). `PATH` comes from the user's own session, and a same-user attacker is already past the trust boundary. Absolute paths would break snap, rootless and `/usr/local` installs.
 
 ## Per-dimension summary
-- Design: clean, no over-engineering · Docs: accurate; CHANGELOG added · Tests: trustworthy; FIFO swap, directory, grown file and open error covered · Security: race closed; symlinks still refused when they point at a non-regular file · Correctness: KiB rounding is right (ceil)
+- Design: sound; adapter → domain type respects the dependency rule · Docs: diagrams 05/06/07/08 and CHANGELOG current · Tests: deterministic burst tests; reasons covered end to end · Security: nothing; full path shown is the user's own pin · Correctness: counters are scoped per sync attempt, so the final state is always published

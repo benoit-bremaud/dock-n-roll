@@ -258,6 +258,47 @@ describe('observeDocker — sequence diagram 06', () => {
     expect(eventRequests()).toBe(2)
   })
 
+  it('publishes once per burst of events instead of once per event', async () => {
+    start()
+    await waitFor(() => snapshots.length === 1)
+    const db = daemon.containers.get('db')
+    if (db !== undefined) db.status = 'running'
+
+    daemon.emitBurst([['create', 'web'], ['start', 'web'], ['create', 'db'], ['start', 'db'], ['health_status', 'web']])
+
+    await waitFor(() => stateOf('db') === 'running')
+    await quietFor(100)
+    expect(snapshots).toHaveLength(2)
+  })
+
+  it('still publishes during a long burst, at least every maxBatch events', async () => {
+    start({ maxBatch: 3 })
+    await waitFor(() => snapshots.length === 1)
+    const db = daemon.containers.get('db')
+    if (db !== undefined) db.status = 'running'
+
+    daemon.emitBurst([['start', 'web'], ['start', 'web'], ['start', 'web'], ['start', 'web'], ['start', 'web'], ['start', 'db']])
+
+    await waitFor(() => stateOf('db') === 'running')
+    await quietFor(100)
+    expect(snapshots).toHaveLength(3)
+  })
+
+  it('never batches away a container leaving running: a crash then a restart both publish', async () => {
+    start()
+    await waitFor(() => snapshots.length === 1)
+    const web = daemon.containers.get('web')
+    if (web !== undefined) {
+      web.status = 'exited'
+      web.statusAfterInspect = 'running'
+    }
+
+    daemon.emitBurst([['die', 'web'], ['start', 'web']])
+
+    await waitFor(() => snapshots.length >= 3)
+    expect(snapshots.map((snapshot) => snapshot.find((c) => c.id === 'web')?.state)).toEqual(['running', 'exited', 'running'])
+  })
+
   it('applies a live event that arrives while the buffered flush is still running, in order', async () => {
     daemon.inspectDelayMs = 30
     daemon.beforeNextList = () => {

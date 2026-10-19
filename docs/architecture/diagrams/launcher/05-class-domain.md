@@ -95,6 +95,10 @@ classDiagram
     off
     partial
   }
+  class MissingPath {
+    +string kind
+    +string path
+  }
   class ListeningSocket {
     +string address
     +number port

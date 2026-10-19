@@ -4,10 +4,10 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { filesExist } from './file-probe'
+import { findMissingPath } from './file-probe'
 import { probeHealth } from './health-probe'
 
-describe('filesExist — spec §4 `missing`', () => {
+describe('findMissingPath — spec §4 `missing`', () => {
   let root: string
 
   beforeAll(() => {
@@ -20,24 +20,30 @@ describe('filesExist — spec §4 `missing`', () => {
     rmSync(root, { recursive: true, force: true })
   })
 
-  it('is true when the working dir and every config file exist', async () => {
-    await expect(filesExist(join(root, 'app'), [join(root, 'app', 'compose.yaml')])).resolves.toBe(true)
+  it('finds nothing when the working dir and every config file exist', async () => {
+    await expect(findMissingPath(join(root, 'app'), [join(root, 'app', 'compose.yaml')])).resolves.toBeNull()
   })
 
-  it('is true for a never-started pin with no config file yet', async () => {
-    await expect(filesExist(join(root, 'app'), [])).resolves.toBe(true)
+  it('finds nothing for a never-started pin with no config file yet', async () => {
+    await expect(findMissingPath(join(root, 'app'), [])).resolves.toBeNull()
   })
 
-  it('is false when the working dir is gone', async () => {
-    await expect(filesExist(join(root, 'gone'), [])).resolves.toBe(false)
+  it('names the working dir when it is gone, before its config files', async () => {
+    const dir = join(root, 'gone')
+
+    await expect(findMissingPath(dir, [join(dir, 'compose.yaml')])).resolves.toEqual({ kind: 'folder', path: dir })
   })
 
-  it('is false when a config file is gone', async () => {
-    await expect(filesExist(join(root, 'app'), [join(root, 'app', 'compose.override.yaml')])).resolves.toBe(false)
+  it('names the config file that is gone', async () => {
+    const file = join(root, 'app', 'compose.override.yaml')
+
+    await expect(findMissingPath(join(root, 'app'), [join(root, 'app', 'compose.yaml'), file])).resolves.toEqual({ kind: 'compose file', path: file })
   })
 
-  it('is false when the working dir is a file', async () => {
-    await expect(filesExist(join(root, 'app', 'compose.yaml'), [])).resolves.toBe(false)
+  it('names the working dir when it is a file', async () => {
+    const dir = join(root, 'app', 'compose.yaml')
+
+    await expect(findMissingPath(dir, [])).resolves.toEqual({ kind: 'folder', path: dir })
   })
 })
 

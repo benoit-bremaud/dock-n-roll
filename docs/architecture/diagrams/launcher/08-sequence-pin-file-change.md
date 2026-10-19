@@ -33,8 +33,8 @@ sequenceDiagram
   SC->>D: buildServices(containers, pins, resolvedNames)
   D-->>SC: services
   par each service
-    SC->>FP: filesExist(workingDir, configFiles)
-    FP-->>SC: true or false (false after 2 s on a hung mount)
+    SC->>FP: findMissingPath(workingDir, configFiles)
+    FP-->>SC: null, or the missing folder / compose file (the folder after 2 s on a hung mount)
   end
   SC->>D: deriveStatus and allowedControls per service
   D-->>SC: status and controls

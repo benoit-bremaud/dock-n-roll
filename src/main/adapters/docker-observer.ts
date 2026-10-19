@@ -18,10 +18,12 @@ export interface DockerObserverOptions {
   readonly headersTimeoutMs?: number
   /** Schedules a retry and returns its cancel function; overridable for tests. */
   readonly schedule?: (retry: () => void, delayMs: number) => () => void
+  /** A burst publishes once when drained, and at least every `maxBatch` events while it lasts (default 50). */
+  readonly maxBatch?: number
 }
 
 export interface DockerListener {
-  /** The whole snapshot, after the first sync and after every change. */
+  /** The whole snapshot, after the first sync and after every change (once per burst of events). */
   onSnapshot(containers: ContainerSnapshot[]): void
   /** The daemon cannot be reached or the stream dropped; a resync follows automatically. */
   onUnavailable(reason: string): void
@@ -133,6 +135,7 @@ function defaultSchedule(retry: () => void, delayMs: number): () => void {
 export function observeDocker(options: DockerObserverOptions, listener: DockerListener): DockerObserver {
   const initialDelay = options.initialDelayMs ?? 1000
   const maxDelay = options.maxDelayMs ?? 30_000
+  const maxBatch = options.maxBatch ?? 50
   const schedule = options.schedule ?? defaultSchedule
   const headersTimeout = options.headersTimeoutMs ?? EVENTS_HEADERS_TIMEOUT_MS
   let snapshot = new Map<string, ContainerSnapshot>()
@@ -190,18 +193,24 @@ export function observeDocker(options: DockerObserverOptions, listener: DockerLi
     const buffered: DockerEvent[] = []
     let live = false
     let queue = Promise.resolve()
+    /** Live events queued but not applied yet, and applied since the last publish. */
+    let pending = 0
+    let unpublished = 0
     const enqueue = (step: () => Promise<void>): void => {
       queue = queue.then(step).catch((error: unknown) => {
         lost(attempt, error instanceof Error ? error.message : String(error))
       })
     }
-    const apply = async (event: DockerEvent): Promise<void> => {
-      if (!isCurrent(attempt)) return
+    /** Applies one event; true when it took a running container out of `running`. */
+    const apply = async (event: DockerEvent): Promise<boolean> => {
+      if (!isCurrent(attempt)) return false
+      const wasRunning = snapshot.get(event.id)?.state === 'running'
       if (event.kind === 'removed') {
         snapshot.delete(event.id)
       } else {
         await inspectInto(event.id, snapshot, attempt)
       }
+      return wasRunning && snapshot.get(event.id)?.state !== 'running'
     }
     const publish = (): void => {
       if (isCurrent(attempt)) {
@@ -219,9 +228,19 @@ export function observeDocker(options: DockerObserverOptions, listener: DockerLi
         const event = parseDockerEvent(line)
         if (event === null || !isCurrent(attempt)) return
         if (live) {
+          pending += 1
           enqueue(async () => {
-            await apply(event)
-            publish()
+            const leftRunning = await apply(event)
+            pending -= 1
+            unpublished += 1
+            // A `compose up` fires dozens of events: one publish (one recomputation, one IPC push)
+            // per drained burst, with `maxBatch` as a floor so an endless stream still shows. A
+            // container leaving `running` always publishes at once: crash notifications and health
+            // gates must see it even when a restart follows in the same burst.
+            if (leftRunning || pending === 0 || unpublished >= maxBatch) {
+              unpublished = 0
+              publish()
+            }
           })
         } else {
           buffered.push(event)
@@ -249,7 +268,9 @@ export function observeDocker(options: DockerObserverOptions, listener: DockerLi
     snapshot = fresh
     live = true
     for (const event of buffered.splice(0)) {
-      enqueue(() => apply(event))
+      enqueue(async () => {
+        await apply(event)
+      })
     }
     enqueue(() => {
       if (isCurrent(attempt)) delay = initialDelay

@@ -1,18 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { filesExist } from './file-probe'
+import { findMissingPath } from './file-probe'
 
 // A stat on a stale network mount never answers: simulated at the filesystem boundary.
 vi.mock('node:fs/promises', () => ({ stat: () => new Promise<never>(() => undefined) }))
 
-describe('filesExist — hung filesystem', () => {
+describe('findMissingPath — hung filesystem', () => {
   afterEach(() => {
     vi.useRealTimers()
   })
 
-  it('answers false after 2 s instead of holding every recomputation', async () => {
+  it('reports the working dir as missing after 2 s instead of holding every recomputation', async () => {
     vi.useFakeTimers()
     let settled = false
-    const result = filesExist('/mnt/nfs/app', ['/mnt/nfs/app/compose.yaml']).finally(() => {
+    const result = findMissingPath('/mnt/nfs/app', ['/mnt/nfs/app/compose.yaml']).finally(() => {
       settled = true
     })
 
@@ -20,6 +20,6 @@ describe('filesExist — hung filesystem', () => {
     expect(settled).toBe(false)
     await vi.advanceTimersByTimeAsync(1)
 
-    await expect(result).resolves.toBe(false)
+    await expect(result).resolves.toEqual({ kind: 'folder', path: '/mnt/nfs/app' })
   })
 })

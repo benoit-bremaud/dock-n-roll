@@ -14,6 +14,10 @@ export interface FakeContainer {
   statusAfterInspect?: string
 }
 
+function eventLine(action: string, id: string): string {
+  return `${JSON.stringify({ Type: 'container', Action: action, Actor: { ID: id, Attributes: {} } })}\n`
+}
+
 export class FakeDockerDaemon {
   readonly containers = new Map<string, FakeContainer>()
   readonly requests: string[] = []
@@ -50,8 +54,12 @@ export class FakeDockerDaemon {
 
   /** Pushes an event to every open `/events` stream, like the daemon does. */
   emit(action: string, id: string): void {
-    const line = `${JSON.stringify({ Type: 'container', Action: action, Actor: { ID: id, Attributes: {} } })}\n`
-    for (const stream of this.streams) stream.write(line)
+    this.emitRaw(eventLine(action, id))
+  }
+
+  /** Several events in one write, so they reach the observer together, as a `compose up` burst does. */
+  emitBurst(events: readonly (readonly [action: string, id: string])[]): void {
+    this.emitRaw(events.map(([action, id]) => eventLine(action, id)).join(''))
   }
 
   /** Writes raw bytes on every open event stream (split or malformed lines). */
