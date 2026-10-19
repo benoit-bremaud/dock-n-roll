@@ -30,6 +30,8 @@ body {
 }
 
 .app__empty {
+  /* `<output>` (the loading notice) is inline by default. */
+  display: block;
   margin: 0;
   color: var(--color-muted);
 }
@@ -39,15 +41,15 @@ body {
   display: flex;
   gap: var(--space-4);
   margin-bottom: var(--space-4);
-  border-bottom: 1px solid var(--color-line);
+  border-bottom: var(--divider);
 }
 
 .tabs [role='tab'] {
   border: none;
-  border-bottom: 2px solid transparent;
+  border-bottom: var(--border-width-strong) solid transparent;
   border-radius: 0;
   padding: var(--space-2) 0;
-  margin-bottom: -1px;
+  margin-bottom: calc(-1 * var(--border-width));
   color: var(--color-muted);
 }
 
@@ -62,7 +64,7 @@ button {
   color: inherit;
   background: transparent;
   /* Muted, not hairline: an enabled control's edge must reach 3:1 (WCAG 1.4.11). */
-  border: 1px solid var(--color-muted);
+  border: var(--border-width) solid var(--color-muted);
   border-radius: var(--radius);
   padding: var(--space-1) var(--space-3);
   cursor: pointer;
@@ -79,9 +81,26 @@ button:hover:enabled {
   color: var(--color-bg);
 }
 
+/* A ring outside the fill: visible on the filled button in both themes, unlike a tint. */
+/* Read by screen readers, not shown (the cut reason is shown instead). */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .button--primary:hover:enabled {
-  background: var(--color-muted);
-  border-color: var(--color-muted);
+  box-shadow: 0 0 0 var(--border-width-strong) var(--color-bg), 0 0 0 calc(2 * var(--border-width-strong)) var(--color-muted);
+}
+
+/* Shadows are dropped in forced colours: the hover keeps a visible outline there. */
+@media (forced-colors: active) {
+  .button--primary:hover:enabled {
+    outline: var(--border-width-strong) solid CanvasText;
+  }
 }
 
 /* Disabled stays in place (aligned columns) but quiet; `disabled` tells assistive tech. */
@@ -92,8 +111,8 @@ button:disabled {
 }
 
 button:focus-visible {
-  outline: 2px solid var(--color-fg);
-  outline-offset: 2px;
+  outline: var(--border-width-strong) solid var(--color-fg);
+  outline-offset: var(--border-width-strong);
 }
 
 .banners:empty {
@@ -104,6 +123,7 @@ button:focus-visible {
   margin: 0 0 var(--space-2);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius);
+  border-left: calc(2 * var(--border-width-strong)) solid var(--color-warning);
   background: var(--color-banner);
 }
 
@@ -119,7 +139,7 @@ button:focus-visible {
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-2);
-  border-bottom: 1px solid var(--color-line);
+  border-bottom: var(--divider);
 }
 
 .service:hover {
@@ -129,7 +149,8 @@ button:focus-visible {
 .service__badge {
   flex: none;
   align-self: flex-start;
-  margin-top: 5px;
+  /* Centred on the first text line (the name), however the row wraps. */
+  margin-top: calc((1lh - var(--badge-size)) / 2);
   width: var(--badge-size);
   height: var(--badge-size);
   border-radius: 50%;
@@ -152,7 +173,7 @@ button:focus-visible {
 
 .service--greyed .service__badge {
   background: none;
-  border: 1px dashed var(--status-unavailable);
+  border: var(--border-width) dashed var(--status-unavailable);
 }
 
 .service__main {
@@ -211,7 +232,7 @@ button:focus-visible {
 .running td {
   text-align: left;
   padding: var(--space-2);
-  border-bottom: 1px solid var(--color-line);
+  border-bottom: var(--divider);
 }
 
 .running th {
@@ -222,6 +243,17 @@ button:focus-visible {
 
 .running td {
   font-variant-numeric: tabular-nums;
+  vertical-align: top;
+  /* Long container and image names wrap inside their cell instead of widening the table. */
+  overflow-wrap: anywhere;
+}
+
+.running caption {
+  caption-side: top;
+  text-align: left;
+  padding-bottom: var(--space-2);
+  font-size: var(--font-size-small);
+  color: var(--color-muted);
 }
 
 /* UC7 logs panel: full width under its row, text only. */

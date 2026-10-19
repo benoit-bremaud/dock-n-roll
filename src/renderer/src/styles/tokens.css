@@ -8,7 +8,9 @@
   /* Hairlines, row hover and banner tint, derived so dark mode follows. */
   --color-line: color-mix(in srgb, var(--color-muted) 25%, transparent);
   --color-hover: color-mix(in srgb, var(--color-muted) 8%, transparent);
-  --color-banner: color-mix(in srgb, var(--status-off) 12%, transparent);
+  --color-banner: color-mix(in srgb, var(--color-warning) 14%, transparent);
+  /* Banners report a degraded state (Docker down, pin-file error), not a failed action. */
+  --color-warning: #9a6700;
 
   --status-on: #1a7f37;
   --status-off: #cf222e;
@@ -22,6 +24,9 @@
   --space-5: 24px;
 
   --radius: 6px;
+  --border-width: 1px;
+  --border-width-strong: 2px;
+  --divider: var(--border-width) solid var(--color-line);
   --badge-size: 10px;
   --actions-width: 152px;
 
@@ -37,6 +42,7 @@
     --color-bg: #0d1117;
     --color-fg: #e6edf3;
     --color-muted: #9198a1;
+    --color-warning: #d29922;
 
     --status-on: #3fb950;
     --status-off: #f85149;

@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent } from 'react'
-import type { DockNRollApi } from '../../shared/ipc'
+import type { ControllerState, DockNRollApi } from '../../shared/ipc'
 import { Banners } from './components/Banners'
 import { RunningTab } from './components/RunningTab'
 import { ServiceRow } from './components/ServiceRow'
@@ -12,6 +12,42 @@ const TABS = [
 ] as const
 
 type Tab = (typeof TABS)[number]['key']
+
+/** Services tab: a wait (nothing if the first read failed: the banner says it), an empty list, or one row per service. */
+function ServicesPanel({
+  state,
+  error,
+  api,
+  logsFor,
+  onToggleLogs
+}: {
+  readonly state: ControllerState | null
+  readonly error: string | null
+  readonly api: DockNRollApi
+  readonly logsFor: string | null
+  readonly onToggleLogs: (id: string) => void
+}): React.ReactNode {
+  // Before the first state: a short wait, said once to assistive tech. A read error is the banner.
+  if (state === null) return error === null ? <output className="app__empty">Loading…</output> : null
+  if (state.services.length === 0) return <p className="app__empty">No Compose project found.</p>
+  return (
+    <ul className="services">
+      {state.services.map((service) => (
+        <ServiceRow
+          key={service.id}
+          service={service}
+          api={api}
+          dockerAvailable={state.dockerAvailable}
+          homeDir={state.homeDir}
+          logsOpen={logsFor === service.id}
+          onToggleLogs={() => {
+            onToggleLogs(service.id)
+          }}
+        />
+      ))}
+    </ul>
+  )
+}
 
 /** Dashboard window (component diagram 09): renders what the main process pushes, sends ids back. */
 export function App({ api }: { readonly api: DockNRollApi }): React.JSX.Element {
@@ -65,26 +101,16 @@ export function App({ api }: { readonly api: DockNRollApi }): React.JSX.Element 
       </div>
       <Banners state={state} error={error} />
       <section role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
-        {tab === 'running' ? (
-          <RunningTab api={api} />
-        ) : state === null ? null : state.services.length === 0 ? (
-          <p className="app__empty">No Compose project found.</p>
-        ) : (
-          <ul className="services">
-            {state.services.map((service) => (
-              <ServiceRow
-                key={service.id}
-                service={service}
-                api={api}
-                dockerAvailable={state.dockerAvailable}
-                homeDir={state.homeDir}
-                logsOpen={logsFor === service.id}
-                onToggleLogs={() => {
-                  setLogsFor((open) => (open === service.id ? null : service.id))
-                }}
-              />
-            ))}
-          </ul>
+        {tab === 'running' ? <RunningTab api={api} /> : (
+          <ServicesPanel
+            state={state}
+            error={error}
+            api={api}
+            logsFor={logsFor}
+            onToggleLogs={(id) => {
+              setLogsFor((open) => (open === id ? null : id))
+            }}
+          />
         )}
       </section>
     </main>

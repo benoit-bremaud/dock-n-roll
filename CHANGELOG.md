@@ -18,6 +18,10 @@ file format (`services.yaml`) and the installed package.
 
 ### Changed
 
+- Dashboard: a long path in a row's reason is cut in the middle, with `~` for the home folder; the
+  full reason is the tooltip (#44).
+- Dashboard: "Loading…" until the first state arrives; captions on the Running tables; banners use
+  a warning colour; a ring marks the hovered Start button; long names wrap in the tables (#14).
 - Start at login: the entry is written atomically with its mode always set; an unreadable entry
   hides the checkbox instead of showing it as off (#13).
 - Package: Debian maintainer with an email (no lintian warning), `desktopName` set, README
