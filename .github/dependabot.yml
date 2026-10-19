@@ -7,6 +7,11 @@ updates:
     # A just-published (possibly compromised) release waits a few days before it is proposed.
     cooldown:
       default-days: 5
+    ignore:
+      # @types/node follows the Node major bundled by Electron (Electron 44 = Node 24), not the
+      # latest Node: bump it by hand together with Electron.
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
     groups:
       # One PR for the routine bumps; majors stay separate so each is reviewed on its own.
       minor-and-patch:
