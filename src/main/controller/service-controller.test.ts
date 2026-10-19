@@ -495,7 +495,7 @@ describe('restart — UC6, diagram 12', () => {
     await settle()
 
     expect(f.runs).toHaveLength(1)
-    expect(row(BLOG)).toMatchObject({ status: 'missing', reason: 'folder /srv/blog is missing' })
+    expect(row(BLOG)).toMatchObject({ status: 'missing', reason: 'folder "/srv/blog" is missing' })
   })
 
   it('runs no `up` when Docker became unavailable during the stop', async () => {
@@ -722,7 +722,7 @@ describe('inputs that need IO — spec §3, §4, §10 P1', () => {
 
     expect(f.resolveCalls).toEqual(['/home/u/sonarqube-stack'])
     const row = controller.state().services.find((service) => service.workingDir === '/home/u/sonarqube-stack')
-    expect(row).toMatchObject({ status: 'conflict', reason: 'project name also used by /home/u/dev-infra/sonarqube' })
+    expect(row).toMatchObject({ status: 'conflict', reason: 'project name also used by "/home/u/dev-infra/sonarqube"' })
   })
 
   it('shows a project whose folder is gone as missing, with the reason', async () => {
@@ -732,7 +732,7 @@ describe('inputs that need IO — spec §3, §4, §10 P1', () => {
     f.snapshot([web])
     await settle()
 
-    expect(controller.state().services[0]).toMatchObject({ status: 'missing', reason: 'folder /srv/blog is missing' })
+    expect(controller.state().services[0]).toMatchObject({ status: 'missing', reason: 'folder "/srv/blog" is missing' })
   })
 
   it('holds a service on starting until its healthUrl answers, probing every 2 s', async () => {
@@ -1101,7 +1101,7 @@ describe('review fixes — state publication', () => {
     f.snapshot([web])
     await settle()
 
-    expect(controller.state().services[0]).toMatchObject({ status: 'missing', reason: 'compose file /srv/blog/compose.yaml is missing' })
+    expect(controller.state().services[0]).toMatchObject({ status: 'missing', reason: 'compose file "/srv/blog/compose.yaml" is missing' })
   })
 
   it('keeps the last state when a probe fails, and recomputes on the next input', async () => {
@@ -1128,7 +1128,7 @@ describe('review fixes — state publication', () => {
     f.snapshot([web, container({ id: 'x', labels: composeLabels('blog', '/home/u/blog') })])
     await settle()
 
-    expect(controller.state().services.find((s) => s.workingDir === '/srv/blog')?.reason).toBe('project name also used by /home/u/blog')
+    expect(controller.state().services.find((s) => s.workingDir === '/srv/blog')?.reason).toBe('project name also used by "/home/u/blog"')
   })
 
   it('drops the state of services that disappeared', async () => {

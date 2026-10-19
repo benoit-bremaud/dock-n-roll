@@ -13,8 +13,8 @@ file format (`services.yaml`) and the installed package.
   file") instead of after the 5 s read timeout, and a file swapped or grown after the check is still
   refused unread (#20).
 - Pin file: the size-cap error reads in KiB, like ADR-0005 (#21).
-- A missing project now names what is gone: `folder /srv/x is missing` or
-  `compose file /srv/x/compose.yaml is missing` (#12).
+- A missing project now names what is gone: `folder "/srv/x" is missing` or
+  `compose file "/srv/x/compose.yaml" is missing` (#12); paths in reasons are quoted, spaces included.
 
 ### Changed
 

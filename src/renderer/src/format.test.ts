@@ -80,6 +80,19 @@ describe('shortenReason — paths in a reason stay readable (#44)', () => {
     expect(shortenReason(text, '/home/u')).toBe(text)
   })
 
+  it('shortens a quoted path whole, spaces included', () => {
+    expect(shortenReason('compose file "/home/u/My Projects/clients/acme/2026/backend/compose.yaml" is missing', '/home/u')).toBe(
+      'compose file "~/My Projects/c…026/backend/compose.yaml" is missing'
+    )
+  })
+
+  it('never splits a character outside the Basic Multilingual Plane', () => {
+    const cut = middleEllipsis(`/srv/${'a'.repeat(9)}🐳${'b'.repeat(40)}`, 20)
+    expect(cut).not.toMatch(/[\uD800-\uDFFF](?![\uDC00-\uDFFF])/u)
+    expect(Array.from(cut)).toHaveLength(20)
+    expect(middleEllipsis(`🐳${'a'.repeat(20)}🐳`, 4)).toBe('🐳…a🐳')
+  })
+
   it('shortens every path of a reason, and the home folder alone', () => {
     expect(shortenReason(`${long} and ${long}`, '/home/u')).toBe('~/Documents/cli…me/projects/2026/backend and ~/Documents/cli…me/projects/2026/backend')
     expect(shortenReason('folder /home/u is missing', '/home/u')).toBe('folder ~ is missing')
