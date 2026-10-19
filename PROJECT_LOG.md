@@ -352,3 +352,17 @@ Sensitivity: C and A stay top two and G last under value 45 or effort 35; E pass
 - Gate: the local review applied 2 Must and 2 Should. 532 tests, coverage 98.2 / 91.7 / 97.3, Sonar OK,
   CI green with the smoke at 8/8 on the runner. Codex is out of quota.
 - Next: brick A+F (#20 #21 #23 #12, #13 #27).
+
+## 2026-10-19 — Brick A+F, PR 1: pin file checks (PR #40)
+
+- Owner MCDA 2026-10-16: the brick ships as 3 PRs (450, against 400 for 2 PRs and 295 for 1). The Debian
+  `Maintainer` email will be the owner's GitHub noreply address (420).
+- `readPinFile` opens `services.yaml` with `O_NONBLOCK` and takes type, size and content from that one
+  handle. It reads at most cap + 1 bytes. A FIFO, device or directory is refused at once. A file swapped
+  or grown after the check is refused too. The size error reads in KiB, and `MAX_PIN_FILE_BYTES` is
+  exported (#20 #21 #23 closed).
+- Gate: 0 Must from the local review; the 4 Should were applied (stat/read race, FIFO swap test, Windows
+  skip, CHANGELOG). 537 tests, coverage 96.9 / 91.4 / 97.6 / 98.3, Sonar OK, E2E smoke 8/8, CI green.
+  Codex is out of quota and Copilot returned 422. Merged as `74cf1ab`.
+- Backlog: #41 "Stop all", an owner request, to be modelled in UML first.
+- Next: PR 2, adapter robustness (#12).
