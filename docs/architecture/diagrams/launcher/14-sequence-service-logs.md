@@ -20,13 +20,17 @@ sequenceDiagram
   participant LS as LogSession (main)
   participant LF as log-lines (domain)
   participant DL as DockerLogs (adapter)
+  participant DF as docker-frames (adapter)
   participant DE as Docker Engine
 
   Dev->>UI: click Logs on a service row
   UI->>IPC: onLogsChanged(callback), then openLogs(serviceId, null)
   IPC->>LS: open(serviceId, containerId)
   LS->>LS: container of the service (asked one if it belongs to it, else first running, else first)
-  alt no container (never started)
+  alt service no longer listed (pin removed meanwhile)
+    LS->>LS: close the previous stream, if any
+    LS-->>UI: logsChanged(no container, "Service no longer listed")
+  else no container (never started)
     LS-->>UI: logsChanged(no container, "No container yet")
   else
     LS->>LS: close the previous stream, if any
@@ -35,11 +39,12 @@ sequenceDiagram
     DE-->>DL: 200, Content-Type multiplexed-stream or raw-stream (TTY)
     loop each chunk
       opt multiplexed (no TTY), a TTY stream is decoded as is
-        DL->>LF: parseLogFrames(leftover + chunk)
-        LF-->>DL: payloads, leftover bytes (invalid header or frame over 1 MiB: stream dropped)
+        DL->>DF: parseLogFrames(leftover + chunk)
+        DF-->>DL: payloads with their stream, leftover bytes (invalid header or frame over 1 MiB: stream dropped)
       end
+      DL->>DL: decode each payload with its stream's decoder (stdout, stderr)
       DL-->>LS: onText(stdout or stderr text)
-      LS->>LF: appendLogText(lines, partial, text): ANSI and control chars removed, lines capped
+      LS->>LF: appendLogText(lines, partial, text): last \r segment kept, ANSI and control chars removed, lines capped
       LS->>LS: ring buffer, last 500 lines
       LS-->>UI: logsChanged(state), at most every 200 ms
     end
@@ -63,6 +68,13 @@ sequenceDiagram
 - **Only ids cross IPC**: the renderer names a service id and, optionally, one of that
   service's container ids. Any other container id is ignored, so the dashboard cannot read the
   logs of a container outside the listed services.
+- **Unknown service**: an id that is no longer listed (pin removed between the click and the
+  open) closes any previous stream and ends the panel with "Service no longer listed", instead
+  of leaving it empty.
+- **Progress bars**: a line redrawn with `\r` (pull and build progress) keeps only its last
+  segment, what a terminal shows; a trailing `\r` (CRLF) is dropped.
+- **Decoders**: stdout and stderr each have their own `TextDecoder`, so a character split
+  across two frames of one stream is not corrupted by a frame of the other between them.
 - **Text only**: lines are rendered with `textContent` in a `<pre>`, never as HTML. ANSI
   escapes and control characters (except tab) are removed in the main process; a line is cut
   at 2000 characters, the buffer keeps 500 lines.
@@ -71,7 +83,7 @@ sequenceDiagram
   parser returns the leftover bytes. With a TTY the stream is raw text. Docker tells which by
   the response `Content-Type` (API ≥ 1.42).
 - **No reconnect**: when the container stops (Stop, Restart, crash) the stream ends and the
-  panel offers Reopen, also after "No container yet" (a reopen picks the container started since). Following across restarts is backlog (YAGNI).
+  panel offers Reopen, also after "No container yet" (a reopen picks the container started since). Following across restarts comes next (brick E, PR 4).
 - **Push throttled** to one state every 200 ms, full state (like `stateChanged`), so a
   missed push loses nothing and a chatty container cannot flood IPC.
 - **Lifecycle**: the stream is destroyed on `closeLogs`, on a new `openLogs`, when the

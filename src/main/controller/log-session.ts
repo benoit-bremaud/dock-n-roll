@@ -17,7 +17,10 @@ export interface LogSessionDeps {
 }
 
 export interface LogSession {
-  /** `containerId` is used only if it belongs to the service; else its first running container, else its first. */
+  /**
+   * `containerId` is used only if it belongs to the service; else its first running container,
+   * else its first. An unlisted service ends the panel ("Service no longer listed").
+   */
   open(serviceId: string, containerId: string | null): void
   /** Stops the stream and pushes `null`; nothing when no panel is open. */
   close(): void
@@ -53,8 +56,13 @@ export function createLogSession(deps: LogSessionDeps): LogSession {
   return {
     open: (serviceId, containerId) => {
       const containers = deps.containersOf(serviceId)
-      if (containers === null) return
       stop()
+      if (containers === null) {
+        // Pin removed between the click and the open: the panel says so instead of staying empty.
+        state = { serviceId, containerId: null, containers: [], lines: [], ended: 'Service no longer listed' }
+        publish()
+        return
+      }
       const chosen = pick(containers, containerId)
       state = {
         serviceId,

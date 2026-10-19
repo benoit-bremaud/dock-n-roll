@@ -55,7 +55,7 @@ describe('registerIpc', () => {
     controller = made.spies
     logs = { open: vi.fn<LogSession['open']>(), close: vi.fn<LogSession['close']>() }
     const session: LogSession = { ...logs, onChange: () => () => undefined }
-    registerIpc(made.controller, () => Promise.resolve(BACKGROUND), (event) => event === TRUSTED, session)
+    registerIpc({ controller: made.controller, listBackground: () => Promise.resolve(BACKGROUND), isTrusted: (event) => event === TRUSTED, logs: session })
   })
 
   it('registers one handler per invoke channel', () => {

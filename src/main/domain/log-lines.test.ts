@@ -1,62 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { appendLogText, cleanLogLine, MAX_FRAME_BYTES, MAX_LINE_CHARS, parseLogFrames } from './log-lines'
-
-const OVER_CAP = MAX_FRAME_BYTES + 1
-
-const encoder = new TextEncoder()
-const decoder = new TextDecoder()
-
-function frame(stream: 1 | 2, text: string): Uint8Array {
-  const payload = encoder.encode(text)
-  const header = new Uint8Array(8)
-  header[0] = stream
-  new DataView(header.buffer).setUint32(4, payload.length)
-  return new Uint8Array([...header, ...payload])
-}
-
-const texts = (payloads: Uint8Array[]): string[] => payloads.map((payload) => decoder.decode(payload))
-
-describe('parseLogFrames — diagram 14', () => {
-  it('splits stdout and stderr frames', () => {
-    const { payloads, rest } = parseLogFrames(new Uint8Array([...frame(1, 'out\n'), ...frame(2, 'err\n')]))
-
-    expect(texts(payloads)).toEqual(['out\n', 'err\n'])
-    expect(rest).toHaveLength(0)
-  })
-
-  it('reads the size big-endian (cap check of the case below)', () => {
-    expect(new DataView(new Uint8Array([0x00, 0x10, 0x00, 0x01]).buffer).getUint32(0)).toBe(OVER_CAP)
-  })
-
-  it.each([
-    ['an unknown stream byte', [7, 0, 0, 0, 0, 0, 0, 1]],
-    ['non-zero padding', [1, 0, 9, 0, 0, 0, 0, 1]],
-    ['a frame over the cap', [1, 0, 0, 0, 0x00, 0x10, 0x00, 0x01]] // MAX_FRAME_BYTES + 1, big-endian
-  ])('flags %s as invalid, keeping the frames before it and buffering nothing', (_name, header) => {
-    const { payloads, rest, invalid } = parseLogFrames(new Uint8Array([...frame(1, 'ok\n'), ...header]))
-
-    expect(texts(payloads)).toEqual(['ok\n'])
-    expect(rest).toHaveLength(0)
-    expect(invalid).toBe(true)
-  })
-
-  it('keeps a frame split across chunks, header or payload, for the next chunk', () => {
-    const whole = frame(1, 'hello\n')
-
-    const first = parseLogFrames(whole.slice(0, 5))
-    expect(first.payloads).toEqual([])
-    const second = parseLogFrames(new Uint8Array([...first.rest, ...whole.slice(5, 10)]))
-    expect(second.payloads).toEqual([])
-    const third = parseLogFrames(new Uint8Array([...second.rest, ...whole.slice(10)]))
-
-    expect(texts(third.payloads)).toEqual(['hello\n'])
-    expect(third.rest).toHaveLength(0)
-  })
-
-  it('returns nothing for an empty chunk', () => {
-    expect(parseLogFrames(new Uint8Array())).toEqual({ payloads: [], rest: new Uint8Array(), invalid: false })
-  })
-})
+import { appendLogText, cleanLogLine, MAX_LINE_CHARS } from './log-lines'
 
 describe('cleanLogLine — text only', () => {
   it.each([
@@ -69,12 +12,39 @@ describe('cleanLogLine — text only', () => {
     expect(cleanLogLine(raw)).toBe(clean)
   })
 
+  it.each([
+    ['a progress bar redrawn with \\r', '10%\r50%\r100%', '100%'],
+    ['a CRLF line ending', 'done\r', 'done'],
+    ['several trailing \\r', 'done\r\r', 'done'],
+    ['a line wiped with spaces', 'abc\r   ', '   ']
+  ])('keeps what a terminal shows for %s', (_name, line, expected) => {
+    expect(cleanLogLine(line)).toBe(expected)
+  })
+
+  it('keeps the last redraw of a progress line longer than the cap', () => {
+    expect(cleanLogLine(`${'#'.repeat(MAX_LINE_CHARS * 5)}\rdone`)).toBe('done')
+  })
+
   it('cuts a line longer than the cap', () => {
     expect(cleanLogLine('x'.repeat(MAX_LINE_CHARS + 10))).toHaveLength(MAX_LINE_CHARS)
   })
 })
 
 describe('appendLogText', () => {
+  it('shows the last state of a progress bar written in pieces', () => {
+    const first = appendLogText([], '', '10%\r', 10)
+    const second = appendLogText(first.lines, first.partial, '50%\r', 10)
+    const third = appendLogText(second.lines, second.partial, '100%\r\n', 10)
+
+    expect(third).toEqual({ lines: ['100%'], partial: '' })
+  })
+
+  it('keeps the last redraw of an unfinished progress line longer than the cap', () => {
+    const { partial } = appendLogText([], '', `${'#'.repeat(MAX_LINE_CHARS * 5)}\r50%`, 10)
+
+    expect(appendLogText([], partial, '\n', 10).lines).toEqual(['50%'])
+  })
+
   it('adds complete lines and keeps the unfinished one for later', () => {
     const first = appendLogText([], '', 'a\nb', 10)
     expect(first).toEqual({ lines: ['a'], partial: 'b' })

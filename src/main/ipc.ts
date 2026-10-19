@@ -10,18 +10,21 @@ function asId(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 && value.length < 4096 ? value : null
 }
 
+export interface IpcDeps {
+  readonly controller: ServiceController
+  readonly listBackground: () => Promise<BackgroundView>
+  /** The call comes from the dashboard page (`isTrustedSender`). */
+  readonly isTrusted: (event: IpcMainInvokeEvent) => boolean
+  readonly logs: LogSession
+}
+
 /**
  * Registers the handlers of the channels in `IPC` (class diagram 07), once, at startup. Calls
  * from any frame other than the dashboard page are ignored (`isTrusted`), and so are invalid
  * ids: a refusal is silent, never an error sent back. `start` / `stop` / `restart` resolve once the
  * command ends; the outcome is only visible in the next pushed state.
  */
-export function registerIpc(
-  controller: ServiceController,
-  listBackground: () => Promise<BackgroundView>,
-  isTrusted: (event: IpcMainInvokeEvent) => boolean,
-  logs: LogSession
-): void {
+export function registerIpc({ controller, listBackground, isTrusted, logs }: IpcDeps): void {
   ipcMain.handle(IPC.getState, (event): ControllerState | null => (isTrusted(event) ? controller.state() : null))
   const command = (channel: (typeof IPC)[keyof typeof IPC], act: (id: string) => Promise<void>): void => {
     ipcMain.handle(channel, async (event, id: unknown) => {

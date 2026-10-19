@@ -193,14 +193,14 @@ async function start(trayIcon: Tray): Promise<void> {
   session.onChange((state) => {
     pushLogsTo(() => dashboard, state)
   })
-  registerIpc(
-    created,
-    createBackgroundSource(() => created.containers(), scanListeningPorts),
-    (event: IpcMainInvokeEvent) =>
+  registerIpc({
+    controller: created,
+    listBackground: createBackgroundSource(() => created.containers(), scanListeningPorts),
+    isTrusted: (event: IpcMainInvokeEvent) =>
       // A destroyed window's `webContents` throws on access: a call landing during quit is refused.
       isTrustedSender(event, dashboard !== null && !dashboard.isDestroyed() ? dashboard.webContents : null, DASHBOARD_ORIGIN),
-    session
-  )
+    logs: session
+  })
   // A dashboard opened during startup read no state (no IPC yet), and `publish()` skips an
   // unchanged state: hand it the current one now (diagram 11).
   pushStateTo(() => dashboard, created.state())

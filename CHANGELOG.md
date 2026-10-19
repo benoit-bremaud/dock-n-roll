@@ -18,6 +18,10 @@ file format (`services.yaml`) and the installed package.
 
 ### Changed
 
+- Logs panel: a line redrawn with `\r` (pull or build progress) shows its last state instead of
+  every step glued together; stdout and stderr are decoded apart, so a character split across
+  frames of one is not broken by the other; a service removed from the pin file meanwhile ends
+  the panel with "Service no longer listed" instead of leaving it empty (#33).
 - Packaging: an application icon (the tray's ring and dot on a dark tile, 32 to 512 px) replaces
   Electron's default icon in the launcher and on the dashboard window (#47).
 - Dashboard: a long path in a row's reason is cut in the middle, with `~` for the home folder; the
@@ -36,7 +40,7 @@ file format (`services.yaml`) and the installed package.
 
 ### Added
 
-- Restart action in the menu and the dashboard: a stop then an `up`, so edits to the Compose
+- Restart action in the tray menu and the dashboard: a stop then an `up`, so edits to the Compose
   file or `.env` apply (#29).
 - Desktop notification when a running container of a listed service crashes (exit code other
   than 0/130/137/143, out of memory, or restarting); silent for stops you asked for, at most
