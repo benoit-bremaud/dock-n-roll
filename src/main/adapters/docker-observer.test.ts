@@ -258,6 +258,31 @@ describe('observeDocker — sequence diagram 06', () => {
     expect(eventRequests()).toBe(2)
   })
 
+  it('publishes once per burst of events instead of once per event', async () => {
+    start()
+    await waitFor(() => snapshots.length === 1)
+    // A slow inspect lets the whole burst queue up behind the first event.
+    daemon.inspectDelayMs = 50
+
+    for (let i = 0; i < 5; i += 1) daemon.emit('start', i % 2 === 0 ? 'web' : 'db')
+
+    await waitFor(() => daemon.answered.filter((path) => path.endsWith('/json') && !path.includes('containers/json')).length >= 2 + 5)
+    await quietFor(100)
+    expect(snapshots).toHaveLength(2)
+  })
+
+  it('still publishes during a long burst, at least every maxBatch events', async () => {
+    start({ maxBatch: 3 })
+    await waitFor(() => snapshots.length === 1)
+    daemon.inspectDelayMs = 50
+
+    for (let i = 0; i < 6; i += 1) daemon.emit('start', 'web')
+
+    await waitFor(() => daemon.answered.filter((path) => path.endsWith('/web/json')).length >= 1 + 6)
+    await quietFor(100)
+    expect(snapshots).toHaveLength(3)
+  })
+
   it('applies a live event that arrives while the buffered flush is still running, in order', async () => {
     daemon.inspectDelayMs = 30
     daemon.beforeNextList = () => {

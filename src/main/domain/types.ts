@@ -103,6 +103,12 @@ export type PendingOperation = 'start' | 'stop'
  */
 export type HealthGate = 'none' | 'waiting' | 'passed'
 
+/** What makes a service `missing` (spec §4): its working dir, or one of its config files. */
+export interface MissingPath {
+  readonly kind: 'folder' | 'compose file'
+  readonly path: string
+}
+
 export interface StatusInputs {
   readonly containers: readonly ContainerSnapshot[]
   readonly pending: PendingOperation | null

@@ -6,7 +6,7 @@ import { buildStopArgs, buildUpArgs } from '../domain/compose-args'
 import { allowedControls, deriveStatus } from '../domain/derive-status'
 import { crashedContainers, crashMessage } from '../domain/crash'
 import { buildServices } from '../domain/service-catalog'
-import type { ContainerSnapshot, Controls, HealthGate, PendingOperation, PinEntry, PinFileResult, Service, StatusInputs } from '../domain/types'
+import type { ContainerSnapshot, Controls, HealthGate, MissingPath, PendingOperation, PinEntry, PinFileResult, Service, StatusInputs } from '../domain/types'
 import type { ControllerState, ServiceView } from '../../shared/ipc'
 
 // Application layer of class diagram 07: orchestrates domain and adapters, holds no rule of
@@ -33,7 +33,7 @@ export interface ControllerDeps {
   openPinFileStore(path: string, onChange: (result: PinFileResult) => void): Promise<PinFileStore>
   runCompose(args: readonly string[], options: RunOptions): Promise<ComposeResult>
   resolveProjectName(workingDir: string, options: Omit<RunOptions, 'cwd'>): Promise<string | null>
-  filesExist(workingDir: string, configFiles: readonly string[]): Promise<boolean>
+  findMissingPath(workingDir: string, configFiles: readonly string[]): Promise<MissingPath | null>
   probeHealth(url: string, options: ProbeOptions): Promise<boolean>
   /** Shows a desktop notification; both texts are plain (the adapter escapes them). */
   notify(title: string, body: string): void
@@ -130,7 +130,8 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   let resolvedNames: ReadonlyMap<string, string> = new Map()
   let services: Service[] = []
   let pending: Pending[] = []
-  const filesOk = new Map<string, boolean>()
+  /** `null` when every file is there; no entry before the first check. */
+  const missingPaths = new Map<string, MissingPath | null>()
   const gates = new Map<string, HealthGate>()
   const probing = new Map<string, () => void>()
   const lastError = new Map<string, string>()
@@ -155,7 +156,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     return {
       containers: service.containers,
       pending: pendingFor(pending, service),
-      filesExist: filesOk.get(service.id) ?? true,
+      filesExist: (missingPaths.get(service.id) ?? null) === null,
       conflict: service.conflictingDirs.length > 0,
       invalid: service.invalidReason !== null,
       healthGate: gate
@@ -165,7 +166,8 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   const reasonOf = (service: Service, inputs: StatusInputs): string | null => {
     if (service.invalidReason !== null) return service.invalidReason
     if (inputs.conflict) return `project name also used by ${service.conflictingDirs.join(', ')}`
-    if (!inputs.filesExist) return 'folder or compose file is missing'
+    const missing = missingPaths.get(service.id)
+    if (missing) return `${missing.kind} ${missing.path} is missing`
     if (unresolved(service)) return 'Compose project name could not be resolved'
     return lastError.get(service.id) ?? null
   }
@@ -224,7 +226,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   /** Per-service state of services that no longer exist would leak, or resurface on an id change. */
   const prune = (): void => {
     const ids = new Set(services.map((service) => service.id))
-    for (const map of [filesOk, gates, lastError, notifiedAt, stoppedAt]) {
+    for (const map of [missingPaths, gates, lastError, notifiedAt, stoppedAt]) {
       for (const id of map.keys()) if (!ids.has(id)) map.delete(id)
     }
     for (const id of [...probing.keys()]) if (!ids.has(id)) cancelProbe(id)
@@ -248,11 +250,11 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
 
   const rebuild = async (): Promise<void> => {
     const next = buildServices(containers, pins, resolvedNames)
-    const checks = await Promise.all(next.map((service) => deps.filesExist(service.workingDir, service.configFiles)))
+    const checks = await Promise.all(next.map((service) => deps.findMissingPath(service.workingDir, service.configFiles)))
     // `dispose()` may have run during the await: no publish, no new probe after it.
     if (disposed) return
     services = next
-    services.forEach((service, index) => filesOk.set(service.id, checks[index] ?? true))
+    services.forEach((service, index) => missingPaths.set(service.id, checks[index] ?? null))
     prune()
     driveHealthGates()
     publish()
@@ -348,7 +350,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   }
 
   /** Read through a call: both inputs can change during an await, which narrowing cannot see. */
-  const canUp = (service: Service): boolean => !isDisposed() && dockerAvailable && filesOk.get(service.id) !== false
+  const canUp = (service: Service): boolean => !isDisposed() && dockerAvailable && (missingPaths.get(service.id) ?? null) === null
 
   /** The service a request may act on, under the name its command runs with; `null` when refused. */
   const claim = (id: string, request: keyof Controls): { service: Service; name: string } | null => {

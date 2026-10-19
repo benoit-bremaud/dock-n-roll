@@ -96,7 +96,7 @@ classDiagram
     +observeDocker
     +runCompose
     +resolveProjectName
-    +filesExist
+    +findMissingPath
     +probeHealth
     +notify
     +openPinFileStore
@@ -178,8 +178,9 @@ classDiagram
   `healthUrl` with no container HEALTHCHECK, the controller probes it every 2 s
   (`schedule`); the gate becomes `passed` on the first 2xx/3xx and resets when the service
   stops.
-- **Files**: `filesExist` is probed for every service on each snapshot or pin change (a few
-  `stat` calls); results feed `StatusInputs.filesExist`.
+- **Files**: `findMissingPath` is probed for every service on each snapshot or pin change (a few
+  `stat` calls); it feeds `StatusInputs.filesExist` and names the missing folder or compose file
+  in the reason.
 - **`socketPath`** is one value given both to `observeDocker` and to `runCompose` (ADR-0002),
   resolved once at startup: a unix `DOCKER_HOST` (rootless Docker) wins, else
   `/var/run/docker.sock` (`dockerSocketPath`).

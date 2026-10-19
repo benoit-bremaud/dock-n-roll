@@ -29,7 +29,7 @@ function fakes() {
   const delays: number[] = []
   const nameRetries: (() => void)[] = []
   const counters = { observerStopped: 0, storeClosed: 0, probesCancelled: 0, filesChecks: 0 }
-  /** When set, filesExist answers only when the test releases it. */
+  /** When set, findMissingPath answers only when the test releases it. */
   const heldFiles: { release: () => void }[] = []
   let holdFiles = false
   /** When set, resolveProjectName answers only when the test releases it. */
@@ -86,13 +86,14 @@ function fakes() {
         })
       })
     },
-    filesExist: (dir) => {
+    findMissingPath: (dir) => {
       counters.filesChecks += 1
-      if (!holdFiles) return Promise.resolve(!missing.has(dir))
+      const found = missing.has(dir) ? { kind: 'folder' as const, path: dir } : null
+      if (!holdFiles) return Promise.resolve(found)
       return new Promise((resolve) => {
         heldFiles.push({
           release: () => {
-            resolve(!missing.has(dir))
+            resolve(found)
           }
         })
       })
@@ -490,7 +491,7 @@ describe('restart — UC6, diagram 12', () => {
     await settle()
 
     expect(f.runs).toHaveLength(1)
-    expect(row(BLOG)).toMatchObject({ status: 'missing', reason: 'folder or compose file is missing' })
+    expect(row(BLOG)).toMatchObject({ status: 'missing', reason: 'folder /srv/blog is missing' })
   })
 
   it('runs no `up` when Docker became unavailable during the stop', async () => {
@@ -727,7 +728,7 @@ describe('inputs that need IO — spec §3, §4, §10 P1', () => {
     f.snapshot([web])
     await settle()
 
-    expect(controller.state().services[0]).toMatchObject({ status: 'missing', reason: 'folder or compose file is missing' })
+    expect(controller.state().services[0]).toMatchObject({ status: 'missing', reason: 'folder /srv/blog is missing' })
   })
 
   it('holds a service on starting until its healthUrl answers, probing every 2 s', async () => {
@@ -1094,12 +1095,12 @@ describe('review fixes — state publication', () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     f.snapshot([web])
     await settle()
-    f.deps.filesExist = () => Promise.reject(new Error('EACCES'))
+    f.deps.findMissingPath = () => Promise.reject(new Error('EACCES'))
     f.snapshot([webStopped])
     await settle()
     expect(controller.state().services[0]?.status).toBe('on')
 
-    f.deps.filesExist = () => Promise.resolve(true)
+    f.deps.findMissingPath = () => Promise.resolve(null)
     f.snapshot([webStopped])
     await settle()
     expect(controller.state().services[0]?.status).toBe('off')

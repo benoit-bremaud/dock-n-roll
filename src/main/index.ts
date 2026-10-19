@@ -6,7 +6,7 @@ import { isAutostartEnabled, setAutostart } from './adapters/autostart'
 import { resolveProjectName, runCompose } from './adapters/compose-runner'
 import { followLogs } from './adapters/docker-logs'
 import { observeDocker } from './adapters/docker-observer'
-import { filesExist } from './adapters/file-probe'
+import { findMissingPath } from './adapters/file-probe'
 import { probeHealth } from './adapters/health-probe'
 import { openPinFileStore } from './adapters/pin-file-store'
 import { scanListeningPorts } from './adapters/port-scanner'
@@ -156,7 +156,7 @@ async function start(trayIcon: Tray): Promise<void> {
     openPinFileStore,
     runCompose,
     resolveProjectName,
-    filesExist,
+    findMissingPath,
     probeHealth,
     notify: showNotification,
     schedule

@@ -39,7 +39,9 @@ sequenceDiagram
         DO->>API: GET /containers/{id}/json
         API-->>DO: fresh state
       end
-      DO-->>SC: onSnapshot(all containers)
+      opt queue drained, or maxBatch (50) events since the last publish
+        DO-->>SC: onSnapshot(all containers)
+      end
     end
     API--xDO: stream ends or socket error
     DO-->>SC: onUnavailable(reason) — banner, rows greyed
@@ -54,6 +56,8 @@ sequenceDiagram
   as the initial list. Simpler and impossible to drift.
 - **Buffered events applied after the list** are each turned into a re-inspect too, so their
   order versus the list does not matter.
+- `onSnapshot` fires once per burst of events (a `compose up` fires dozens), at least every
+  `maxBatch` events while a burst lasts.
 - `onSnapshot` always carries the whole snapshot (a few dozen containers): the domain
   derives everything from it (`buildServices`), no incremental bookkeeping.
 - Backoff resets to 1 s after a successful sync.

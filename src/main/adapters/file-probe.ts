@@ -1,4 +1,5 @@
 import { stat } from 'node:fs/promises'
+import type { MissingPath } from '../domain/types'
 import { withTimeout } from './with-timeout'
 
 /** Runs inside the recomputation chain: a hung mount must not hold it. */
@@ -14,8 +15,14 @@ async function isKind(path: string, kind: 'dir' | 'file'): Promise<boolean> {
   }
 }
 
-/** Working dir and every config file still exist — the `filesExist` input of spec §4 `missing`. */
-export async function filesExist(workingDir: string, configFiles: readonly string[]): Promise<boolean> {
-  const checks = await Promise.all([isKind(workingDir, 'dir'), ...configFiles.map((file) => isKind(file, 'file'))])
-  return checks.every(Boolean)
+/**
+ * The first of the working dir and its config files that is gone — the `filesExist` input of
+ * spec §4 `missing`, plus what to name in the reason. The dir comes first: without it, every
+ * config file inside is gone too. `null` when everything is there.
+ */
+export async function findMissingPath(workingDir: string, configFiles: readonly string[]): Promise<MissingPath | null> {
+  const [dirOk, ...filesOk] = await Promise.all([isKind(workingDir, 'dir'), ...configFiles.map((file) => isKind(file, 'file'))])
+  if (!dirOk) return { kind: 'folder', path: workingDir }
+  const file = configFiles.find((_path, index) => !filesOk[index])
+  return file === undefined ? null : { kind: 'compose file', path: file }
 }

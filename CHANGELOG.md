@@ -13,6 +13,13 @@ file format (`services.yaml`) and the installed package.
   file") instead of after the 5 s read timeout, and a file swapped or grown after the check is still
   refused unread (#20).
 - Pin file: the size-cap error reads in KiB, like ADR-0005 (#21).
+- A missing project now names what is gone: `folder /srv/x is missing` or
+  `compose file /srv/x/compose.yaml is missing` (#12).
+
+### Changed
+
+- Docker events are published once per burst (at least every 50 events) instead of once per event:
+  a `compose up` no longer rebuilds the tray menu dozens of times (#12).
 
 ## [1.1.0] - 2026-10-16
 
