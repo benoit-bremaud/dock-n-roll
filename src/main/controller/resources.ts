@@ -12,3 +12,8 @@ export interface ResourceContext {
 export function trayIconPath(context: ResourceContext): string {
   return context.isPackaged ? join(context.resourcesPath, 'tray-icon.png') : join(context.mainDir, '../../resources/tray-icon.png')
 }
+
+/** The dashboard window icon (X11 and dev; GNOME on Wayland reads the `.desktop` icon instead). */
+export function appIconPath(context: ResourceContext): string {
+  return context.isPackaged ? join(context.resourcesPath, 'app-icon.png') : join(context.mainDir, '../../resources/icons/256x256.png')
+}

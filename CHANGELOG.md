@@ -18,6 +18,8 @@ file format (`services.yaml`) and the installed package.
 
 ### Changed
 
+- Packaging: an application icon (the tray's ring and dot on a dark tile, 32 to 512 px) replaces
+  Electron's default icon in the launcher and on the dashboard window (#47).
 - Dashboard: a long path in a row's reason is cut in the middle, with `~` for the home folder; the
   full reason is the tooltip (#44).
 - Dashboard: "Loading…" until the first state arrives; captions on the Running tables; banners use

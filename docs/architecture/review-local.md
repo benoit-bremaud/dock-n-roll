@@ -1,41 +1,34 @@
-# Local review — dock-n-roll (feat/dashboard-polish, brick E PR 1: #14 #44)
+# Local review — dock-n-roll (feat/app-icon, brick E PR 2: #47)
 
 - Date: 2026-10-19
-- Scope: branch diff main...feat/dashboard-polish
+- Scope: branch diff main...feat/app-icon
 - Checks run: design · docs · tests · security · correctness
-- Verdict: ship after fixes · Must 2 (fixed) · Should 5 (fixed) · Nice 5 (filed)
+- Verdict: ship · Must 0 · Should 2 (fixed) · Nice 4 (2 applied, 2 declined)
 
 ## Pre-merge gate
 | Step | Result |
 |---|---|
-| 1 Tests | ✅ 561 unit/integration · ✅ E2E smoke 8/8 on the `--linux dir` build |
-| 2 Coverage | 97.16 % stmts / 92.11 % branches / 97.62 % funcs / 98.46 % lines (gate 90/85/90/90) |
-| 3 SonarQube | ✅ PASSED (new coverage 97.7 %, 0 new issues, 0 % duplication) |
-| 4 Secrets | ✅ gitleaks clean · no tracked .env · diff read: nothing sensitive |
-| 5 QA pass | ✅ E2E smoke on the packaged app (ADR-0010): console and CSP clean |
+| 1 Tests | ✅ 565 unit/integration · ✅ E2E smoke 8/8 on the `--linux dir` build |
+| 2 Coverage | 97.17 % stmts / 92.14 % branches / 97.64 % funcs / 98.47 % lines (gate 90/85/90/90) |
+| 3 SonarQube | ✅ PASSED (0 new issues) |
+| 4 Secrets | ✅ gitleaks clean · no tracked .env · SVG has no script or external reference |
+| 5 QA pass | ✅ smoke 8/8 · `.deb` installs hicolor 32–512 px icons, `.desktop` has `Icon=dock-n-roll`, the "default Electron icon" warning is gone |
 
-## 🔴 Must Have (fixed)
-- `src/renderer/src/format.ts` `[correctness|tests]` · the path regex matched "and/or", URLs and trailing quotes or punctuation · bounded regex `REASON_PATH`, tests per case.
-- `src/renderer/src/format.ts` `[correctness]` · `middleEllipsis` returned more than `max` for `max ≤ 1` · guard, `it.each` over 0–11.
+## 🔴 Must Have
+_None._
 
 ## 🟡 Should Have (fixed)
-- `ServiceRow.tsx` `[a11y]` · full reason only in `title` · tooltip only when cut; full reason in a visually hidden span, the cut one `aria-hidden`.
-- `format.test.ts` / `App.test.tsx` `[tests]` · edge cases: several paths, home alone, quotes, URL; loading notice dropped once the state arrives.
-- `format.ts` `[docs]` · `shortenReason` docstring matched only "absolute paths"; `0.4` named `HEAD_SHARE`.
-- `App.tsx` `[docs]` · `ServicesPanel` docstring covers the read-error case; explicit `null`.
-- `tokens.css` `[design]` · `--radius-round: 50%` removed (nothing to theme).
+- `electron-builder.yml` · only 256/512 px shipped, blurry at 48 px in the dock · 32, 48, 64 and 128 px added.
+- `src/main/index.ts` · dashboard window had no icon (X11, `pnpm dev`) · `appIconPath` (tested) + `app-icon.png` extra resource.
 
-## 🔵 Nice to Have (filed as an issue)
-- `ServicesPanel` could move to `components/`.
-- `.app__empty` now also styles the loading notice (rename to `app__notice`).
-- A distinct error colour for `role=alert` read errors vs warning banners.
-- `.running td { overflow-wrap: anywhere }` may break mid-word on a narrow window; limit to Name/Image.
-- Loading `<output>` mounted already filled may not be announced (initial render: read in normal flow).
+## 🔵 Nice to Have
+- `resources/icon.svg` · export command documented in the SVG comment (applied).
+- `resources/icon.svg` · green dot vs monochrome tray: intentional, noted in the comment (applied).
+- `resources/icon.svg` · tile at 87.5 % of the canvas vs GNOME's ~78 %: declined, it reads well at small sizes.
+- `CHANGELOG.md` · sizes reworded (applied with the Should).
 
 ## ⚪ Disagree / Intentional
-- `<caption>` + `aria-labelledby`: the heading names the table, the caption describes it.
-- Badge `1lh`: the badge inherits the row's body font and line-height, the same as the name's line.
-- Forced colours: the hover ring now falls back to an outline (fixed alongside).
+_None._
 
 ## Per-dimension summary
-- Design: proportionate; one superfluous token removed · Docs: two docstrings corrected · Tests: edge cases added · Security: text only, no HTML injection · Correctness: two edge bugs fixed.
+- Design: one resolver beside `trayIconPath` · Docs: CHANGELOG and SVG comment · Tests: `appIconPath` both branches · Security: static SVG · Correctness: icons verified in the `.deb`.

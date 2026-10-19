@@ -15,7 +15,7 @@ import { createBackgroundSource } from './controller/background-monitor'
 import { dockerSocketPath } from './controller/docker-socket'
 import { createLogSession, type LogSession } from './controller/log-session'
 import { createServiceController, type ServiceController } from './controller/service-controller'
-import { trayIconPath } from './controller/resources'
+import { appIconPath, trayIconPath } from './controller/resources'
 import { buildTrayMenu, type MenuEntry } from './controller/tray-menu'
 import { pushLogsTo, pushStateTo, registerIpc } from './ipc'
 import { showNotification } from './notifier'
@@ -49,6 +49,7 @@ function createDashboard(): BrowserWindow {
     height: 520,
     show: false,
     autoHideMenuBar: true,
+    icon: appIconPath({ isPackaged: app.isPackaged, resourcesPath: process.resourcesPath, mainDir: __dirname }),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
