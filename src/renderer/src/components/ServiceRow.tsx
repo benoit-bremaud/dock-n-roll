@@ -1,6 +1,20 @@
 import type { DockNRollApi, ServiceView } from '../../../shared/ipc'
-import { shortenPath } from '../format'
+import { shortenPath, shortenReason } from '../format'
 import { LogPanel } from './LogPanel'
+
+/** #44: long paths cut in the middle; the full reason is the tooltip and what screen readers read. */
+function Reason({ reason, homeDir }: { readonly reason: string; readonly homeDir: string }): React.JSX.Element {
+  const shown = shortenReason(reason, homeDir)
+  if (shown === reason) return <span className="service__reason">{reason}</span>
+  return (
+    <span className="service__reason">
+      <span title={reason} aria-hidden="true">
+        {shown}
+      </span>
+      <span className="visually-hidden">{reason}</span>
+    </span>
+  )
+}
 
 /**
  * One service. Buttons mirror the controls the controller derived (the main process re-checks
@@ -34,7 +48,7 @@ export function ServiceRow({
         <span className="service__dir" title={service.workingDir}>
           {shortenPath(service.workingDir, homeDir)}
         </span>
-        {service.reason !== null && <span className="service__reason">{service.reason}</span>}
+        {service.reason !== null && <Reason reason={service.reason} homeDir={homeDir} />}
       </div>
       <div className="service__actions">
         <button type="button" className="button--primary" aria-label={`Start ${name}`} disabled={!service.controls.start} onClick={() => void api.start(service.id)}>

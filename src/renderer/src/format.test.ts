@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isFollowing, runningSummary, shortenPath } from './format'
+import { isFollowing, middleEllipsis, runningSummary, shortenPath, shortenReason } from './format'
 
 describe('shortenPath — home folder shown as ~', () => {
   it.each([
@@ -34,5 +34,67 @@ describe('isFollowing — UC7 logs autoscroll', () => {
     [100, 0, 100, true]
   ])('height %i, top %i, client %i → %s', (scrollHeight, scrollTop, clientHeight, expected) => {
     expect(isFollowing({ scrollHeight, scrollTop, clientHeight })).toBe(expected)
+  })
+})
+
+describe('middleEllipsis — keeps both ends of a long text', () => {
+  it('leaves a text within the limit as it is', () => {
+    expect(middleEllipsis('/srv/blog', 9)).toBe('/srv/blog')
+  })
+
+  it('cuts the middle and keeps the end (the file name) a little longer', () => {
+    expect(middleEllipsis('/srv/a/very/long/path/compose.yaml', 20)).toBe('/srv/a/…compose.yaml')
+  })
+
+  it.each([
+    [11, 'abcd…uvwxyz'],
+    [3, '…yz'],
+    [2, '…z'],
+    [1, '…'],
+    [0, '…']
+  ])('cut to %i characters → %s', (max, expected) => {
+    expect(middleEllipsis('abcdefghijklmnopqrstuvwxyz', max)).toBe(expected)
+  })
+})
+
+describe('shortenReason — paths in a reason stay readable (#44)', () => {
+  it('shows the home folder as ~ and cuts a long path in the middle', () => {
+    const reason = 'compose file /home/u/Documents/clients/acme/projects/2026/backend/compose.yaml is missing'
+    expect(shortenReason(reason, '/home/u')).toBe('compose file ~/Documents/cli…026/backend/compose.yaml is missing')
+  })
+
+  it('leaves a reason with short paths or none as it is', () => {
+    expect(shortenReason('project name also used by /srv/x', '/home/u')).toBe('project name also used by /srv/x')
+    expect(shortenReason('invalid port', '/home/u')).toBe('invalid port')
+  })
+
+  const long = '/home/u/Documents/clients/acme/projects/2026/backend'
+
+  it('leaves the quotes and punctuation around a path outside it', () => {
+    expect(shortenReason(`working dir is not an absolute path: "${long}"`, '/home/u')).toBe('working dir is not an absolute path: "~/Documents/cli…me/projects/2026/backend"')
+    expect(shortenReason('folder /home/u/x, then /home/u/y.', '/home/u')).toBe('folder ~/x, then ~/y.')
+  })
+
+  it('leaves slashes that are not a path as they are', () => {
+    const text = `start and/or stop, see https://example.com${long}`
+    expect(shortenReason(text, '/home/u')).toBe(text)
+  })
+
+  it('shortens a quoted path whole, spaces included', () => {
+    expect(shortenReason('compose file "/home/u/My Projects/clients/acme/2026/backend/compose.yaml" is missing', '/home/u')).toBe(
+      'compose file "~/My Projects/c…026/backend/compose.yaml" is missing'
+    )
+  })
+
+  it('never splits a character outside the Basic Multilingual Plane', () => {
+    const cut = middleEllipsis(`/srv/${'a'.repeat(9)}🐳${'b'.repeat(40)}`, 20)
+    expect(cut).not.toMatch(/[\uD800-\uDFFF](?![\uDC00-\uDFFF])/u)
+    expect(Array.from(cut)).toHaveLength(20)
+    expect(middleEllipsis(`🐳${'a'.repeat(20)}🐳`, 4)).toBe('🐳…a🐳')
+  })
+
+  it('shortens every path of a reason, and the home folder alone', () => {
+    expect(shortenReason(`${long} and ${long}`, '/home/u')).toBe('~/Documents/cli…me/projects/2026/backend and ~/Documents/cli…me/projects/2026/backend')
+    expect(shortenReason('folder /home/u is missing', '/home/u')).toBe('folder ~ is missing')
   })
 })

@@ -13,11 +13,15 @@ file format (`services.yaml`) and the installed package.
   file") instead of after the 5 s read timeout, and a file swapped or grown after the check is still
   refused unread (#20).
 - Pin file: the size-cap error reads in KiB, like ADR-0005 (#21).
-- A missing project now names what is gone: `folder /srv/x is missing` or
-  `compose file /srv/x/compose.yaml is missing` (#12).
+- A missing project now names what is gone: `folder "/srv/x" is missing` or
+  `compose file "/srv/x/compose.yaml" is missing` (#12); paths in reasons are quoted, spaces included.
 
 ### Changed
 
+- Dashboard: a long path in a row's reason is cut in the middle, with `~` for the home folder; the
+  full reason is the tooltip (#44).
+- Dashboard: "Loading…" until the first state arrives; captions on the Running tables; banners use
+  a warning colour; a ring marks the hovered Start button; long names wrap in the tables (#14).
 - Start at login: the entry is written atomically with its mode always set; an unreadable entry
   hides the checkbox instead of showing it as off (#13).
 - Package: Debian maintainer with an email (no lintian warning), `desktopName` set, README

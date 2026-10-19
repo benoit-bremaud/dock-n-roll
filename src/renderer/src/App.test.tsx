@@ -115,6 +115,25 @@ describe('App — header and paths (diagram 09)', () => {
     const dir = within(await rowOf('Blog')).getByText('~/Documents/blog')
     expect(dir.getAttribute('title')).toBe('/home/u/Documents/blog')
   })
+
+  it('cuts a long path in the reason, the full reason as a tooltip (#44)', async () => {
+    const reason = 'compose file /home/u/Documents/clients/acme/projects/2026/backend/compose.yaml is missing'
+    render(<App api={fakeApi(state({ services: [view({ status: 'missing', reason })] })).api} />)
+
+    const row = await rowOf('Blog')
+    const shown = within(row).getByText('compose file ~/Documents/cli…026/backend/compose.yaml is missing')
+    expect(shown.getAttribute('title')).toBe(reason)
+    // Screen readers get the full reason, not the cut one.
+    expect(shown.getAttribute('aria-hidden')).toBe('true')
+    expect(within(row).getByText(reason).className).toBe('visually-hidden')
+  })
+
+  it('has no tooltip on a reason short enough to show whole', async () => {
+    render(<App api={fakeApi(state({ services: [view({ status: 'missing', reason: 'folder /srv/x is missing' })] })).api} />)
+
+    const shown = within(await rowOf('Blog')).getByText('folder /srv/x is missing')
+    expect([shown.getAttribute('title'), shown.getAttribute('aria-hidden')]).toEqual([null, null])
+  })
 })
 
 describe('App — services tab (spec §4, UC1–UC3, UC5)', () => {
@@ -151,6 +170,7 @@ describe('App — services tab (spec §4, UC1–UC3, UC5)', () => {
     render(<App api={fake.api} />)
 
     expect((await screen.findByRole('alert')).textContent).toBe('Could not read the state: IPC closed')
+    expect(screen.queryByRole('status')).toBeNull()
   })
 
   it('shows the status as a word next to the colour badge', async () => {
@@ -244,6 +264,22 @@ describe('App — services tab (spec §4, UC1–UC3, UC5)', () => {
   })
 })
 
+describe('App — loading (#14)', () => {
+  it('says it is loading until the first state arrives', () => {
+    const { api } = fakeApi(state({ services: [view()] }))
+    render(<App api={{ ...api, getState: () => new Promise(() => undefined) }} />)
+
+    expect(screen.getByRole('status').textContent).toBe('Loading…')
+  })
+
+  it('drops the loading notice once the state arrives', async () => {
+    render(<App api={fakeApi(state({ services: [view()] })).api} />)
+
+    await rowOf('Blog')
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+})
+
 describe('App — banners (spec §4, §9 Q1)', () => {
   const bannerTexts = async (): Promise<string[]> =>
     [...(await screen.findByRole('alert')).querySelectorAll('p')].map((p) => p.textContent)
@@ -329,6 +365,8 @@ describe('App — running tab (UC4)', () => {
     await userEvent.setup().click(screen.getByRole('tab', { name: 'Running' }))
 
     const sonar = (await screen.findByText('sonarqube:community')).closest('tr')
+    expect(screen.getByRole('table', { name: 'Containers' }).querySelector('caption')?.textContent).toBe('Every container on this machine, running or stopped.')
+    expect(screen.getByRole('table', { name: 'Listening ports' }).querySelector('caption')?.textContent).toBe('TCP ports listening on this machine, and what owns them.')
     expect(sonar?.textContent).toBe('sonarqubesonarqube:communityrunninghealthysonarqube')
     expect(screen.getByText('pyinstaller-test').closest('tr')?.textContent).toBe('pyinstaller-testalpine:3.20exited——')
     expect(screen.getByText('node (pid 42)')).toBeTruthy()

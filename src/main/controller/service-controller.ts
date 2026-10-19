@@ -167,9 +167,9 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
 
   const reasonOf = (service: Service, inputs: StatusInputs): string | null => {
     if (service.invalidReason !== null) return service.invalidReason
-    if (inputs.conflict) return `project name also used by ${service.conflictingDirs.join(', ')}`
+    if (inputs.conflict) return `project name also used by ${service.conflictingDirs.map((dir) => JSON.stringify(dir)).join(', ')}`
     const missing = missingPaths.get(service.id)
-    if (missing) return `${missing.kind} ${missing.path} is missing`
+    if (missing) return `${missing.kind} ${JSON.stringify(missing.path)} is missing`
     if (unresolved(service)) return 'Compose project name could not be resolved'
     return lastError.get(service.id) ?? null
   }

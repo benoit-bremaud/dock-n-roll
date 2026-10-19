@@ -1,39 +1,41 @@
-# Local review — dock-n-roll (branch diff main...chore/types-node-electron-align)
+# Local review — dock-n-roll (feat/dashboard-polish, brick E PR 1: #14 #44)
 
 - Date: 2026-10-19
-- Commit: working tree on top of 36e6a37
-- Scope: branch diff `main...HEAD` — `package.json`, `pnpm-lock.yaml`, `.github/dependabot.yml`
-- Checks run: design · docs · tests · security · correctness (inline, proportional: no source code changed)
-- Verdict: **ship as-is** · Must 0 · Should 0 · Nice 1
+- Scope: branch diff main...feat/dashboard-polish
+- Checks run: design · docs · tests · security · correctness
+- Verdict: ship after fixes · Must 2 (fixed) · Should 5 (fixed) · Nice 5 (filed)
 
-## Pre-merge gate (head = working tree on 36e6a37)
+## Pre-merge gate
 | Step | Result |
 |---|---|
-| 1 Tests | ✅ 545 unit/integration (34 files) · ✅ E2E smoke 8/8 on `electron-builder --linux dir` |
-| 2 Coverage | tests 97.12 % stmts / 92.04 % branches / 97.58 % funcs / 98.44 % lines (floors 90/85/90/90) · docs: no code changed |
-| 3 SonarQube | ✅ PASSED (new coverage 97.5, duplication 0.0, new violations 0) |
+| 1 Tests | ✅ 561 unit/integration · ✅ E2E smoke 8/8 on the `--linux dir` build |
+| 2 Coverage | 97.16 % stmts / 92.11 % branches / 97.62 % funcs / 98.46 % lines (gate 90/85/90/90) |
+| 3 SonarQube | ✅ PASSED (new coverage 97.7 %, 0 new issues, 0 % duplication) |
 | 4 Secrets | ✅ gitleaks clean · no tracked .env · diff read: nothing sensitive |
-| 5 QA pass | ✅ smoke only (tooling diff): app starts, `app://` dashboard renders, no console or CSP error |
-- Gate: **GREEN — merge authorised**
+| 5 QA pass | ✅ E2E smoke on the packaged app (ADR-0010): console and CSP clean |
 
-## 🔴 Must Have
-_None._
+## 🔴 Must Have (fixed)
+- `src/renderer/src/format.ts` `[correctness|tests]` · the path regex matched "and/or", URLs and trailing quotes or punctuation · bounded regex `REASON_PATH`, tests per case.
+- `src/renderer/src/format.ts` `[correctness]` · `middleEllipsis` returned more than `max` for `max ≤ 1` · guard, `it.each` over 0–11.
 
-## 🟡 Should Have
-_None._
+## 🟡 Should Have (fixed)
+- `ServiceRow.tsx` `[a11y]` · full reason only in `title` · tooltip only when cut; full reason in a visually hidden span, the cut one `aria-hidden`.
+- `format.test.ts` / `App.test.tsx` `[tests]` · edge cases: several paths, home alone, quotes, URL; loading notice dropped once the state arrives.
+- `format.ts` `[docs]` · `shortenReason` docstring matched only "absolute paths"; `0.4` named `HEAD_SHARE`.
+- `App.tsx` `[docs]` · `ServicesPanel` docstring covers the read-error case; explicit `null`.
+- `tokens.css` `[design]` · `--radius-round: 50%` removed (nothing to theme).
 
-## 🔵 Nice to Have
-- `package.json` `[correctness]` · `engines.node` is `>=22.12.0` while `@types/node` is now 24: build-time
-  scripts (`electron.vite.config.ts`, `e2e/smoke.mjs`) could use a Node 24-only API without the
-  typecheck noticing on a Node 22 host · raise `engines.node` to `>=24` when the CI runner and the
-  owner's machine are on Node 24 (follow-up issue).
+## 🔵 Nice to Have (filed as an issue)
+- `ServicesPanel` could move to `components/`.
+- `.app__empty` now also styles the loading notice (rename to `app__notice`).
+- A distinct error colour for `role=alert` read errors vs warning banners.
+- `.running td { overflow-wrap: anywhere }` may break mid-word on a narrow window; limit to Name/Image.
+- Loading `<output>` mounted already filled may not be announced (initial render: read in normal flow).
 
 ## ⚪ Disagree / Intentional
-- `package.json` `[correctness]` · `@types/node` 24 rather than the roadmap's 26 · Electron 44 bundles
-  Node 24.21.0 (`process.versions.node`); typing 26 would allow APIs missing at runtime · owner MCDA
-  2026-10-19 (500 vs 350).
+- `<caption>` + `aria-labelledby`: the heading names the table, the caption describes it.
+- Badge `1lh`: the badge inherits the row's body font and line-height, the same as the name's line.
+- Forced colours: the hover ring now falls back to an outline (fixed alongside).
 
 ## Per-dimension summary
-- Design: no structure touched · Docs: Dependabot ignore rule carries its rationale inline · Tests: no
-  test change needed, typecheck is the guard · Security: version pinned exactly, 18 days old, lockfile
-  only swaps the `@types/node` peer · Correctness: typecheck and all suites green against Node 24 types.
+- Design: proportionate; one superfluous token removed · Docs: two docstrings corrected · Tests: edge cases added · Security: text only, no HTML injection · Correctness: two edge bugs fixed.

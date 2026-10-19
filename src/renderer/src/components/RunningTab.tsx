@@ -50,6 +50,7 @@ export function RunningTab({ api }: { readonly api: DockNRollApi }): React.JSX.E
         <p className="app__empty">No container.</p>
       ) : (
         <table aria-labelledby="running-containers">
+          <caption>Every container on this machine, running or stopped.</caption>
           <thead>
             <tr><th>Name</th><th>Image</th><th>State</th><th>Health</th><th>Project</th></tr>
           </thead>
@@ -67,6 +68,7 @@ export function RunningTab({ api }: { readonly api: DockNRollApi }): React.JSX.E
         <p className="app__empty">No listening port.</p>
       ) : (
         <table aria-labelledby="running-ports">
+          <caption>TCP ports listening on this machine, and what owns them.</caption>
           <thead>
             <tr><th>Port</th><th>Address</th><th>Owner</th></tr>
           </thead>
