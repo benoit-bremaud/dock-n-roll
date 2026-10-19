@@ -75,6 +75,27 @@ describe('followLogs — diagram 14, ADR-0008', () => {
     await waitFor(() => text === 'café\noops\n')
   })
 
+  it('decodes stdout and stderr apart, so a character split in one is not broken by the other', async () => {
+    follow('web')
+    await waitFor(() => daemon.openLogStreams === 1)
+    const cafe = frame(1, 'café\n')
+    const insideE = cafe.indexOf(0xc3) + 1
+    const header = (stream: 1 | 2, size: number): Uint8Array => {
+      const bytes = new Uint8Array(8)
+      bytes[0] = stream
+      new DataView(bytes.buffer).setUint32(4, size)
+      return bytes
+    }
+    const payload = cafe.slice(8)
+    const cut = insideE - 8
+
+    daemon.writeLogs(new Uint8Array([...header(1, cut), ...payload.slice(0, cut), ...frame(2, 'err\n'), ...header(1, payload.length - cut), ...payload.slice(cut)]))
+
+    // The é survives the stderr frame in between. The lines still interleave by frame, as Docker
+    // sends them: the panel has one unfinished line for both streams.
+    await waitFor(() => text === 'caferr\né\n')
+  })
+
   it('passes a TTY container raw stream through', async () => {
     daemon.ttyLogs.add('web')
     follow('web')

@@ -1,5 +1,6 @@
 import { request } from 'node:http'
-import { MAX_LOG_LINES, parseLogFrames } from '../domain/log-lines'
+import { MAX_LOG_LINES } from '../domain/log-lines'
+import { parseLogFrames, type LogFrame } from './docker-frames'
 import { API_PREFIX } from './docker-observer'
 
 // Follows one container's logs over the Docker socket (ADR-0008, diagram 14).
@@ -42,25 +43,32 @@ export function followLogs(socketPath: string, containerId: string, listener: Lo
     }
     // Docker names the framing in the content type (API >= 1.42): raw text for a TTY container.
     const multiplexed = response.headers['content-type'] !== 'application/vnd.docker.raw-stream'
-    // One decoder for the whole stream: a character may be split across chunks.
-    const decoder = new TextDecoder()
+    // One decoder per stream: a character split across frames of stdout is not broken by a
+    // stderr frame between them. A TTY stream uses the stdout one.
+    const stdout = new TextDecoder()
+    const stderr = new TextDecoder()
+    // Stream byte 2 is stderr; 1 (and 0, never sent for logs) is stdout.
+    const decode = (stream: number, bytes: Uint8Array): string => (stream === 2 ? stderr : stdout).decode(bytes, { stream: true })
+    const emit = (frames: readonly LogFrame[]): void => {
+      for (const { stream, bytes } of frames) listener.onText(decode(stream, bytes))
+    }
     let rest: Uint8Array = new Uint8Array()
     response.on('data', (chunk: Buffer) => {
       if (stopped) return
       if (!multiplexed) {
-        listener.onText(decoder.decode(chunk, { stream: true }))
+        listener.onText(decode(1, chunk))
         return
       }
       const parsed = parseLogFrames(Buffer.concat([rest, chunk]))
       rest = parsed.rest
       if (parsed.invalid) {
-        // Payloads before the bad header still count; nothing after it is trusted.
-        for (const payload of parsed.payloads) listener.onText(decoder.decode(payload, { stream: true }))
+        // Frames before the bad header still count; nothing after it is trusted.
+        emit(parsed.frames)
         end('Unreadable log stream')
         call.destroy()
         return
       }
-      for (const payload of parsed.payloads) listener.onText(decoder.decode(payload, { stream: true }))
+      emit(parsed.frames)
     })
     response.on('error', (error) => {
       end(error.message)

@@ -137,6 +137,11 @@ Primary actor for all: **Developer**. Supporting actor: **Docker Engine**.
     publishing it, else "unknown (root process)").
 - Read-only in V1.
 
+### UC5 — Open a service in the browser
+
+- Precondition: the service has a `url` in the pin file.
+- Developer clicks the link icon → system opens the URL in the default browser.
+
 ### UC6 — Restart a service (v1.1)
 
 - **Precondition**: Stop is allowed (UC2) and the status is not `missing` (the `up` needs the files).
@@ -155,13 +160,9 @@ Primary actor for all: **Developer**. Supporting actor: **Docker Engine**.
   the panel closes. A service with several containers offers a container picker. Diagram 14.
 - **Extensions**: no container yet → "No container yet", Reopen offered; the container stops
   or the daemon drops → stream ended, Reopen offered; the dashboard is hidden or reloaded →
-  stream closed, lines kept, "Logs closed", Reopen offered.
-- **Note**: text only (no HTML, ANSI removed); only one panel open at a time; read-only.
-
-### UC5 — Open a service in the browser
-
-- Precondition: the service has a `url` in the pin file.
-- Developer clicks the link icon → system opens the URL in the default browser.
+  stream closed, lines kept, "Logs closed", Reopen offered; the service left the pin file
+  before the panel opened → "Service no longer listed".
+- **Note**: text only (no HTML, ANSI removed, a `\r`-redrawn line shows its last state); only one panel open at a time; read-only.
 
 ## 6. Risks and constraints (from the brainstorm, verified on the workstation 2026-10-09)
 

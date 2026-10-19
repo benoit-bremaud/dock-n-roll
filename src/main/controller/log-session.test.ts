@@ -144,14 +144,22 @@ describe('createLogSession — UC7, diagram 14', () => {
     expect(last()).toBeNull()
   })
 
-  it('ignores an unknown service and a close with nothing open', () => {
-    const { session, follows, pushes } = setup()
+  it('ignores a close with nothing open', () => {
+    const { session, pushes } = setup()
 
-    session.open('nope', null)
     session.close()
 
-    expect(follows).toEqual([])
     expect(pushes).toEqual([])
+  })
+
+  it('ends the panel when the service is no longer listed, closing the previous stream', () => {
+    const { session, follows, last } = setup({ blog: [web] })
+    session.open('blog', null)
+
+    session.open('gone', null)
+
+    expect(follows.map((f) => [f.id, f.stopped])).toEqual([['w', true]])
+    expect(last()).toEqual({ serviceId: 'gone', containerId: null, containers: [], lines: [], ended: 'Service no longer listed' })
   })
 
   it('ignores late callbacks of a replaced stream', () => {
