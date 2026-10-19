@@ -19,7 +19,8 @@ file format (`services.yaml`) and the installed package.
 ### Changed
 
 - Docker events are published once per burst (at least every 50 events) instead of once per event:
-  a `compose up` no longer rebuilds the tray menu dozens of times (#12).
+  a `compose up` no longer rebuilds the tray menu dozens of times. A container that stops or crashes
+  is still published at once (#12).
 
 ## [1.1.0] - 2026-10-16
 

@@ -201,13 +201,16 @@ export function observeDocker(options: DockerObserverOptions, listener: DockerLi
         lost(attempt, error instanceof Error ? error.message : String(error))
       })
     }
-    const apply = async (event: DockerEvent): Promise<void> => {
-      if (!isCurrent(attempt)) return
+    /** Applies one event; true when it took a running container out of `running`. */
+    const apply = async (event: DockerEvent): Promise<boolean> => {
+      if (!isCurrent(attempt)) return false
+      const wasRunning = snapshot.get(event.id)?.state === 'running'
       if (event.kind === 'removed') {
         snapshot.delete(event.id)
       } else {
         await inspectInto(event.id, snapshot, attempt)
       }
+      return wasRunning && snapshot.get(event.id)?.state !== 'running'
     }
     const publish = (): void => {
       if (isCurrent(attempt)) {
@@ -227,12 +230,14 @@ export function observeDocker(options: DockerObserverOptions, listener: DockerLi
         if (live) {
           pending += 1
           enqueue(async () => {
-            await apply(event)
+            const leftRunning = await apply(event)
             pending -= 1
             unpublished += 1
             // A `compose up` fires dozens of events: one publish (one recomputation, one IPC push)
-            // per drained burst, with `maxBatch` as a floor so an endless stream still shows.
-            if (pending === 0 || unpublished >= maxBatch) {
+            // per drained burst, with `maxBatch` as a floor so an endless stream still shows. A
+            // container leaving `running` always publishes at once: crash notifications and health
+            // gates must see it even when a restart follows in the same burst.
+            if (leftRunning || pending === 0 || unpublished >= maxBatch) {
               unpublished = 0
               publish()
             }
@@ -263,7 +268,9 @@ export function observeDocker(options: DockerObserverOptions, listener: DockerLi
     snapshot = fresh
     live = true
     for (const event of buffered.splice(0)) {
-      enqueue(() => apply(event))
+      enqueue(async () => {
+        await apply(event)
+      })
     }
     enqueue(() => {
       if (isCurrent(attempt)) delay = initialDelay
