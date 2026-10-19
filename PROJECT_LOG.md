@@ -396,3 +396,16 @@ Sensitivity: C and A stay top two and G last under value 45 or effort 35; E pass
 - **Brick A+F done**: #40, #45 and #48 close #12, #13, #20, #21, #23 and #27. New backlog: #41 (stop
   all), #43, #44 and #47.
 - Next: brick D, major upgrades (TS7 / Vite 8 / electron-vite 6 / @types/node 26).
+
+## 2026-10-19 — Brick D, PR 1: @types/node aligned with Electron (PR #53)
+
+- Owner MCDA: ship what is eligible now, park the rest (455, against 360 to wait and 255 to break the
+  2-week age rule). Blockers found: typescript-eslint 8.71.2 peers `typescript <6.1.0`, so TS7 is parked
+  in #51; electron-vite 6.0.0 dates from 2026-10-14 and electron-vite 5 peers `vite <=7`, so Vite 8,
+  electron-vite 6 and plugin-react 6 ship together in #52 on 2026-10-28.
+- `@types/node` 22.20.5 → 24.19.1, not 26: Electron 44 bundles Node 24.21.0 (owner MCDA 500 vs 350).
+  Dependabot ignores `@types/node` majors, which follow Electron by hand.
+- Gate: 545 tests, coverage 97.1 / 92.0 / 97.6 / 98.4, Sonar OK, gitleaks clean, E2E smoke 8/8, CI
+  green, and Codex found nothing. Local review: Must 0, Should 0, 1 Nice → #50 (`engines.node` >= 24).
+  Merged `92eb8ef`.
+- Next: brick E (dashboard polish #14 #33 #44 #47) while #52 waits for 2026-10-28.
