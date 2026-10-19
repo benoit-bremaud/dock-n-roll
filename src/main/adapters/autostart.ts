@@ -1,4 +1,4 @@
-import { mkdir, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 // XDG autostart (ADR-0006): GNOME runs every `.desktop` file of ~/.config/autostart at login.
@@ -36,12 +36,17 @@ export function autostartEntry(executablePath: string): string {
   ].join('\n')
 }
 
-/** Whether our entry exists. An entry disabled by another tool (`Hidden=true`) still reads as on. */
+/**
+ * Whether our entry exists. An entry disabled by another tool (`Hidden=true`) still reads as on.
+ * Only a missing entry reads as off: any other error (EACCES…) is thrown, so an unreadable
+ * setting is never shown as "off".
+ */
 export async function isAutostartEnabled(entryPath: string): Promise<boolean> {
   try {
     return (await stat(entryPath)).isFile()
-  } catch {
-    return false
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error.code === 'ENOENT' || error.code === 'ENOTDIR')) return false
+    throw error
   }
 }
 
@@ -49,7 +54,19 @@ export async function isAutostartEnabled(entryPath: string): Promise<boolean> {
 export async function setAutostart(entryPath: string, enabled: boolean, executablePath: string): Promise<void> {
   if (enabled) {
     await mkdir(dirname(entryPath), { recursive: true })
-    await writeFile(entryPath, autostartEntry(executablePath), { mode: 0o644 })
+    // Written aside then renamed: GNOME never reads half an entry, and the mode is applied even
+    // when the entry already exists (`writeFile` only sets it on creation). GNOME ignores the
+    // temporary file (no `.desktop` suffix); one left by a crash is replaced, never followed.
+    const temporary = `${entryPath}.tmp`
+    await rm(temporary, { force: true, recursive: true })
+    try {
+      await writeFile(temporary, autostartEntry(executablePath), { flag: 'wx' })
+      await chmod(temporary, 0o644)
+      await rename(temporary, entryPath)
+    } catch (error) {
+      await rm(temporary, { force: true, recursive: true })
+      throw error
+    }
   } else {
     await rm(entryPath, { force: true })
   }

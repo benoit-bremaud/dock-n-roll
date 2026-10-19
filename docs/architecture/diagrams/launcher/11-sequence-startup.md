@@ -39,6 +39,9 @@ sequenceDiagram
     Note over M,W: a page still loading drops that push; its did-finish-load pushes again
     opt packaged build
       M->>M: await autostart state
+      alt entry unreadable (EACCES…)
+        M->>M: log; Start at login not offered
+      end
     end
     M->>T: render menu from current state
   end

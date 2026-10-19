@@ -5,6 +5,7 @@
   "description": "GNOME top-bar launcher for local dev services: one-click ON/OFF for Docker Compose projects + background activity monitor",
   "license": "UNLICENSED",
   "homepage": "https://github.com/benoit-bremaud/dock-n-roll",
+  "desktopName": "dock-n-roll.desktop",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/benoit-bremaud/dock-n-roll.git"

@@ -98,6 +98,16 @@ function toElectron(entries: readonly MenuEntry[]): MenuItemConstructorOptions[]
 const AUTOSTART_ENTRY = join(app.getPath('appData'), 'autostart', 'dock-n-roll.desktop')
 let autostart: AutostartToggle | undefined
 
+/** The current setting, or undefined when it cannot be read: the checkbox is then not offered. */
+async function readAutostart(): Promise<boolean | undefined> {
+  try {
+    return await isAutostartEnabled(AUTOSTART_ENTRY)
+  } catch (error) {
+    console.error('dock-n-roll: cannot read the autostart entry', error)
+    return undefined
+  }
+}
+
 /** Shown until the controller exists, so a slow startup never leaves the app without a tray (#8). */
 function createStartingTray(): Tray {
   const trayIcon = new Tray(nativeImage.createFromPath(TRAY_ICON_PATH))
@@ -193,9 +203,10 @@ async function start(trayIcon: Tray): Promise<void> {
   // A dashboard opened during startup read no state (no IPC yet), and `publish()` skips an
   // unchanged state: hand it the current one now (diagram 11).
   pushStateTo(() => dashboard, created.state())
-  if (app.isPackaged) {
+  const autostartInitial = app.isPackaged ? await readAutostart() : undefined
+  if (autostartInitial !== undefined) {
     autostart = createAutostartToggle({
-      initial: await isAutostartEnabled(AUTOSTART_ENTRY),
+      initial: autostartInitial,
       write: (enabled) => setAutostart(AUTOSTART_ENTRY, enabled, process.execPath),
       onChange: () => {
         renderTray(trayIcon, created, created.state())
