@@ -1,34 +1,32 @@
-# Local review — dock-n-roll (chore/sonar-logic-smells)
+# Local review — dock-n-roll (docs/fuse-rationale-single-source)
 
 - Date: 2026-10-22
-- Commit: 43a425c
-- Scope: branch diff chore/sonar-mechanical-smells...HEAD (#30, part 2: logic and a11y Sonar smells)
+- Commit: 00318ab
+- Scope: branch diff origin/main...HEAD (#22: single source for the Electron fuse rationale)
 - Checks run: design · docs · tests · security · correctness
-- Verdict: ship as-is  ·  Must 0 · Should 2 (applied) · Nice 2 (1 applied)
+- Verdict: ship as-is  ·  Must 0 · Should 0 · Nice 0
 
-## Pre-merge gate (head SHA 43a425c)
+## Pre-merge gate (head SHA 00318ab)
 | Step | Result |
 |---|---|
-| 1 Tests | ✅ 591 unit/integration · ✅ packaged E2E smoke 8/8 (+ fuse check) |
-| 2 Coverage | vitest thresholds 90/85/90/90 met · Sonar new coverage 97.1 % · new functions documented |
-| 3 SonarQube | ✅ PASSED (new_violations 0, duplication 0.0 %); open issues 4 → **0** |
+| 1 Tests | ✅ 589 unit/integration · ✅ packaged E2E smoke 8/8 (includes the `GrantFileProtocolExtraPrivileges` fuse check) |
+| 2 Coverage | vitest thresholds 90/85/90/90 met · Sonar new coverage 98.1 % · docs: ADR-0006 updated |
+| 3 SonarQube | ✅ PASSED (new_violations 0) |
 | 4 Secrets | ✅ gitleaks clean (origin/main..HEAD) · no tracked .env · diff read: nothing sensitive |
-| 5 QA pass | ✅ packaged app: focus Services, ArrowRight → Running selected and focused, Home → Services, End → Running; console clean · `docs/architecture/qa/2026-10-22-tabs-keyboard.png` |
+| 5 QA pass | ✅ smoke only (docs + YAML comments; fuse values unchanged, verified on the built binary) |
 - Gate: **GREEN — merge authorised**
 
 ## 🔴 Must Have
 _None._
 
 ## 🟡 Should Have
-- `src/main/controller/background-monitor.ts:7` `[docs]` · UC4 JSDoc ended up on `projectNameOf` · applied: moved back above `listBackground`.
-- `src/renderer/src/App.test.tsx` `[tests]` · with two tabs, ArrowLeft wrap and End land on the same tab · applied: ArrowRight wrap from the last tab asserted too.
-
-## 🔵 Nice to Have
-- `src/main/index.ts:216` `[tests]` · enable/disable dispatch untested · kept: `index.ts` is the composition root, excluded from coverage by design.
-- `src/main/adapters/autostart.test.ts:5` `[design]` · import order · applied.
-
-## ⚪ Disagree / Intentional
 _None._
 
+## 🔵 Nice to Have
+_None._
+
+## ⚪ Disagree / Intentional
+- ADR-0010, diagrams 10 and 15 still name fuses · they state facts (what the smoke checks, what the binary has), not the rationale; kept.
+
 ## Per-dimension summary
-- Design: boolean-flag API split, helpers extracted · Docs: no stale `setAutostart` reference · Tests: 2 new behaviour tests · Security: nothing new · Correctness: behaviour preserved; keys typed inside the panels no longer reach the tab handler.
+- Design: n/a · Docs: ADR-0006 was stale (said `grantFileProtocolExtraPrivileges` on), now the one table of every fuse · Tests: fuse value still checked by the smoke · Security: fuse values unchanged · Correctness: only comments in `electron-builder.yml` changed.

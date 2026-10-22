@@ -1,17 +1,13 @@
 # Linux .deb only (ADR-0006): keeps Chromium's sandbox — the package installs an AppArmor profile
 # allowing user namespaces (Ubuntu 24.04), and makes chrome-sandbox setuid only where they are unavailable.
 appId: fr.bremaud.dock-n-roll
-# The installed binary runs at every login: turn off the fuses that make it a general Node runtime.
+# Rationale for every fuse, including those left at their defaults: ADR-0006 § Electron fuses.
 electronFuses:
   runAsNode: false
   enableNodeOptionsEnvironmentVariable: false
   enableNodeCliInspectArguments: false
   onlyLoadAppFromAsar: true
-  # The dashboard is served from app:// (ADR-0009), not file:.
   grantFileProtocolExtraPrivileges: false
-  # Left at their defaults (checked on the built app, brick C):
-  # - embeddedAsarIntegrityValidation: enforced on macOS/Windows only.
-  # - cookieEncryption: no session, no cookies to protect.
 productName: dock-n-roll
 directories:
   output: dist
