@@ -33,6 +33,7 @@ function makeController() {
     containers: () => [],
     containersOf: () => null,
     onChange: () => () => undefined,
+    onRecompute: () => () => undefined,
     dispose: () => undefined
   }
   return { controller, spies }
@@ -54,7 +55,7 @@ describe('registerIpc', () => {
     const made = makeController()
     controller = made.spies
     logs = { open: vi.fn<LogSession['open']>(), close: vi.fn<LogSession['close']>() }
-    const session: LogSession = { ...logs, onChange: () => () => undefined }
+    const session: LogSession = { ...logs, refresh: () => undefined, onChange: () => () => undefined }
     registerIpc({ controller: made.controller, listBackground: () => Promise.resolve(BACKGROUND), isTrusted: (event) => event === TRUSTED, logs: session })
   })
 

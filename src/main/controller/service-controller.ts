@@ -63,6 +63,11 @@ export interface ServiceController {
   containersOf(id: string): readonly ContainerSnapshot[] | null
   /** Returns the unsubscribe function. */
   onChange(listener: (state: ControllerState) => void): () => void
+  /**
+   * Called after every recomputation, published or not: container ids and states are not in
+   * `ControllerState`, so a restart between two snapshots changes nothing there (diagram 16).
+   */
+  onRecompute(listener: () => void): () => void
   /** Stops observing, closes the pin file, cancels probes and drops listeners. Final. */
   dispose(): void
 }
@@ -140,6 +145,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   const notifiedAt = new Map<string, number>()
   const stoppedAt = new Map<string, number>()
   const listeners = new Set<(state: ControllerState) => void>()
+  const recomputeListeners = new Set<() => void>()
   let current: ControllerState = { dockerAvailable, dockerReason, pinErrors, services: [], homeDir: deps.homeDir }
   let currentJson = JSON.stringify(current)
   let chain = Promise.resolve()
@@ -237,6 +243,13 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   const publish = (): void => {
     const next: ControllerState = { dockerAvailable, dockerReason, pinErrors, services: services.map(viewOf), homeDir: deps.homeDir }
     const nextJson = JSON.stringify(next)
+    for (const listener of recomputeListeners) {
+      try {
+        listener()
+      } catch (error) {
+        console.error('dock-n-roll: recompute listener failed', error)
+      }
+    }
     // Each push rebuilds the tray menu over D-Bus: an unchanged state must not close it under the pointer.
     if (nextJson === currentJson) return
     current = next
@@ -471,6 +484,10 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
       listeners.add(listener)
       return () => listeners.delete(listener)
     },
+    onRecompute: (listener) => {
+      recomputeListeners.add(listener)
+      return () => recomputeListeners.delete(listener)
+    },
     dispose: () => {
       disposed = true
       cancelNameRetry()
@@ -478,6 +495,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
       store.close()
       for (const id of [...probing.keys()]) cancelProbe(id)
       listeners.clear()
+      recomputeListeners.clear()
     }
   }
 }

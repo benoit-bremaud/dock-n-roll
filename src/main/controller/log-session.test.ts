@@ -1,25 +1,26 @@
 import { describe, expect, it } from 'vitest'
-import type { LogListener } from '../adapters/docker-logs'
+import { STREAM_ENDED, type LogListener } from '../adapters/docker-logs'
 import { container } from '../domain/test-fixtures'
 import type { ContainerSnapshot } from '../domain/types'
 import type { LogsState } from '../../shared/ipc'
 import { MAX_LOG_LINES } from '../domain/log-lines'
-import { createLogSession, PUSH_EVERY_MS } from './log-session'
+import { createLogSession, PUSH_EVERY_MS, RESTART_MARKER } from './log-session'
 
 interface Follow {
   readonly id: string
   readonly listener: LogListener
+  readonly since: number | undefined
   stopped: boolean
 }
 
-function setup(byService: Record<string, ContainerSnapshot[]> = {}) {
+function setup(byService: Record<string, ContainerSnapshot[] | undefined> = {}, clock = { now: 1_000_000 }) {
   const follows: Follow[] = []
   const timers: { run: () => void; delayMs: number; cancelled: boolean }[] = []
   const pushes: (LogsState | null)[] = []
   const session = createLogSession({
     containersOf: (id) => byService[id] ?? null,
-    follow: (id, listener) => {
-      const entry: Follow = { id, listener, stopped: false }
+    follow: (id, listener, since) => {
+      const entry: Follow = { id, listener, since, stopped: false }
       follows.push(entry)
       return {
         stop: () => {
@@ -27,6 +28,7 @@ function setup(byService: Record<string, ContainerSnapshot[]> = {}) {
         }
       }
     },
+    now: () => clock.now,
     schedule: (run, delayMs) => {
       const timer = { run, delayMs, cancelled: false }
       timers.push(timer)
@@ -217,5 +219,177 @@ describe('createLogSession — UC7, diagram 14', () => {
 
     expect(seen).toEqual([])
     expect(pushes).toHaveLength(1)
+  })
+})
+
+describe('createLogSession — across restarts (diagram 16)', () => {
+  const MARKER = RESTART_MARKER
+
+  it('resumes the same container when it runs again, after a marker, from the time it ended', () => {
+    const byService: Record<string, ContainerSnapshot[]> = { blog: [web] }
+    const clock = { now: 1_000_000 }
+    const { session, follows, last } = setup(byService, clock)
+    session.open('blog', null)
+    clock.now = 1_234_500
+    follows[0]?.listener.onText('before\n')
+    clock.now = 1_300_000
+    follows[0]?.listener.onEnd('Log stream ended')
+    byService.blog = [stoppedWeb]
+    session.refresh()
+
+    byService.blog = [web]
+    session.refresh()
+
+    expect(follows.map((f) => [f.id, f.since])).toEqual([['w', undefined], ['w', 1_234_500]])
+    expect(last()).toMatchObject({ containerId: 'w', lines: ['before', MARKER], ended: null })
+  })
+
+  it('follows a recreated container from its whole recent log', () => {
+    const byService: Record<string, ContainerSnapshot[]> = { blog: [web] }
+    const { session, follows, last } = setup(byService)
+    session.open('blog', null)
+    follows[0]?.listener.onEnd('Log stream ended')
+
+    byService.blog = [container({ id: 'w2', name: 'blog-web-1' })]
+    session.refresh()
+
+    expect(follows.map((f) => [f.id, f.since])).toEqual([['w', undefined], ['w2', undefined]])
+    expect(last()).toMatchObject({ containerId: 'w2', containers: [{ id: 'w2', name: 'blog-web-1' }], ended: null })
+  })
+
+  it('waits while nothing runs, refreshing the picker', () => {
+    const byService: Record<string, ContainerSnapshot[]> = { blog: [web] }
+    const { session, follows, last } = setup(byService)
+    session.open('blog', null)
+    follows[0]?.listener.onEnd('Log stream ended')
+
+    byService.blog = [stoppedWeb, container({ id: 'x', name: 'blog-worker-1', state: 'exited', exitCode: 1 })]
+    session.refresh()
+
+    expect(follows).toHaveLength(1)
+    expect(last()).toMatchObject({ ended: 'Log stream ended', containers: [{ id: 'w', name: 'blog-web-1' }, { id: 'x', name: 'blog-worker-1' }] })
+  })
+
+  it('starts following, without a marker, a service that had no container yet', () => {
+    const byService: Record<string, ContainerSnapshot[]> = { blog: [] }
+    const { session, follows, last } = setup(byService)
+    session.open('blog', null)
+
+    byService.blog = [web]
+    session.refresh()
+
+    expect(follows.map((f) => [f.id, f.since])).toEqual([['w', undefined]])
+    expect(last()).toMatchObject({ containerId: 'w', lines: [], ended: null })
+  })
+
+  it('prefers the container picked by hand when several run again', () => {
+    const byService: Record<string, ContainerSnapshot[]> = { blog: [web, db] }
+    const { session, follows } = setup(byService)
+    session.open('blog', 'd')
+    follows[0]?.listener.onEnd('Log stream ended')
+    byService.blog = [web, { ...db, state: 'exited' }]
+    session.refresh()
+
+    byService.blog = [web, db]
+    session.refresh()
+
+    expect(follows.map((f) => f.id)).toEqual(['d', 'd'])
+  })
+
+  it('resumes nothing after a close', () => {
+    const { session, follows, pushes } = setup({ blog: [web] })
+    session.open('blog', null)
+    session.close()
+    const count = pushes.length
+
+    session.refresh()
+
+    expect(follows).toHaveLength(1)
+    expect(pushes).toHaveLength(count)
+  })
+
+  it('ends the panel when the service leaves the pin file, stopping the stream', () => {
+    const byService: Record<string, ContainerSnapshot[] | undefined> = { blog: [web] }
+    const { session, follows, last } = setup(byService)
+    session.open('blog', null)
+
+    byService.blog = undefined
+    session.refresh()
+
+    expect(follows[0]?.stopped).toBe(true)
+    expect(last()).toEqual({ serviceId: 'blog', containerId: null, containers: [], lines: [], ended: 'Service no longer listed' })
+  })
+
+  it('pushes nothing when the open service did not change', () => {
+    const { session, pushes } = setup({ blog: [web] })
+    session.open('blog', null)
+    const count = pushes.length
+
+    session.refresh()
+
+    expect(pushes).toHaveLength(count)
+  })
+
+  it('does not follow again a stream that failed while its container still runs', () => {
+    const { session, follows, last } = setup({ blog: [web] })
+    session.open('blog', null)
+    follows[0]?.listener.onEnd('Docker answered 500')
+
+    session.refresh()
+    session.refresh()
+
+    expect(follows).toHaveLength(1)
+    expect(last()).toMatchObject({ ended: 'Docker answered 500' })
+  })
+
+  it('keeps a stopped container picked by hand instead of switching to a running one', () => {
+    const { session, follows, last } = setup({ blog: [web, { ...db, state: 'exited' }] })
+    session.open('blog', 'd')
+    follows[0]?.listener.onEnd('Log stream ended')
+
+    session.refresh()
+
+    expect(follows.map((f) => f.id)).toEqual(['d'])
+    expect(last()).toMatchObject({ containerId: 'd', ended: 'Log stream ended' })
+  })
+
+  it('remembers a stop published before the stream ended', () => {
+    const byService: Record<string, ContainerSnapshot[]> = { blog: [web] }
+    const { session, follows } = setup(byService)
+    session.open('blog', null)
+    byService.blog = [stoppedWeb]
+    session.refresh()
+    follows[0]?.listener.onEnd('Log stream ended')
+
+    byService.blog = [web]
+    session.refresh()
+
+    expect(follows.map((f) => f.id)).toEqual(['w', 'w'])
+  })
+
+  it('resumes from the open time when the stream gave no text', () => {
+    const byService: Record<string, ContainerSnapshot[]> = { blog: [stoppedWeb] }
+    const clock = { now: 2_000_000 }
+    const { session, follows } = setup(byService, clock)
+    session.open('blog', null)
+    session.refresh()
+    clock.now = 2_500_000
+    follows[0]?.listener.onEnd('Log stream ended')
+
+    byService.blog = [web]
+    session.refresh()
+
+    expect(follows.map((f) => [f.id, f.since])).toEqual([['w', undefined], ['w', 2_000_000]])
+  })
+
+  it('follows a container restarted between two snapshots, its stream having ended cleanly', () => {
+    const { session, follows, last } = setup({ blog: [web] })
+    session.open('blog', null)
+    follows[0]?.listener.onEnd(STREAM_ENDED)
+
+    session.refresh()
+
+    expect(follows.map((f) => f.id)).toEqual(['w', 'w'])
+    expect(last()).toMatchObject({ containerId: 'w', ended: null })
   })
 })

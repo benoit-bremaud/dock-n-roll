@@ -186,10 +186,15 @@ async function start(trayIcon: Tray): Promise<void> {
   })
   const session = createLogSession({
     containersOf: (id) => created.containersOf(id),
-    follow: (containerId, listener) => followLogs(socketPath, containerId, listener),
+    follow: (containerId, listener, sinceMs) => followLogs(socketPath, containerId, listener, { sinceMs }),
+    now: () => Date.now(),
     schedule
   })
   logs = session
+  // Diagram 16: every recomputation, not only published states, which hold no container ids.
+  created.onRecompute(() => {
+    session.refresh()
+  })
   session.onChange((state) => {
     pushLogsTo(() => dashboard, state)
   })
