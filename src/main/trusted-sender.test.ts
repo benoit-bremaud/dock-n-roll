@@ -24,6 +24,10 @@ describe('isTrustedSender', () => {
     expect(isTrustedSender(event({ sender: { id: 'other' } }), dashboard, packaged)).toBe(false)
   })
 
+  it('refuses a structural clone of the dashboard: the sender is compared by identity', () => {
+    expect(isTrustedSender(event({ sender: { ...dashboard } }), dashboard, packaged)).toBe(false)
+  })
+
   it('refuses a disposed frame', () => {
     expect(isTrustedSender(event({ senderFrame: null }), dashboard, packaged)).toBe(false)
   })
