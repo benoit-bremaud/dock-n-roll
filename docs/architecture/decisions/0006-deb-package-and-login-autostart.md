@@ -32,11 +32,19 @@ present, `~/.config/autostart` exists.
   does nothing on Linux). The entry runs the installed executable; it is per user, so it is not
   written by the package. The checkbox state changes only once the file is written; a failure is
   shown in a dialog and the checkbox snaps back.
-- **Electron fuses**: `runAsNode`, `NODE_OPTIONS` and the inspect flags are off, and the app only
-  loads from its asar: the binary launched at every login is not a general Node runtime.
-  `grantFileProtocolExtraPrivileges` stays on: turning it off breaks `loadFile()` of the dashboard
-  from the asar (ERR_FILE_NOT_FOUND, checked on the built app, brick C) until the renderer is served
-  from a custom protocol. ASAR integrity validation is enforced on macOS/Windows only.
+- **Electron fuses**: the binary launched at every login must not be a general Node runtime.
+  This section is the single source of the fuse rationale; `electron-builder.yml` and
+  `src/main/index.ts` only point here. Per fuse (`electronFuses` in `electron-builder.yml`):
+
+  | Fuse | Value | Why |
+  |---|---|---|
+  | `runAsNode` | off | `ELECTRON_RUN_AS_NODE` would turn the binary into a plain Node runtime. |
+  | `enableNodeOptionsEnvironmentVariable` | off | `NODE_OPTIONS` could inject code at launch. |
+  | `enableNodeCliInspectArguments` | off | `--inspect` would open a debugger on the running app. |
+  | `onlyLoadAppFromAsar` | on | the app code is only read from its asar, never from a side folder. |
+  | `grantFileProtocolExtraPrivileges` | off | the dashboard is served from `app://` (ADR-0009), so `file:` needs no extra privileges. Until ADR-0009 (2026-10-16) it stayed on: turning it off broke `loadFile()` from the asar (`ERR_FILE_NOT_FOUND`, brick C). `pnpm e2e:smoke` checks it on the built binary. |
+  | `embeddedAsarIntegrityValidation` | default | enforced on macOS/Windows only. |
+  | `cookieEncryption` | default | the dashboard keeps no session and no cookies to protect. |
 - **Dependencies**: Docker CLI, the Compose plugin and `iproute2` (`ss`).
 
 ### Consequences

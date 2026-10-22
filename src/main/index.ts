@@ -29,8 +29,8 @@ const DEV_SERVER_URL = !app.isPackaged ? process.env['ELECTRON_RENDERER_URL'] : 
 const DASHBOARD_ORIGIN: DashboardOrigin =
   DEV_SERVER_URL === undefined ? { kind: 'app', url: APP_PAGE_URL } : { kind: 'devServer', url: DEV_SERVER_URL }
 
-// The bundled page is served from app:// (ADR-0009, diagram 15), so the file: protocol needs no
-// extra privileges (fuse off). Must run before ready.
+// The bundled page is served from app:// (ADR-0009, diagram 15); fuses: ADR-0006 § Electron fuses.
+// Must run before ready.
 protocol.registerSchemesAsPrivileged([{ scheme: APP_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } }])
 
 let dashboard: BrowserWindow | null = null
