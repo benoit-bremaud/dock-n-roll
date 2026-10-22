@@ -409,3 +409,25 @@ Sensitivity: C and A stay top two and G last under value 45 or effort 35; E pass
   green, and Codex found nothing. Local review: Must 0, Should 0, 1 Nice → #50 (`engines.node` >= 24).
   Merged `92eb8ef`.
 - Next: brick E (dashboard polish #14 #33 #44 #47) while #52 waits for 2026-10-28.
+
+## 2026-10-22 — Brick E: dashboard polish (PRs #56 #58 #60 #62), brick closed
+
+- PR #56 (`e8f4ea9`): long reasons and paths are cut in the middle by code point (`middleEllipsis`), with
+  the full text kept for screen readers. Paths in reasons are quoted, spaces included. Captions and
+  tokens were polished (#14 #44). Codex P2 ×2 fixed.
+- PR #58 (`e31f9b8`): the application icon at 32 to 512 px for the launcher and the dashboard window
+  (#47). Owner choice: the tray icon stays monochrome.
+- PR #60 (`f499545`): logs decode stdout and stderr apart, keep the last redraw of `\r` progress bars,
+  and end on a service that is no longer listed. `registerIpc` takes a params object (#33, part 1).
+- PR #62 (`44c5482`): the logs panel follows a container again across restarts (diagram 16, owner MCDA
+  A 460). It keeps the lines, adds a `— container restarted —` marker, and resumes the same container
+  with `since`; a recreated one gets `tail`. The picker stays current. The review-local QA pass on the
+  packaged app found that a `docker restart` was never resumed, because published states carry no
+  container ids. Fix: `ServiceController.onRecompute`, and a clean stream end counts as a stop.
+  ADR-0008 addendum. Codex P2 ×2 fixed. Closes #33, which had been reopened because it was closed early.
+- Gate on #62: 589 tests, coverage 97.2 / 92.5 / 97.5 / 98.5, Sonar OK, gitleaks clean, E2E smoke 8/8,
+  QA screenshots `docs/architecture/qa/2026-10-22-logs-*.png`, CI green.
+- Workflow compliance: the GitHub Project "dock-n-roll" (#66) was created as the kanban. Nice items
+  filed: #57, #59, #63 (exact resume boundary, a line repeated around the marker) and #64 (panel opens
+  mid-buffer). #61 (service actions menu) is planned as its own brick.
+- Next: brick B, the legacy Sonar smells (#30) and #22. Then H (#25), then G. #52 is due 2026-10-28.
