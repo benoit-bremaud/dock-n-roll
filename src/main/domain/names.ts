@@ -14,8 +14,8 @@ export function isValidProjectName(name: string): boolean {
  * Returns `null` when nothing valid is left.
  */
 export function defaultProjectName(workingDir: string): string | null {
-  const base = workingDir.split('/').filter((part) => part !== '').pop() ?? ''
-  const name = base.toLowerCase().replace(/[^a-z0-9_-]/g, '').replace(/^[_-]+/, '')
+  const base = workingDir.split('/').findLast((part) => part !== '') ?? ''
+  const name = base.toLowerCase().replaceAll(/[^a-z0-9_-]/g, '').replace(/^[_-]+/, '')
   return isValidProjectName(name) ? name : null
 }
 

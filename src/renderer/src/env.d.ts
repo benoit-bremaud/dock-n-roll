@@ -2,8 +2,6 @@
 import type { DockNRollApi } from '../../shared/ipc'
 
 declare global {
-  interface Window {
-    /** Exposed by the preload script (src/preload/index.ts). */
-    readonly dockNRoll: DockNRollApi | undefined
-  }
+  /** Exposed on the window by the preload script (src/preload/index.ts). */
+  var dockNRoll: DockNRollApi | undefined
 }

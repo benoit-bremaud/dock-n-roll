@@ -26,7 +26,7 @@ function originOf(url: string): string | null {
  */
 export function isTrustedSender(event: SenderEvent, dashboardContents: object | null, origin: DashboardOrigin): boolean {
   const frame = event.senderFrame
-  if (frame === null || frame.parent !== null || dashboardContents === null || event.sender !== dashboardContents) return false
+  if (frame?.parent !== null || dashboardContents === null || event.sender !== dashboardContents) return false
   if (origin.kind === 'app') return frame.url === origin.url
   const frameOrigin = originOf(frame.url)
   return frameOrigin !== null && frameOrigin === originOf(origin.url)

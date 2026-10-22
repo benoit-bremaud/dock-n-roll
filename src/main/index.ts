@@ -24,7 +24,7 @@ import type { ControllerState } from '../shared/ipc'
 
 const TRAY_ICON_PATH = trayIconPath({ isPackaged: app.isPackaged, resourcesPath: process.resourcesPath, mainDir: __dirname })
 const RENDERER_DIR = join(__dirname, '../renderer')
-const DEV_SERVER_URL = !app.isPackaged ? process.env['ELECTRON_RENDERER_URL'] : undefined
+const DEV_SERVER_URL = app.isPackaged ? undefined : process.env['ELECTRON_RENDERER_URL']
 
 const DASHBOARD_ORIGIN: DashboardOrigin =
   DEV_SERVER_URL === undefined ? { kind: 'app', url: APP_PAGE_URL } : { kind: 'devServer', url: DEV_SERVER_URL }
@@ -226,10 +226,7 @@ async function start(trayIcon: Tray): Promise<void> {
   if (!trayIcon.isDestroyed()) renderTray(trayIcon, created, created.state())
 }
 
-if (!app.requestSingleInstanceLock()) {
-  // A second launch (autostart + manual start) must not add a second tray icon.
-  app.quit()
-} else {
+if (app.requestSingleInstanceLock()) {
   app.on('second-instance', showDashboard)
   // The single shutdown path, emitted before windows close whatever triggered the quit:
   // flag first (the dashboard really closes), then stop every input, then remove the icon.
@@ -263,4 +260,7 @@ if (!app.requestSingleInstanceLock()) {
       app.quit()
     })
   })
+} else {
+  // A second launch (autostart + manual start) must not add a second tray icon.
+  app.quit()
 }

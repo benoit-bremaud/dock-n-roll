@@ -11,8 +11,8 @@ import { dirname } from 'node:path'
  */
 function execArgument(path: string): string {
   if (/^[A-Za-z0-9/._+-]+$/.test(path)) return path
-  const quoted = `"${path.replace(/%/g, '%%').replace(/[\\"`$]/g, (char) => `\\${char}`)}"`
-  return quoted.replace(/\\/g, '\\\\')
+  const escaped = path.replaceAll('%', '%%').replaceAll(/[\\"`$]/g, (char) => '\\' + char)
+  return `"${escaped}"`.replaceAll('\\', '\\\\')
 }
 
 /**

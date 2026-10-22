@@ -25,8 +25,8 @@ export function RunningTab({ api }: { readonly api: DockNRollApi }): React.JSX.E
         setView(next)
         setError(next === null ? 'Could not scan: refused by the main process' : null)
       },
-      (failure: unknown) => {
-        if (ticket === latest.current) setError(`Could not scan: ${failure instanceof Error ? failure.message : String(failure)}`)
+      (error_: unknown) => {
+        if (ticket === latest.current) setError(`Could not scan: ${error_ instanceof Error ? error_.message : String(error_)}`)
       }
     )
   }, [api])
