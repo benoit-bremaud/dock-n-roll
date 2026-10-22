@@ -68,8 +68,9 @@ export function createLogSession(deps: LogSessionDeps): LogSession {
     partial = ''
   }
 
-  // Diagram 16 memory: the container last followed, and when its stream ended (epoch ms).
-  let endedAt: number | null = null
+  // Diagram 16 memory: when the followed stream last delivered text (or started), epoch ms. Used
+  // as `since` on resume: it predates the disconnect, so a fast restart loses no line.
+  let lastSeenAt: number | null = null
   // Set once the followed container is seen not running after its stream ended: a stream that
   // failed while the container still runs is not resumed (no re-follow loop).
   let seenDown = false
@@ -80,6 +81,7 @@ export function createLogSession(deps: LogSessionDeps): LogSession {
       containerId,
       {
         onText: (text) => {
+          if (stream === own) lastSeenAt = deps.now()
           if (stream !== own || state === null) return
           const next = appendLogText(state.lines, partial, text, MAX_LOG_LINES)
           partial = next.partial
@@ -92,7 +94,6 @@ export function createLogSession(deps: LogSessionDeps): LogSession {
           state = { ...state, lines, ended: reason }
           stream = null
           partial = ''
-          endedAt = deps.now()
           publish()
         }
       },
@@ -104,7 +105,6 @@ export function createLogSession(deps: LogSessionDeps): LogSession {
   const resume = (current: LogsState, containers: readonly ContainerSnapshot[]): void => {
     const running = containers.filter((c) => c.state === 'running')
     const previous = containers.find((c) => c.id === current.containerId)
-    if (previous !== undefined && previous.state !== 'running') seenDown = true
     // A container still listed is waited for (it may be the one picked by hand); a gone one is
     // replaced by the first running container of the service.
     const chosen = previous === undefined ? running[0] : running.find((c) => c.id === previous.id)
@@ -113,7 +113,7 @@ export function createLogSession(deps: LogSessionDeps): LogSession {
     const lines = current.containerId === null ? current.lines : [...current.lines, RESTART_MARKER].slice(-MAX_LOG_LINES)
     state = { ...current, containerId: chosen.id, lines, ended: null }
     seenDown = false
-    start(chosen.id, same && endedAt !== null ? endedAt / 1000 : undefined)
+    start(chosen.id, same && lastSeenAt !== null ? lastSeenAt / 1000 : undefined)
   }
 
   return {
@@ -128,13 +128,15 @@ export function createLogSession(deps: LogSessionDeps): LogSession {
       }
       const before = state
       if (!sameList(state.containers, containers)) state = { ...state, containers: containers.map(({ id, name }) => ({ id, name })) }
+      // Recorded even while a stream is open: its `onEnd` may arrive after the stop was published.
+      if (containers.some((c) => c.id === state?.containerId && c.state !== 'running')) seenDown = true
       if (stream === null) resume(state, containers)
       if (state !== before) publish()
     },
     open: (serviceId, containerId) => {
       const containers = deps.containersOf(serviceId)
       stop()
-      endedAt = null
+      lastSeenAt = deps.now()
       seenDown = false
       if (containers === null) {
         // Pin removed between the click and the open: the panel says so instead of staying empty.

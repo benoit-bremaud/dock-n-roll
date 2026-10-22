@@ -42,7 +42,7 @@ file format (`services.yaml`) and the installed package.
 
 - Logs panel across restarts: when the followed container runs again (Restart, Stop then Start),
   the panel follows it without a click, keeps the previous lines after a `— container restarted —`
-  marker and asks only the lines written since; the container picker stays current (#33).
+  marker and asks only the newer lines; the container picker stays current (#33).
 
 - Restart action in the tray menu and the dashboard: a stop then an `up`, so edits to the Compose
   file or `.env` apply (#29).

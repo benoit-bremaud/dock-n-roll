@@ -230,8 +230,9 @@ describe('createLogSession — across restarts (diagram 16)', () => {
     const clock = { now: 1_000_000 }
     const { session, follows, last } = setup(byService, clock)
     session.open('blog', null)
-    follows[0]?.listener.onText('before\n')
     clock.now = 1_234_500
+    follows[0]?.listener.onText('before\n')
+    clock.now = 1_300_000
     follows[0]?.listener.onEnd('Log stream ended')
     byService.blog = [stoppedWeb]
     session.refresh()
@@ -349,5 +350,34 @@ describe('createLogSession — across restarts (diagram 16)', () => {
 
     expect(follows.map((f) => f.id)).toEqual(['d'])
     expect(last()).toMatchObject({ containerId: 'd', ended: 'Log stream ended' })
+  })
+
+  it('remembers a stop published before the stream ended', () => {
+    const byService: Record<string, ContainerSnapshot[]> = { blog: [web] }
+    const { session, follows } = setup(byService)
+    session.open('blog', null)
+    byService.blog = [stoppedWeb]
+    session.refresh()
+    follows[0]?.listener.onEnd('Log stream ended')
+
+    byService.blog = [web]
+    session.refresh()
+
+    expect(follows.map((f) => f.id)).toEqual(['w', 'w'])
+  })
+
+  it('resumes from the open time when the stream gave no text', () => {
+    const byService: Record<string, ContainerSnapshot[]> = { blog: [stoppedWeb] }
+    const clock = { now: 2_000_000 }
+    const { session, follows } = setup(byService, clock)
+    session.open('blog', null)
+    session.refresh()
+    clock.now = 2_500_000
+    follows[0]?.listener.onEnd('Log stream ended')
+
+    byService.blog = [web]
+    session.refresh()
+
+    expect(follows.map((f) => [f.id, f.since])).toEqual([['w', undefined], ['w', 2000]])
   })
 })

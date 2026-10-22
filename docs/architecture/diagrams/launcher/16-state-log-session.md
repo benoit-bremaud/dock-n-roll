@@ -39,7 +39,7 @@ stateDiagram-v2
   id), else the first running container of the service (an `up` after Stop may recreate it).
 - **Lines are kept** across the resume and a marker line separates the runs:
   `— container restarted —`. The same container (Restart keeps its id, and its old log) is
-  asked with `since=<time the previous stream ended>`, so nothing is shown twice and nothing
+  asked with `since=<time its last text arrived (or the open)>`, so nothing is shown twice and nothing
   written during the reconnect is lost. A recreated container (new id) has a fresh log and is
   asked with `tail=500` as usual.
 - **Waiting shows the reason** (`ended`) with Reopen, as before; Reopen still works and is
