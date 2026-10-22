@@ -150,7 +150,7 @@ describe('openPinFileStore — hung filesystem and watcher lifecycle', () => {
     for (let i = 0; i < 3; i += 1) fsState.listeners.at(-1)?.('change', 'services.yaml')
     await vi.advanceTimersByTimeAsync(99)
     expect(seen).toEqual([])
-    await vi.advanceTimersByTimeAsync(1000)
+    await vi.advanceTimersByTimeAsync(1) // the debounce is exactly 100 ms
 
     expect(seen).toHaveLength(1)
     store.close()
