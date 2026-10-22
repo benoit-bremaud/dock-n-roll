@@ -32,15 +32,16 @@ stateDiagram-v2
 
 ## Notes
 
-- **Trigger**: the session listens to the controller's state (`onChange`, every published
-  state). It reads only the open service's containers, so other services' changes cost a
-  lookup and a compare.
+- **Trigger**: the session is refreshed after every controller recomputation (`onRecompute`),
+  published or not: container ids and states are not in the published state, so a restart
+  caught by one snapshot changes nothing there. It reads only the open service's containers.
 - **Which container on resume**: the one followed before if it runs again (Restart keeps the
   id), else the first running container of the service (an `up` after Stop may recreate it).
-- **Lines are kept** across the resume and a marker line separates the runs:
+- **Lines are kept** across the resume and a marker line separates the runs (no marker when
+  the panel had no container yet):
   `— container restarted —`. The same container (Restart keeps its id, and its old log) is
-  asked with `since=<time its last text arrived (or the open)>`, so nothing is shown twice and nothing
-  written during the reconnect is lost. A recreated container (new id) has a fresh log and is
+  asked with `since=<time its last text arrived (or the stream started)>`, so at most a few
+  lines around the reconnect are lost or repeated (host clock against daemon clock: #63). A recreated container (new id) has a fresh log and is
   asked with `tail=500` as usual.
 - **Waiting shows the reason** (`ended`) with Reopen, as before; Reopen still works and is
   simply no longer needed for a restart.
@@ -48,6 +49,7 @@ stateDiagram-v2
   the one followed when it runs again.
 - **Picker refresh**: the `containers` list is replaced and pushed when its ids or names
   change, so a recreated container appears without reopening the panel.
-- **No loop**: the followed container is resumed only after it was seen not running; a stream
+- **No loop**: the followed container is resumed only after it was seen not running (a snapshot
+  shows it stopped, or its stream ended cleanly: the daemon closes it on stop); a stream
   that failed while its container still runs stays in Waiting (Reopen). A container still listed
   (a stopped one picked by hand) is waited for, never swapped for another running one.

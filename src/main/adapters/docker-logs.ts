@@ -19,20 +19,24 @@ export interface LogStream {
   stop(): void
 }
 
-/**
- * Follows one container's logs: the last `MAX_LOG_LINES`, then live. Never throws: every
- * failure (non-200, socket error, invalid frame, no headers within `headersTimeoutMs`) reaches
- * `listener.onEnd` exactly once. The timeout bounds the wait for headers only: a quiet
- * container keeps its stream open.
- */
+/** Reason of a stream the daemon closed itself: the container stopped (diagram 16). */
+export const STREAM_ENDED = 'Log stream ended'
+
 export interface FollowOptions {
+  /** Wait for the response headers only; a quiet container keeps its stream open. */
   readonly headersTimeoutMs?: number | undefined
-  /** Unix time in seconds: only the lines written since then (a container that runs again). */
-  readonly since?: number | undefined
+  /** Epoch milliseconds: only the lines written since then (a container that runs again). */
+  readonly sinceMs?: number | undefined
 }
 
+/**
+ * Follows one container's logs: the last `MAX_LOG_LINES`, then live. Never throws: every
+ * failure (non-200, socket error, invalid frame, no headers within `options.headersTimeoutMs`) reaches
+ * `listener.onEnd` exactly once. The timeout bounds the wait for headers only: a quiet
+ * container keeps its stream open. `options.sinceMs` adds `since` on top of `tail`.
+ */
 export function followLogs(socketPath: string, containerId: string, listener: LogListener, options: FollowOptions = {}): LogStream {
-  const { headersTimeoutMs = HEADERS_TIMEOUT_MS, since } = options
+  const { headersTimeoutMs = HEADERS_TIMEOUT_MS, sinceMs } = options
   let stopped = false
   const end = (reason: string): void => {
     if (stopped) return
@@ -40,7 +44,8 @@ export function followLogs(socketPath: string, containerId: string, listener: Lo
     clearTimeout(timer)
     listener.onEnd(reason)
   }
-  const sinceQuery = since === undefined ? '' : '&since=' + String(since)
+  // Docker takes Unix seconds, fractions allowed.
+  const sinceQuery = sinceMs === undefined ? '' : '&since=' + String(sinceMs / 1000)
   const path = `${API_PREFIX}/containers/${encodeURIComponent(containerId)}/logs?follow=1&stdout=1&stderr=1&tail=${String(MAX_LOG_LINES)}${sinceQuery}`
   const call = request({ socketPath, path }, (response) => {
     clearTimeout(timer)
@@ -82,7 +87,7 @@ export function followLogs(socketPath: string, containerId: string, listener: Lo
       end(error.message)
     })
     response.on('close', () => {
-      end('Log stream ended')
+      end(STREAM_ENDED)
     })
   })
   // Bounds only the wait for the headers: a quiet container keeps its stream open.

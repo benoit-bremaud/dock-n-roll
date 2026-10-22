@@ -282,6 +282,21 @@ describe('createServiceController — one way in, one way out (diagram 07)', () 
     expect(controller.state().services[0]?.displayName).toBe('Blog')
   })
 
+  it('tells recompute listeners about every snapshot, even one the state does not show (diagram 16)', async () => {
+    const { f, controller, states } = await controllerWith()
+    f.snapshot([web])
+    await settle()
+    let calls = 0
+    controller.onRecompute(() => (calls += 1))
+    const published = states.length
+
+    f.snapshot([container({ id: 'w2', state: 'running', labels: composeLabels('blog', '/srv/blog') })])
+    await settle()
+
+    expect(states).toHaveLength(published)
+    expect(calls).toBe(1)
+  })
+
   it('pushes a new state to listeners on every change', async () => {
     const { f, states } = await controllerWith()
     f.snapshot([web])

@@ -1,9 +1,10 @@
-import type { LogListener, LogStream } from '../adapters/docker-logs'
+import { STREAM_ENDED, type LogListener, type LogStream } from '../adapters/docker-logs'
 import { appendLogText, MAX_LOG_LINES } from '../domain/log-lines'
 import type { ContainerSnapshot } from '../domain/types'
 import type { LogsState } from '../../shared/ipc'
 
-// UC7 (diagram 14): the one open logs panel — which container, its last lines, its stream.
+// UC7 (diagram 14): the one open logs panel — which container, its last lines, its stream;
+// following it again across restarts: diagram 16.
 
 /** A chatty container is pushed at most this often, whole state, so IPC is never flooded. */
 export const PUSH_EVERY_MS = 200
@@ -11,8 +12,8 @@ export const PUSH_EVERY_MS = 200
 export interface LogSessionDeps {
   /** Containers of a listed service; `null` for an unknown id (`ServiceController.containersOf`). */
   containersOf(serviceId: string): readonly ContainerSnapshot[] | null
-  /** `since` (Unix seconds) asks only the lines written after a previous stream ended. */
-  follow(containerId: string, listener: LogListener, since?: number): LogStream
+  /** `sinceMs` (epoch ms, as `now`) asks only the lines written after a previous stream. */
+  follow(containerId: string, listener: LogListener, sinceMs?: number): LogStream
   /** Epoch milliseconds (`Date.now`). */
   now(): number
   /** Schedules a push and returns its cancel function. */
@@ -39,6 +40,8 @@ export interface LogSession {
 function pick(containers: readonly ContainerSnapshot[], asked: string | null): ContainerSnapshot | undefined {
   return containers.find((c) => c.id === asked) ?? containers.find((c) => c.state === 'running') ?? containers[0]
 }
+
+const UNLISTED = 'Service no longer listed'
 
 /** Separates the runs of a container followed again across a restart. */
 export const RESTART_MARKER = '— container restarted —'
@@ -75,7 +78,8 @@ export function createLogSession(deps: LogSessionDeps): LogSession {
   // failed while the container still runs is not resumed (no re-follow loop).
   let seenDown = false
 
-  const start = (containerId: string, since?: number): void => {
+  const start = (containerId: string, sinceMs?: number): void => {
+    lastSeenAt = deps.now()
     // Callbacks of a replaced stream are ignored: `stream` no longer is this one.
     const own: LogStream = deps.follow(
       containerId,
@@ -94,10 +98,13 @@ export function createLogSession(deps: LogSessionDeps): LogSession {
           state = { ...state, lines, ended: reason }
           stream = null
           partial = ''
+          // The daemon closes a follow stream when its container stops: a restart may happen
+          // between two snapshots, so no snapshot ever shows it stopped.
+          if (reason === STREAM_ENDED) seenDown = true
           publish()
         }
       },
-      since
+      sinceMs
     )
     stream = own
   }
@@ -113,16 +120,16 @@ export function createLogSession(deps: LogSessionDeps): LogSession {
     const lines = current.containerId === null ? current.lines : [...current.lines, RESTART_MARKER].slice(-MAX_LOG_LINES)
     state = { ...current, containerId: chosen.id, lines, ended: null }
     seenDown = false
-    start(chosen.id, same && lastSeenAt !== null ? lastSeenAt / 1000 : undefined)
+    start(chosen.id, same && lastSeenAt !== null ? lastSeenAt : undefined)
   }
 
   return {
     refresh: () => {
-      if (state === null || state.ended === 'Service no longer listed') return
+      if (state === null || state.ended === UNLISTED) return
       const containers = deps.containersOf(state.serviceId)
       if (containers === null) {
         stop()
-        state = { serviceId: state.serviceId, containerId: null, containers: [], lines: [], ended: 'Service no longer listed' }
+        state = { serviceId: state.serviceId, containerId: null, containers: [], lines: [], ended: UNLISTED }
         publish()
         return
       }
@@ -136,11 +143,11 @@ export function createLogSession(deps: LogSessionDeps): LogSession {
     open: (serviceId, containerId) => {
       const containers = deps.containersOf(serviceId)
       stop()
-      lastSeenAt = deps.now()
+      lastSeenAt = null
       seenDown = false
       if (containers === null) {
         // Pin removed between the click and the open: the panel says so instead of staying empty.
-        state = { serviceId, containerId: null, containers: [], lines: [], ended: 'Service no longer listed' }
+        state = { serviceId, containerId: null, containers: [], lines: [], ended: UNLISTED }
         publish()
         return
       }

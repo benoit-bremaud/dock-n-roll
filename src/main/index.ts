@@ -186,13 +186,13 @@ async function start(trayIcon: Tray): Promise<void> {
   })
   const session = createLogSession({
     containersOf: (id) => created.containersOf(id),
-    follow: (containerId, listener, since) => followLogs(socketPath, containerId, listener, { since }),
+    follow: (containerId, listener, sinceMs) => followLogs(socketPath, containerId, listener, { sinceMs }),
     now: () => Date.now(),
     schedule
   })
   logs = session
-  // Diagram 16: a container that runs again is followed again, and the picker stays current.
-  created.onChange(() => {
+  // Diagram 16: every recomputation, not only published states, which hold no container ids.
+  created.onRecompute(() => {
     session.refresh()
   })
   session.onChange((state) => {

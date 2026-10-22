@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import type { LogListener } from '../adapters/docker-logs'
+import { STREAM_ENDED, type LogListener } from '../adapters/docker-logs'
 import { container } from '../domain/test-fixtures'
 import type { ContainerSnapshot } from '../domain/types'
 import type { LogsState } from '../../shared/ipc'
 import { MAX_LOG_LINES } from '../domain/log-lines'
-import { createLogSession, PUSH_EVERY_MS } from './log-session'
+import { createLogSession, PUSH_EVERY_MS, RESTART_MARKER } from './log-session'
 
 interface Follow {
   readonly id: string
@@ -223,7 +223,7 @@ describe('createLogSession — UC7, diagram 14', () => {
 })
 
 describe('createLogSession — across restarts (diagram 16)', () => {
-  const MARKER = '— container restarted —'
+  const MARKER = RESTART_MARKER
 
   it('resumes the same container when it runs again, after a marker, from the time it ended', () => {
     const byService: Record<string, ContainerSnapshot[]> = { blog: [web] }
@@ -240,7 +240,7 @@ describe('createLogSession — across restarts (diagram 16)', () => {
     byService.blog = [web]
     session.refresh()
 
-    expect(follows.map((f) => [f.id, f.since])).toEqual([['w', undefined], ['w', 1234.5]])
+    expect(follows.map((f) => [f.id, f.since])).toEqual([['w', undefined], ['w', 1_234_500]])
     expect(last()).toMatchObject({ containerId: 'w', lines: ['before', MARKER], ended: null })
   })
 
@@ -331,7 +331,7 @@ describe('createLogSession — across restarts (diagram 16)', () => {
   })
 
   it('does not follow again a stream that failed while its container still runs', () => {
-    const { session, follows } = setup({ blog: [web] })
+    const { session, follows, last } = setup({ blog: [web] })
     session.open('blog', null)
     follows[0]?.listener.onEnd('Docker answered 500')
 
@@ -339,6 +339,7 @@ describe('createLogSession — across restarts (diagram 16)', () => {
     session.refresh()
 
     expect(follows).toHaveLength(1)
+    expect(last()).toMatchObject({ ended: 'Docker answered 500' })
   })
 
   it('keeps a stopped container picked by hand instead of switching to a running one', () => {
@@ -378,6 +379,17 @@ describe('createLogSession — across restarts (diagram 16)', () => {
     byService.blog = [web]
     session.refresh()
 
-    expect(follows.map((f) => [f.id, f.since])).toEqual([['w', undefined], ['w', 2000]])
+    expect(follows.map((f) => [f.id, f.since])).toEqual([['w', undefined], ['w', 2_000_000]])
+  })
+
+  it('follows a container restarted between two snapshots, its stream having ended cleanly', () => {
+    const { session, follows, last } = setup({ blog: [web] })
+    session.open('blog', null)
+    follows[0]?.listener.onEnd(STREAM_ENDED)
+
+    session.refresh()
+
+    expect(follows.map((f) => f.id)).toEqual(['w', 'w'])
+    expect(last()).toMatchObject({ containerId: 'w', ended: null })
   })
 })

@@ -40,3 +40,9 @@ a dedicated window (315).
   at most 2000 characters, pushes throttled to 200 ms.
 - Bad: ~40 lines of frame parsing; one container at a time (picker for multi-container
   services); no follow across restarts (Reopen); a small panel instead of a full window.
+
+### Addendum 2026-10-22 — follow across restarts (#33)
+
+The "no follow across restarts" limit is lifted: the session is refreshed after every controller
+recomputation and follows a container that runs again, the same one with `since`, a recreated
+one with `tail` (diagram 16). Reopen stays for a stream that failed while its container runs.

@@ -33,6 +33,7 @@ function makeController() {
     containers: () => [],
     containersOf: () => null,
     onChange: () => () => undefined,
+    onRecompute: () => () => undefined,
     dispose: () => undefined
   }
   return { controller, spies }
