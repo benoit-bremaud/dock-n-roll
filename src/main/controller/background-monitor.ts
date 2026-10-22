@@ -1,7 +1,14 @@
 import { composeLabelsOf } from '../domain/compose-labels'
 import { joinPorts } from '../domain/port-join'
-import type { ContainerSnapshot, ListeningSocket } from '../domain/types'
+import type { ComposeLabels, ContainerSnapshot, ListeningSocket } from '../domain/types'
 import type { BackgroundView } from '../../shared/ipc'
+
+/** The project a container claims, even through invalid labels; `null` outside Compose. */
+function projectNameOf(labels: ComposeLabels): string | null {
+  if (labels.kind === 'valid') return labels.ref.name
+  if (labels.kind === 'invalid') return labels.rawProject
+  return null
+}
 
 /** UC4: every container plus every TCP listening port with its best-known owner. Never rejects. */
 export async function listBackground(
@@ -24,7 +31,7 @@ export async function listBackground(
         state: container.state,
         // Docker keeps the last health of a stopped container: it says nothing any more (spec §3).
         health: container.state === 'running' ? container.health : null,
-        project: labels.kind === 'valid' ? labels.ref.name : labels.kind === 'invalid' ? labels.rawProject : null
+        project: projectNameOf(labels)
       }
     }),
     ports: joinPorts(sockets, containers)

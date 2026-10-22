@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { app, BrowserWindow, dialog, Menu, nativeImage, protocol, session, shell, Tray, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
 import { APP_PAGE_URL, APP_SCHEME, createAppProtocolHandler } from './app-protocol'
-import { isAutostartEnabled, setAutostart } from './adapters/autostart'
+import { disableAutostart, enableAutostart, isAutostartEnabled } from './adapters/autostart'
 import { resolveProjectName, runCompose } from './adapters/compose-runner'
 import { followLogs } from './adapters/docker-logs'
 import { observeDocker } from './adapters/docker-observer'
@@ -213,7 +213,7 @@ async function start(trayIcon: Tray): Promise<void> {
   if (autostartInitial !== undefined) {
     autostart = createAutostartToggle({
       initial: autostartInitial,
-      write: (enabled) => setAutostart(AUTOSTART_ENTRY, enabled, process.execPath),
+      write: (enabled) => (enabled ? enableAutostart(AUTOSTART_ENTRY, process.execPath) : disableAutostart(AUTOSTART_ENTRY)),
       onChange: () => {
         renderTray(trayIcon, created, created.state())
       },
