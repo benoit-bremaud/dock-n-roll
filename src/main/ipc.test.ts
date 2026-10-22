@@ -16,7 +16,7 @@ vi.mock('electron', () => ({
 
 const STATE: ControllerState = { dockerAvailable: true, dockerReason: null, pinErrors: [], services: [], homeDir: '/home/me' }
 const BACKGROUND: BackgroundView = { containers: [], ports: [] }
-// isTrusted compares by identity, so two distinct empty events are enough.
+// Partial fakes: the isTrusted stub below compares by identity, so two distinct empty events suffice.
 const TRUSTED = {} satisfies Partial<IpcMainInvokeEvent> as IpcMainInvokeEvent
 const UNTRUSTED = {} satisfies Partial<IpcMainInvokeEvent> as IpcMainInvokeEvent
 
