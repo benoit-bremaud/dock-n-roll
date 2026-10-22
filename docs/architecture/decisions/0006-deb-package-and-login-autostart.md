@@ -45,6 +45,8 @@ present, `~/.config/autostart` exists.
   | `grantFileProtocolExtraPrivileges` | off | the dashboard is served from `app://` (ADR-0009), so `file:` needs no extra privileges. Until ADR-0009 (2026-10-16) it stayed on: turning it off broke `loadFile()` from the asar (`ERR_FILE_NOT_FOUND`, brick C). `pnpm e2e:smoke` checks it on the built binary. |
   | `embeddedAsarIntegrityValidation` | default | enforced on macOS/Windows only. |
   | `cookieEncryption` | default | the dashboard keeps no session and no cookies to protect. |
+  | `loadBrowserProcessSpecificV8Snapshot` | default (off) | no custom V8 snapshot is shipped. |
+  | `wasmTrapHandlers` | default (on) | Electron's default; the app runs no WebAssembly and has no reason to change it. |
 - **Dependencies**: Docker CLI, the Compose plugin and `iproute2` (`ss`).
 
 ### Consequences
