@@ -59,7 +59,7 @@ export function App({ api }: { readonly api: DockNRollApi }): React.JSX.Element 
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   // WAI-ARIA tabs pattern: one tab stop, arrow keys / Home / End move and select.
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>): void => {
     const current = TABS.findIndex((candidate) => candidate.key === tab)
     const next = { ArrowRight: current + 1, ArrowLeft: current - 1, Home: 0, End: TABS.length - 1 }[event.key]
     if (next === undefined) return
@@ -78,7 +78,7 @@ export function App({ api }: { readonly api: DockNRollApi }): React.JSX.Element 
         {/* Hidden while Docker is down: the last known statuses may be wrong (spec §4). */}
         {summary !== null && <p className="app__summary">{summary}</p>}
       </header>
-      <div role="tablist" aria-label="Views" className="tabs" onKeyDown={onKeyDown}>
+      <div role="tablist" aria-label="Views" className="tabs">
         {TABS.map((candidate, index) => (
           <button
             key={candidate.key}
@@ -91,6 +91,7 @@ export function App({ api }: { readonly api: DockNRollApi }): React.JSX.Element 
             aria-controls={`panel-${candidate.key}`}
             aria-selected={tab === candidate.key}
             tabIndex={tab === candidate.key ? 0 : -1}
+            onKeyDown={onKeyDown}
             onClick={() => {
               setTab(candidate.key)
             }}

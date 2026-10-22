@@ -343,6 +343,23 @@ describe('App — tabs (WAI-ARIA tabs pattern)', () => {
     expect(document.activeElement).toBe(tabs[1])
     expect(tabs[1]?.getAttribute('aria-selected')).toBe('true')
   })
+
+  it('wraps with the arrow keys and jumps with Home / End, the keys handled by the tabs, not the tablist', async () => {
+    render(<App api={fakeApi(state()).api} />)
+    const user = userEvent.setup()
+    await rowOf('Blog')
+
+    const tabs = screen.getAllByRole('tab')
+    expect(screen.getByRole('tablist').hasAttribute('tabindex')).toBe(false)
+    tabs[0]?.focus()
+    await user.keyboard('{ArrowLeft}')
+    expect(document.activeElement).toBe(tabs[1])
+    await user.keyboard('{Home}')
+    expect(document.activeElement).toBe(tabs[0])
+    await user.keyboard('{End}')
+    expect(document.activeElement).toBe(tabs[1])
+    expect(tabs[1]?.getAttribute('aria-selected')).toBe('true')
+  })
 })
 
 describe('App — running tab (UC4)', () => {

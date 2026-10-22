@@ -2,7 +2,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { autostartEntry, isAutostartEnabled, setAutostart } from './autostart'
+import { autostartEntry, isAutostartEnabled, enableAutostart, disableAutostart } from './autostart'
 
 const execLine = (path: string): string | undefined => autostartEntry(path).split('\n').find((line) => line.startsWith('Exec='))
 
@@ -39,7 +39,7 @@ describe('autostartEntry — XDG autostart desktop file (ADR-0006)', () => {
   })
 })
 
-describe('setAutostart / isAutostartEnabled', () => {
+describe('enableAutostart / disableAutostart / isAutostartEnabled', () => {
   let home: string
   let file: string
 
@@ -57,7 +57,7 @@ describe('setAutostart / isAutostartEnabled', () => {
   })
 
   it('writes a world-readable entry, creating the autostart directory', async () => {
-    await setAutostart(file, true, '/opt/dock-n-roll/dock-n-roll')
+    await enableAutostart(file, '/opt/dock-n-roll/dock-n-roll')
 
     expect(readFileSync(file, 'utf8')).toBe(autostartEntry('/opt/dock-n-roll/dock-n-roll'))
     expect(statSync(file).mode & 0o777).toBe(0o644)
@@ -68,7 +68,7 @@ describe('setAutostart / isAutostartEnabled', () => {
     mkdirSync(join(home, '.config', 'autostart'), { recursive: true })
     writeFileSync(file, 'stale', { mode: 0o600 })
 
-    await setAutostart(file, true, '/opt/dock-n-roll/dock-n-roll')
+    await enableAutostart(file, '/opt/dock-n-roll/dock-n-roll')
 
     expect(readFileSync(file, 'utf8')).toBe(autostartEntry('/opt/dock-n-roll/dock-n-roll'))
     expect(statSync(file).mode & 0o777).toBe(0o644)
@@ -76,16 +76,23 @@ describe('setAutostart / isAutostartEnabled', () => {
   })
 
   it('removes the entry', async () => {
-    await setAutostart(file, true, '/opt/dock-n-roll/dock-n-roll')
+    await enableAutostart(file, '/opt/dock-n-roll/dock-n-roll')
 
-    await setAutostart(file, false, '/opt/dock-n-roll/dock-n-roll')
+    await disableAutostart(file)
 
     expect(existsSync(file)).toBe(false)
     expect(await isAutostartEnabled(file)).toBe(false)
   })
 
+  it('leaves the entry alone when enabled twice', async () => {
+    await enableAutostart(file, '/opt/dock-n-roll/dock-n-roll')
+    await enableAutostart(file, '/opt/dock-n-roll/dock-n-roll')
+
+    expect(readFileSync(file, 'utf8')).toBe(autostartEntry('/opt/dock-n-roll/dock-n-roll'))
+  })
+
   it('treats removing an absent entry as done', async () => {
-    await expect(setAutostart(file, false, '/opt/x')).resolves.toBeUndefined()
+    await expect(disableAutostart(file)).resolves.toBeUndefined()
   })
 
   it('is off when the path is a directory, not an entry', async () => {
@@ -110,7 +117,7 @@ describe('setAutostart / isAutostartEnabled', () => {
   it('leaves no temporary file when the rename over the entry fails', async () => {
     mkdirSync(join(file, 'blocker'), { recursive: true })
 
-    await expect(setAutostart(file, true, '/opt/dock-n-roll/dock-n-roll')).rejects.toThrow()
+    await expect(enableAutostart(file, '/opt/dock-n-roll/dock-n-roll')).rejects.toThrow()
     expect(readdirSync(join(home, '.config', 'autostart'))).toEqual(['dock-n-roll.desktop'])
   })
 
@@ -121,7 +128,7 @@ describe('setAutostart / isAutostartEnabled', () => {
     writeFileSync(target, 'untouched', { mode: 0o600 })
     symlinkSync(target, `${file}.tmp`)
 
-    await setAutostart(file, true, '/opt/dock-n-roll/dock-n-roll')
+    await enableAutostart(file, '/opt/dock-n-roll/dock-n-roll')
 
     expect(readFileSync(target, 'utf8')).toBe('untouched')
     expect(statSync(target).mode & 0o777).toBe(0o600)
