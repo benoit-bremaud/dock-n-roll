@@ -3,7 +3,6 @@ import { joinPorts } from '../domain/port-join'
 import type { ComposeLabels, ContainerSnapshot, ListeningSocket } from '../domain/types'
 import type { BackgroundView } from '../../shared/ipc'
 
-/** UC4: every container plus every TCP listening port with its best-known owner. Never rejects. */
 /** The project a container claims, even through invalid labels; `null` outside Compose. */
 function projectNameOf(labels: ComposeLabels): string | null {
   if (labels.kind === 'valid') return labels.ref.name
@@ -11,6 +10,7 @@ function projectNameOf(labels: ComposeLabels): string | null {
   return null
 }
 
+/** UC4: every container plus every TCP listening port with its best-known owner. Never rejects. */
 export async function listBackground(
   containers: readonly ContainerSnapshot[],
   scanPorts: () => Promise<ListeningSocket[]>

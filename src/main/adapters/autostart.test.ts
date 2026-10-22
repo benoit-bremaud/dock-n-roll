@@ -2,7 +2,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { autostartEntry, isAutostartEnabled, enableAutostart, disableAutostart } from './autostart'
+import { autostartEntry, disableAutostart, enableAutostart, isAutostartEnabled } from './autostart'
 
 const execLine = (path: string): string | undefined => autostartEntry(path).split('\n').find((line) => line.startsWith('Exec='))
 

@@ -354,6 +354,8 @@ describe('App — tabs (WAI-ARIA tabs pattern)', () => {
     tabs[0]?.focus()
     await user.keyboard('{ArrowLeft}')
     expect(document.activeElement).toBe(tabs[1])
+    await user.keyboard('{ArrowRight}')
+    expect(document.activeElement).toBe(tabs[0])
     await user.keyboard('{Home}')
     expect(document.activeElement).toBe(tabs[0])
     await user.keyboard('{End}')
