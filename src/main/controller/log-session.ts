@@ -70,6 +70,9 @@ export function createLogSession(deps: LogSessionDeps): LogSession {
 
   // Diagram 16 memory: the container last followed, and when its stream ended (epoch ms).
   let endedAt: number | null = null
+  // Set once the followed container is seen not running after its stream ended: a stream that
+  // failed while the container still runs is not resumed (no re-follow loop).
+  let seenDown = false
 
   const start = (containerId: string, since?: number): void => {
     // Callbacks of a replaced stream are ignored: `stream` no longer is this one.
@@ -100,11 +103,16 @@ export function createLogSession(deps: LogSessionDeps): LogSession {
 
   const resume = (current: LogsState, containers: readonly ContainerSnapshot[]): void => {
     const running = containers.filter((c) => c.state === 'running')
-    const chosen = running.find((c) => c.id === current.containerId) ?? running[0]
-    if (chosen === undefined) return
+    const previous = containers.find((c) => c.id === current.containerId)
+    if (previous !== undefined && previous.state !== 'running') seenDown = true
+    // A container still listed is waited for (it may be the one picked by hand); a gone one is
+    // replaced by the first running container of the service.
+    const chosen = previous === undefined ? running[0] : running.find((c) => c.id === previous.id)
+    if (chosen === undefined || (previous !== undefined && !seenDown)) return
     const same = chosen.id === current.containerId
     const lines = current.containerId === null ? current.lines : [...current.lines, RESTART_MARKER].slice(-MAX_LOG_LINES)
     state = { ...current, containerId: chosen.id, lines, ended: null }
+    seenDown = false
     start(chosen.id, same && endedAt !== null ? endedAt / 1000 : undefined)
   }
 
@@ -127,6 +135,7 @@ export function createLogSession(deps: LogSessionDeps): LogSession {
       const containers = deps.containersOf(serviceId)
       stop()
       endedAt = null
+      seenDown = false
       if (containers === null) {
         // Pin removed between the click and the open: the panel says so instead of staying empty.
         state = { serviceId, containerId: null, containers: [], lines: [], ended: 'Service no longer listed' }

@@ -48,5 +48,6 @@ stateDiagram-v2
   the one followed when it runs again.
 - **Picker refresh**: the `containers` list is replaced and pushed when its ids or names
   change, so a recreated container appears without reopening the panel.
-- **No loop**: a stream that ends again at once (crash loop) resumes at most once per published
-  state; the controller publishes a few times per second at most (burst publish, #45).
+- **No loop**: the followed container is resumed only after it was seen not running; a stream
+  that failed while its container still runs stays in Waiting (Reopen). A container still listed
+  (a stopped one picked by hand) is waited for, never swapped for another running one.

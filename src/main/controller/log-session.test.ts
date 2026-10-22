@@ -233,6 +233,8 @@ describe('createLogSession — across restarts (diagram 16)', () => {
     follows[0]?.listener.onText('before\n')
     clock.now = 1_234_500
     follows[0]?.listener.onEnd('Log stream ended')
+    byService.blog = [stoppedWeb]
+    session.refresh()
 
     byService.blog = [web]
     session.refresh()
@@ -284,7 +286,10 @@ describe('createLogSession — across restarts (diagram 16)', () => {
     const { session, follows } = setup(byService)
     session.open('blog', 'd')
     follows[0]?.listener.onEnd('Log stream ended')
+    byService.blog = [web, { ...db, state: 'exited' }]
+    session.refresh()
 
+    byService.blog = [web, db]
     session.refresh()
 
     expect(follows.map((f) => f.id)).toEqual(['d', 'd'])
@@ -322,5 +327,27 @@ describe('createLogSession — across restarts (diagram 16)', () => {
     session.refresh()
 
     expect(pushes).toHaveLength(count)
+  })
+
+  it('does not follow again a stream that failed while its container still runs', () => {
+    const { session, follows } = setup({ blog: [web] })
+    session.open('blog', null)
+    follows[0]?.listener.onEnd('Docker answered 500')
+
+    session.refresh()
+    session.refresh()
+
+    expect(follows).toHaveLength(1)
+  })
+
+  it('keeps a stopped container picked by hand instead of switching to a running one', () => {
+    const { session, follows, last } = setup({ blog: [web, { ...db, state: 'exited' }] })
+    session.open('blog', 'd')
+    follows[0]?.listener.onEnd('Log stream ended')
+
+    session.refresh()
+
+    expect(follows.map((f) => f.id)).toEqual(['d'])
+    expect(last()).toMatchObject({ containerId: 'd', ended: 'Log stream ended' })
   })
 })
