@@ -40,7 +40,8 @@ export function followLogs(socketPath: string, containerId: string, listener: Lo
     clearTimeout(timer)
     listener.onEnd(reason)
   }
-  const path = `${API_PREFIX}/containers/${encodeURIComponent(containerId)}/logs?follow=1&stdout=1&stderr=1&tail=${String(MAX_LOG_LINES)}${since === undefined ? '' : `&since=${String(since)}`}`
+  const sinceQuery = since === undefined ? '' : '&since=' + String(since)
+  const path = `${API_PREFIX}/containers/${encodeURIComponent(containerId)}/logs?follow=1&stdout=1&stderr=1&tail=${String(MAX_LOG_LINES)}${sinceQuery}`
   const call = request({ socketPath, path }, (response) => {
     clearTimeout(timer)
     if (response.statusCode !== 200) {
