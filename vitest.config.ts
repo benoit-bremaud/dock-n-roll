@@ -12,7 +12,14 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/**/*.test.{ts,tsx}', 'src/**/*.d.ts', 'src/main/index.ts', 'src/renderer/src/main.tsx', 'src/main/adapters/fake-docker-daemon.ts', 'src/main/domain/test-fixtures.ts'],
+      exclude: [
+        'src/**/*.test.{ts,tsx}',
+        'src/**/*.d.ts',
+        'src/main/index.ts',
+        'src/renderer/src/main.tsx',
+        'src/main/adapters/fake-docker-daemon.ts',
+        'src/main/domain/test-fixtures.ts'
+      ],
       reporter: ['text-summary', 'html', 'lcov'],
       thresholds: { statements: 90, branches: 85, functions: 90, lines: 90 }
     },
