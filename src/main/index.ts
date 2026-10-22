@@ -186,10 +186,15 @@ async function start(trayIcon: Tray): Promise<void> {
   })
   const session = createLogSession({
     containersOf: (id) => created.containersOf(id),
-    follow: (containerId, listener) => followLogs(socketPath, containerId, listener),
+    follow: (containerId, listener, since) => followLogs(socketPath, containerId, listener, { since }),
+    now: () => Date.now(),
     schedule
   })
   logs = session
+  // Diagram 16: a container that runs again is followed again, and the picker stays current.
+  created.onChange(() => {
+    session.refresh()
+  })
   session.onChange((state) => {
     pushLogsTo(() => dashboard, state)
   })

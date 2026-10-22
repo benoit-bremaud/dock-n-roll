@@ -28,13 +28,13 @@ describe('followLogs — diagram 14, ADR-0008', () => {
   let text: string
   let ends: string[]
 
-  const follow = (id: string, headersTimeoutMs?: number): void => {
+  const follow = (id: string, headersTimeoutMs?: number, since?: number): void => {
     stream = followLogs(daemon.socketPath, id, {
       onText: (chunk) => {
         text += chunk
       },
       onEnd: (reason) => ends.push(reason)
-    }, headersTimeoutMs)
+    }, { headersTimeoutMs, since })
   }
   /** Lets late data arrive before a negative check: can only make it pass wrongly, never flake red. */
   const quietFor = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
@@ -60,6 +60,13 @@ describe('followLogs — diagram 14, ADR-0008', () => {
 
     expect(daemon.requests).toEqual(['/v1.47/containers/web/logs'])
     expect(daemon.logQueries).toEqual(['?follow=1&stdout=1&stderr=1&tail=500'])
+  })
+
+  it('asks only for the lines written since a time when resuming a container', async () => {
+    follow('web', undefined, 1_760_000_000.25)
+    await waitFor(() => daemon.openLogStreams === 1)
+
+    expect(daemon.logQueries).toEqual(['?follow=1&stdout=1&stderr=1&tail=500&since=1760000000.25'])
   })
 
   it('decodes multiplexed frames, also when a frame and a character are split across chunks', async () => {

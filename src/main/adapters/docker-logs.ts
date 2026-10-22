@@ -25,7 +25,14 @@ export interface LogStream {
  * `listener.onEnd` exactly once. The timeout bounds the wait for headers only: a quiet
  * container keeps its stream open.
  */
-export function followLogs(socketPath: string, containerId: string, listener: LogListener, headersTimeoutMs = HEADERS_TIMEOUT_MS): LogStream {
+export interface FollowOptions {
+  readonly headersTimeoutMs?: number | undefined
+  /** Unix time in seconds: only the lines written since then (a container that runs again). */
+  readonly since?: number | undefined
+}
+
+export function followLogs(socketPath: string, containerId: string, listener: LogListener, options: FollowOptions = {}): LogStream {
+  const { headersTimeoutMs = HEADERS_TIMEOUT_MS, since } = options
   let stopped = false
   const end = (reason: string): void => {
     if (stopped) return
@@ -33,7 +40,7 @@ export function followLogs(socketPath: string, containerId: string, listener: Lo
     clearTimeout(timer)
     listener.onEnd(reason)
   }
-  const path = `${API_PREFIX}/containers/${encodeURIComponent(containerId)}/logs?follow=1&stdout=1&stderr=1&tail=${String(MAX_LOG_LINES)}`
+  const path = `${API_PREFIX}/containers/${encodeURIComponent(containerId)}/logs?follow=1&stdout=1&stderr=1&tail=${String(MAX_LOG_LINES)}${since === undefined ? '' : `&since=${String(since)}`}`
   const call = request({ socketPath, path }, (response) => {
     clearTimeout(timer)
     if (response.statusCode !== 200) {
