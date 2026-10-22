@@ -431,3 +431,23 @@ Sensitivity: C and A stay top two and G last under value 45 or effort 35; E pass
   filed: #57, #59, #63 (exact resume boundary, a line repeated around the marker) and #64 (panel opens
   mid-buffer). #61 (service actions menu) is planned as its own brick.
 - Next: brick B, the legacy Sonar smells (#30) and #22. Then H (#25), then G. #52 is due 2026-10-28.
+
+## 2026-10-22 — Brick B: legacy SonarQube smells and fuse rationale (PRs #66 #67 #69), brick closed
+
+- Split chosen by owner MCDA (C 405 vs B 395 vs A 295): mechanical smells, then logic/a11y smells, then #22.
+- PR #66 (`5b54e7e`): 23 behaviour-preserving smells (replaceAll, findLast, includes, optional chain,
+  globalThis, negated conditions, nested templates). `dockNRoll` is now a global `var` in `env.d.ts`.
+- PR #67 (`6b169ea`): `enableAutostart` / `disableAutostart` replace the boolean `setAutostart`
+  (S2301); catalog and background-monitor helpers extracted (S3776, S3358); the tab keys moved from the
+  tablist to each tab (S6852), with a wrap / Home / End test and a QA screenshot
+  (`docs/architecture/qa/2026-10-22-tabs-keyboard.png`). Sonar open issues 27 → **0**. Closes #30.
+- PR #69 (`05142dc`): ADR-0006 § Electron fuses is the single source, one table of all 9 fuses of
+  `@electron/fuses` 2.1.3. It was stale: it said `grantFileProtocolExtraPrivileges` stays on, which
+  ADR-0009 changed. Codex P2 (two fuses missing) fixed. `electron-builder.yml` and `index.ts` point
+  to it. Closes #22.
+- Gate on each PR: lint, typecheck, 589 → 591 tests, coverage thresholds, Sonar gate OK, gitleaks
+  clean, E2E smoke 8/8, review-local Must 0, CI green, Codex: one finding, fixed.
+- Owner requests during the brick: the UI keeps the fewest visible controls, and buttons and fields
+  appear only after the choice that needs them. Logs in their own window, closed by a button or a
+  click outside, filed as #68.
+- Next: brick H (#25 test Nice). #68 and #61 still need a place in the roadmap. #52 is due 2026-10-28.
