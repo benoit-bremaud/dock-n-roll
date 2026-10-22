@@ -253,7 +253,7 @@ describe('observeDocker — sequence diagram 06', () => {
     start()
 
     await waitFor(() => latest().length === 2)
-    await quietFor(100)
+    await quietFor(100) // lets a late callback of the abandoned connection report a 2nd outage
     expect(outages).toHaveLength(1)
     expect(eventRequests()).toBe(2)
   })
