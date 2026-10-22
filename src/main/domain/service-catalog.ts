@@ -14,7 +14,7 @@ interface DiscoveredProject {
 }
 
 function basename(path: string): string {
-  return path.split('/').filter((part) => part !== '').pop() ?? path
+  return path.split('/').findLast((part) => part !== '') ?? path
 }
 
 function discoverProjects(containers: readonly ContainerSnapshot[]): DiscoveredProject[] {

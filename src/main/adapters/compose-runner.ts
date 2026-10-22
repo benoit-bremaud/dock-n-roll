@@ -111,10 +111,10 @@ export function runCompose(args: readonly string[], options: RunOptions, extraEn
         resolve(failure(timeoutCause(), stdout, stderr))
       } else if (code === 0) {
         resolve({ exitCode: 0, stdout, stderr })
-      } else if (code !== null) {
-        resolve({ exitCode: code, stdout, stderr })
-      } else {
+      } else if (code === null) {
         resolve(failure('killed by a signal', stdout, stderr))
+      } else {
+        resolve({ exitCode: code, stdout, stderr })
       }
     })
     timers.term = setTimeout(() => {

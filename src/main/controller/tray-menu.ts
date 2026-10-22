@@ -47,9 +47,9 @@ const MAX_LABEL_CHARS = 80
  */
 export function menuLabel(text: string): string {
   // eslint-disable-next-line no-control-regex -- stripping control characters is the point
-  const flat = text.replace(/[\r\n\t]+/g, ' ').replace(/[\u0000-\u001f\u007f]/g, '').replace(/ {2,}/g, ' ').trim()
+  const flat = text.replaceAll(/[\r\n\t]+/g, ' ').replaceAll(/[\u0000-\u001f\u007f]/g, '').replaceAll(/ {2,}/g, ' ').trim()
   const short = flat.length > MAX_LABEL_CHARS ? `${flat.slice(0, MAX_LABEL_CHARS - 1)}…` : flat
-  return short.replace(/&/g, '&&')
+  return short.replaceAll('&', '&&')
 }
 
 function serviceEntry(service: ServiceView, actions: TrayActions): MenuEntry {
@@ -70,7 +70,8 @@ function serviceEntry(service: ServiceView, actions: TrayActions): MenuEntry {
 export function buildTrayMenu(state: ControllerState, actions: TrayActions, options: TrayOptions = {}): MenuEntry[] {
   let head: MenuEntry[]
   if (!state.dockerAvailable) {
-    head = [{ label: `Docker unavailable${state.dockerReason === null ? '' : `: ${menuLabel(state.dockerReason)}`}`, enabled: false }]
+    const reason = state.dockerReason === null ? '' : `: ${menuLabel(state.dockerReason)}`
+    head = [{ label: `Docker unavailable${reason}`, enabled: false }]
   } else if (state.services.length === 0) {
     head = [{ label: 'No Compose project found', enabled: false }]
   } else {
