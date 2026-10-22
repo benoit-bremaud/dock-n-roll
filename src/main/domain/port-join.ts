@@ -4,7 +4,7 @@ const ANY_ADDRESS = new Set(['', '0.0.0.0', '::', '[::]', '*'])
 
 /** `[::1]` / `127.0.0.53%lo` → `::1` / `127.0.0.53`, so `ss` and Docker addresses compare. */
 function bareAddress(address: string): string {
-  return address.replace(/^\[|\]$/g, '').replace(/%.*$/, '')
+  return address.replaceAll(/^\[|\]$/g, '').replace(/%.*$/, '')
 }
 
 function isWildcard(address: string): boolean {

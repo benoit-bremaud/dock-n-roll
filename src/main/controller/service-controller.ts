@@ -237,7 +237,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     for (const map of [missingPaths, gates, lastError, notifiedAt, stoppedAt]) {
       for (const id of map.keys()) if (!ids.has(id)) map.delete(id)
     }
-    for (const id of [...probing.keys()]) if (!ids.has(id)) cancelProbe(id)
+    for (const id of probing.keys()) if (!ids.has(id)) cancelProbe(id)
   }
 
   const publish = (): void => {
@@ -344,7 +344,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
         failedAt.delete(dir)
       }
     })
-    return names.some((name) => name === null)
+    return names.includes(null)
   }
 
   const applyPins = (result: PinFileResult): void => {
@@ -493,7 +493,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
       cancelNameRetry()
       observer.stop()
       store.close()
-      for (const id of [...probing.keys()]) cancelProbe(id)
+      for (const id of probing.keys()) cancelProbe(id)
       listeners.clear()
       recomputeListeners.clear()
     }

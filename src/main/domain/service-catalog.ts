@@ -14,7 +14,13 @@ interface DiscoveredProject {
 }
 
 function basename(path: string): string {
-  return path.split('/').filter((part) => part !== '').pop() ?? path
+  return path.split('/').findLast((part) => part !== '') ?? path
+}
+
+function addConfigFiles(project: DiscoveredProject, files: readonly string[]): void {
+  for (const file of files) {
+    if (!project.configFiles.includes(file)) project.configFiles.push(file)
+  }
 }
 
 function discoverProjects(containers: readonly ContainerSnapshot[]): DiscoveredProject[] {
@@ -30,11 +36,7 @@ function discoverProjects(containers: readonly ContainerSnapshot[]): DiscoveredP
     const id = workingDir + ID_SEPARATOR + name
     const project = projects.get(id) ?? { name, workingDir, configFiles: [], containers: [], invalidReason: null }
     if (labels.kind === 'valid') {
-      for (const file of labels.ref.configFiles) {
-        if (!project.configFiles.includes(file)) {
-          project.configFiles.push(file)
-        }
-      }
+      addConfigFiles(project, labels.ref.configFiles)
     } else {
       project.invalidReason ??= labels.reason
     }
