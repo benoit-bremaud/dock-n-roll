@@ -1,35 +1,34 @@
-# Local review — dock-n-roll (test/nice-findings-brick-d)
+# Local review — dock-n-roll (branch chore/72-sonar-new-rules)
 
-- Date: 2026-10-22
-- Commit: e924d19
-- Scope: branch diff origin/main...HEAD (#25: test Nice findings from the brick D review, test-only)
+- Date: 2026-10-23
+- Commit: a065fb0
+- Scope: branch diff origin/main...HEAD (issue #72)
 - Checks run: design · docs · tests · security · correctness
-- Verdict: ship as-is  ·  Must 0 · Should 0 (1 applied) · Nice 2
+- Verdict: ship as-is · Must 0 · Should 0 · Nice 3
 
-## Pre-merge gate (head SHA e924d19)
+## Pre-merge gate (head SHA a065fb0)
 | Step | Result |
 |---|---|
-| 1 Tests | ✅ 592 unit/integration · ✅ packaged E2E smoke 8/8 |
-| 2 Coverage | tests 97.18 % stmts / 92.55 % branches / 97.49 % funcs / 98.46 % lines (thresholds 90/85/90/90) · docs: no public API change |
-| 3 SonarQube | ❌ FAILED: `new_violations` 2. All 5 open issues come from new rules (S8786, S9381, S9382) in files this diff does not touch (`port-join.ts`, `format.ts`, `pin-file-store.ts`, `docker-observer.ts`, `index.ts`). Filed as a follow-up, outside #25 |
-| 4 Secrets | ✅ gitleaks clean (origin/main..HEAD) · no tracked .env · diff read: nothing sensitive |
-| 5 QA pass | ✅ smoke only (test-only diff): packaged app, console and CSP clean |
-- Gate: **RED on SonarQube only, for issues outside the diff.** The owner decides whether to merge.
-
-Mutation checks: `DEBOUNCE_MS = 101` fails 5 tests, and a structural sender comparison fails the new clone test.
+| 1 Tests | ✅ 599 unit/integration · ✅ 8/8 E2E smoke on the packaged build |
+| 2 Coverage | tests 97.13 % stmts / 92.51 % branches (thresholds 90/85/90/90 met) |
+| 3 SonarQube | ✅ PASSED, 0 open issues (the 5 issues from the 26.10 rules are closed) |
+| 4 Secrets | ✅ gitleaks clean · no tracked .env · diff read: nothing sensitive |
+| 5 QA pass | ✅ packaged E2E smoke (ADR-0010): console clean, app:// 200, traversal 404 |
+- Gate: **GREEN — merge authorised**
 
 ## 🔴 Must Have
 _None._
 
 ## 🟡 Should Have
-- `src/main/ipc.test.ts:19` `[docs|tests]` · the comment said that production `isTrusted` compares by identity, but only the stub does · **applied** (e924d19)
+_None._
 
 ## 🔵 Nice to Have
-- `src/main/adapters/pin-file-store-fs.test.ts:153` `[tests]` · import `DEBOUNCE_MS` rather than repeating 100 · the issue allowed either; the mutation check covers drift
-- `src/main/adapters/docker-observer.test.ts:256` `[tests]` · `quietFor` waits in real time; fake timers would make it faster · existing design, documented at `quietFor`
+- `src/main/domain/port-join.ts:10` `[correctness]` · `Math.max(start, end)` can never change the result: a string that starts with `[` and ends with `]` has at least two characters · it can be dropped.
+- `src/main/domain/port-join.ts:11` `[correctness]` · `indexOf('%')` also cuts after a newline, which the old `/%.*$/` did not · `ss` addresses never contain one, so behaviour is unchanged in practice.
+- `src/main/adapters/pin-file-store.ts:80`, `src/main/adapters/docker-observer.ts:262` `[design]` · `NOSONAR` silences every rule on the line, not only S9382 · accepted (owner MCDA A 500): the rule key and the reason are written next to it.
 
 ## ⚪ Disagree / Intentional
-- `src/main/ipc.test.ts:20-27` `[tests]` · `{} satisfies Partial<X> as X` checks little for `{}` · this is exactly what #25 asked for, and it is still stricter than `as unknown as`
+- The sequential awaits (S9382) are kept on purpose: each read depends on the previous offset, and the inspections stop as soon as a newer sync starts.
 
 ## Per-dimension summary
-- Design: no change · Docs: one inaccurate comment, fixed · Tests: stronger (identity and the exact debounce are now pinned) · Security: nothing · Correctness: nothing
+- Design: minimal string scans, no new abstraction. · Docs: the NOSONAR markers carry their reason. · Tests: the pinning tests pass before and after the fix. · Security: linear scans, the backtracking is gone. · Correctness: behaviour unchanged.
