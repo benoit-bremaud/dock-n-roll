@@ -467,3 +467,19 @@ Sensitivity: C and A stay top two and G last under value 45 or effort 35; E pass
 - The tray showed "POSTGRES_PASSWORD required" for the sonarqube stack: it was started from an unmerged
   sonarqube-stack worktree that has no `.env`, and dock-n-roll runs compose in the project directory
   (ADR-0002) without the `environment_file` label. Database encryption was moved to sonarqube-stack#3.
+
+## 2026-10-23 — #72: SonarQube 26.10 rule issues (PR #76), brick closed
+
+- Owner MCDAs: S9382 → `NOSONAR` with the reason inline (A 500 vs Accepted-in-UI 330 vs rewrite 190);
+  split → one PR, one commit per rule (A 470).
+- PR #76 (`5fdb445`): S8786 → `bareAddress` and `shortenPath` trim with linear string scans (pinning tests
+  added first: zone inside brackets, lone brackets, repeated trailing slashes); S9381 → `index.ts` awaits
+  `start()` in a try/catch; S9382 → the pin file read loop and the sync inspects stay sequential on purpose.
+  Closes #72.
+- Gate: lint, typecheck, 599 tests, coverage 97.13 / 92.51 %, Sonar gate OK (0 issues, also on main after
+  merge), gitleaks clean, E2E smoke 8/8, review-local Must 0 / Should 0 / 3 Nice (noted in the report),
+  CI green, Codex: no findings.
+- Backlog triage (owner MCDA A 440): brick G filed as #77; brick #68 also takes #64 #59 #63; brick
+  #41 + #61 also takes #57; #52 right after G (due 2026-10-28). New idea #75: more options for the local
+  SonarQube stack, to brainstorm later.
+- Next: brick G (#77).
