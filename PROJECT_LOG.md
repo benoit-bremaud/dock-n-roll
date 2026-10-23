@@ -451,3 +451,19 @@ Sensitivity: C and A stay top two and G last under value 45 or effort 35; E pass
   appear only after the choice that needs them. Logs in their own window, closed by a button or a
   click outside, filed as #68.
 - Next: brick H (#25 test Nice). #68 and #61 still need a place in the roadmap. #52 is due 2026-10-28.
+
+## 2026-10-23 — Brick H: test Nice findings from the brick D review (PR #71), brick closed
+
+- Owner MCDA on the split: one PR, one commit per item (A 465 vs B 345 vs C 225).
+- PR #71 (`f4acace`), test-only: the trusted-sender test refuses a structural clone of the dashboard; the
+  pin file debounce is pinned at exactly 100 ms (advance 99 ms, then 1 ms); a WHY comment on `quietFor(100)`;
+  the `ipc.test.ts` fakes use `satisfies Partial<…>`; one coverage exclude per line; the preload test is
+  renamed "… and forwards the answer". Mutation checks: a 101 ms debounce fails 5 tests, and comparing
+  senders by structure fails the clone test. Closes #25.
+- Gate: lint, typecheck, 592 tests, coverage 97.2 / 92.6 / 97.5 / 98.5 %, gitleaks clean, E2E smoke 8/8,
+  review-local Must 0 (one Should applied), CI green. Codex: quota exhausted, no review.
+- SonarQube was upgraded to 26.10 by the owner; its new rules (S8786, S9381, S9382) raise 5 issues in
+  untouched code, so the gate is red. Owner merged anyway (MCDA A 465), tracked in #72.
+- The tray showed "POSTGRES_PASSWORD required" for the sonarqube stack: it was started from an unmerged
+  sonarqube-stack worktree that has no `.env`, and dock-n-roll runs compose in the project directory
+  (ADR-0002) without the `environment_file` label. Database encryption was moved to sonarqube-stack#3.
