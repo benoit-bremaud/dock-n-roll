@@ -240,7 +240,7 @@ if (app.requestSingleInstanceLock()) {
   })
   // A tray app keeps running with no window open.
   app.on('window-all-closed', () => undefined)
-  void app.whenReady().then(() => {
+  void app.whenReady().then(async () => {
     // The dashboard needs no browser permission (camera, notifications, ...): deny them all.
     session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
       callback(false)
@@ -252,13 +252,15 @@ if (app.requestSingleInstanceLock()) {
       Menu.setApplicationMenu(null)
     }
     tray = createStartingTray()
-    start(tray).catch((error: unknown) => {
+    try {
+      await start(tray)
+    } catch (error: unknown) {
       // Without this the app would run with no tray and no window, and the single-instance
       // lock would block every relaunch.
       console.error('dock-n-roll: startup failed', error)
       dialog.showErrorBox('dock-n-roll could not start', error instanceof Error ? error.message : String(error))
       app.quit()
-    })
+    }
   })
 } else {
   // A second launch (autostart + manual start) must not add a second tray icon.
