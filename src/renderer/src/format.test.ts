@@ -9,7 +9,10 @@ describe('shortenPath — home folder shown as ~', () => {
     ['/home/user2/x', '/home/u', '/home/user2/x'],
     ['/srv/blog', '/home/u', '/srv/blog'],
     ['/srv/blog', '', '/srv/blog'],
-    ['/srv/blog', '/', '/srv/blog']
+    ['/srv/blog', '/', '/srv/blog'],
+    ['/home/u/x', '/home/u///', '~/x'],
+    ['/srv/blog', '///', '/srv/blog'],
+    ['/home//u/x', '/home//u', '~/x']
   ])('%s with home %j → %s', (path, home, expected) => {
     expect(shortenPath(path, home)).toBe(expected)
   })

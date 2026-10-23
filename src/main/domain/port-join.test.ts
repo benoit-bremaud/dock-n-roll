@@ -55,6 +55,17 @@ describe('joinPorts — spec UC4 and R3', () => {
     expect(joinPorts([{ address: '[::1]', port: 5432 }], [db])[0]?.owner).toEqual({ kind: 'unknown' })
   })
 
+  it.each([
+    ['[fe80::1%eth0]', 'fe80::1'],
+    ['127.0.0.1%lo%x', '127.0.0.1'],
+    ['[::1', '::1'],
+    ['::1]', '::1']
+  ])('strips brackets and zone of %s before comparing with Docker', (address, hostIp) => {
+    const db = container({ name: 'db', publishedPorts: [{ hostIp, hostPort: 5432, containerPort: 5432, protocol: 'tcp' }] })
+
+    expect(joinPorts([{ address, port: 5432 }], [db])[0]?.owner).toMatchObject({ kind: 'container' })
+  })
+
   it('reports an unknown owner when neither ss nor Docker knows it', () => {
     expect(joinPorts([{ address: '127.0.0.53', port: 53 }], [])).toEqual([
       { address: '127.0.0.53', port: 53, owner: { kind: 'unknown' } }

@@ -76,7 +76,8 @@ async function readPinFile(path: string): Promise<string | null> {
     let length = 0
     let bytesRead: number
     do {
-      ;({ bytesRead } = await withTimeout(handle.read(buffer, length, buffer.length - length, length), FS_TIMEOUT_MS, `read ${path}`))
+      // Sequential by design: each read starts at the offset the previous one reached.
+      ;({ bytesRead } = await withTimeout(handle.read(buffer, length, buffer.length - length, length), FS_TIMEOUT_MS, `read ${path}`)) // NOSONAR typescript:S9382
       length += bytesRead
     } while (bytesRead > 0 && length < buffer.length)
     if (length > MAX_PIN_FILE_BYTES) throw tooLarge(length)

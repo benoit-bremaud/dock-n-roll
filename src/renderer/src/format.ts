@@ -4,7 +4,9 @@ type ServiceStatus = ServiceView['status']
 
 /** `/home/u/x` → `~/x`. Only a whole home folder is replaced, never a prefix of another name. */
 export function shortenPath(path: string, homeDir: string): string {
-  const home = homeDir.replace(/\/+$/, '')
+  let end = homeDir.length
+  while (end > 0 && homeDir[end - 1] === '/') end -= 1
+  const home = homeDir.slice(0, end)
   if (home === '') return path
   if (path === home) return '~'
   return path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path

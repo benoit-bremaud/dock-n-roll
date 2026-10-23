@@ -258,7 +258,8 @@ export function observeDocker(options: DockerObserverOptions, listener: DockerLi
       if (status !== 200) throw new Error(`Docker answered the container list with HTTP ${String(status)}`)
       for (const id of containerIds(body)) {
         if (!isCurrent(attempt)) return
-        await inspectInto(id, fresh, attempt)
+        // Sequential by design: stop at once when a newer sync takes over, and never flood the daemon.
+        await inspectInto(id, fresh, attempt) // NOSONAR typescript:S9382
       }
     } catch (error) {
       lost(attempt, error instanceof Error ? error.message : String(error))
