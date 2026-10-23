@@ -51,7 +51,7 @@ describe('preload', () => {
     ['listBackground', () => api.listBackground(), [IPC.listBackground]],
     ['openLogs', () => api.openLogs('web', 'c1'), [IPC.openLogs, 'web', 'c1']],
     ['closeLogs', () => api.closeLogs(), [IPC.closeLogs]]
-  ] as const)('%s invokes its channel with the id only', async (_name, call, expected) => {
+  ] as const)('%s invokes its channel with the id only and forwards the answer', async (_name, call, expected) => {
     electron.invoke.mockClear()
 
     await expect(call()).resolves.toBe('answer')

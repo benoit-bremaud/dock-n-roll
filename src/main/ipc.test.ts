@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { BrowserWindow, IpcMainInvokeEvent } from 'electron'
+import type { BrowserWindow, IpcMainInvokeEvent, WebContents } from 'electron'
 import { IPC, type BackgroundView, type ControllerState, type LogsState } from '../shared/ipc'
 import type { LogSession } from './controller/log-session'
 import type { ServiceController } from './controller/service-controller'
@@ -16,8 +16,14 @@ vi.mock('electron', () => ({
 
 const STATE: ControllerState = { dockerAvailable: true, dockerReason: null, pinErrors: [], services: [], homeDir: '/home/me' }
 const BACKGROUND: BackgroundView = { containers: [], ports: [] }
-const TRUSTED = { trusted: true } as unknown as IpcMainInvokeEvent
-const UNTRUSTED = { trusted: false } as unknown as IpcMainInvokeEvent
+// Partial fakes: the isTrusted stub below compares by identity, so two distinct empty events suffice.
+const TRUSTED = {} satisfies Partial<IpcMainInvokeEvent> as IpcMainInvokeEvent
+const UNTRUSTED = {} satisfies Partial<IpcMainInvokeEvent> as IpcMainInvokeEvent
+
+function fakeWindow(destroyed: boolean, send: WebContents['send']): BrowserWindow {
+  const webContents = { send } satisfies Partial<WebContents> as WebContents
+  return { isDestroyed: () => destroyed, webContents } satisfies Partial<BrowserWindow> as BrowserWindow
+}
 
 // Spies kept apart from the controller object, so assertions never read an unbound method.
 function makeController() {
@@ -140,7 +146,7 @@ describe('registerIpc', () => {
 describe('pushLogsTo', () => {
   it('sends the logs state, or null, on the logs-changed channel', () => {
     const send = vi.fn()
-    const window = { isDestroyed: () => false, webContents: { send } } as unknown as BrowserWindow
+    const window = fakeWindow(false, send)
     const logs: LogsState = { serviceId: 'web', containerId: null, containers: [], lines: [], ended: 'No container yet' }
 
     pushLogsTo(() => window, logs)
@@ -154,7 +160,7 @@ describe('pushLogsTo', () => {
 describe('pushStateTo', () => {
   function makeWindow(destroyed: boolean): { window: BrowserWindow; send: ReturnType<typeof vi.fn> } {
     const send = vi.fn()
-    const window = { isDestroyed: () => destroyed, webContents: { send } } as unknown as BrowserWindow
+    const window = fakeWindow(destroyed, send)
     return { window, send }
   }
 
