@@ -477,7 +477,7 @@ Sensitivity: C and A stay top two and G last under value 45 or effort 35; E pass
   `start()` in a try/catch; S9382 → the pin file read loop and the sync inspects stay sequential on purpose.
   Closes #72.
 - Gate: lint, typecheck, 599 tests, coverage 97.13 / 92.51 %, Sonar gate OK (0 issues, also on main after
-  merge), gitleaks clean, E2E smoke 8/8, review-local Must 0 / Should 0 / 3 Nice (noted in the report),
+  merge), gitleaks clean, E2E smoke 8/8, review-local Must 0 / Should 0 / 3 Nice (filed as #78),
   CI green, Codex: no findings.
 - Backlog triage (owner MCDA A 440): brick G filed as #77; brick #68 also takes #64 #59 #63; brick
   #41 + #61 also takes #57; #52 right after G (due 2026-10-28). New idea #75: more options for the local
