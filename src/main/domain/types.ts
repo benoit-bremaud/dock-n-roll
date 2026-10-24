@@ -60,6 +60,8 @@ export interface PinEntry {
   readonly name?: string
   readonly url?: string
   readonly healthUrl?: string
+  /** Groups (profiles) this entry belongs to, started or stopped together (issue #77). */
+  readonly groups?: readonly string[]
   /** Pinned services come first, in pin-file order. */
   readonly pinned: boolean
   /** Hidden services are left out of the list. */

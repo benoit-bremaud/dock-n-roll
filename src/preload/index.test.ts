@@ -27,7 +27,7 @@ vi.mock('electron', () => ({
   }
 }))
 
-const STATE: ControllerState = { dockerAvailable: true, dockerReason: null, pinErrors: [], services: [], homeDir: '/home/me' }
+const STATE: ControllerState = { dockerAvailable: true, dockerReason: null, pinErrors: [], services: [], groups: [], homeDir: '/home/me' }
 
 describe('preload', () => {
   let api: DockNRollApi
@@ -39,7 +39,7 @@ describe('preload', () => {
 
   it('exposes exactly the DockNRollApi on window.dockNRoll', () => {
     expect([...electron.exposed.keys()]).toEqual(['dockNRoll'])
-    expect(Object.keys(api).sort()).toEqual(['closeLogs', 'getState', 'listBackground', 'onLogsChanged', 'onStateChanged', 'openLogs', 'openUrl', 'restart', 'start', 'stop'])
+    expect(Object.keys(api).sort()).toEqual(['closeLogs', 'getState', 'listBackground', 'onLogsChanged', 'onStateChanged', 'openLogs', 'openUrl', 'restart', 'start', 'startGroup', 'stop', 'stopGroup'])
   })
 
   it.each([
@@ -47,6 +47,8 @@ describe('preload', () => {
     ['start', () => api.start('web'), [IPC.start, 'web']],
     ['stop', () => api.stop('web'), [IPC.stop, 'web']],
     ['restart', () => api.restart('web'), [IPC.restart, 'web']],
+    ['startGroup', () => api.startGroup('QA'), [IPC.startGroup, 'QA']],
+    ['stopGroup', () => api.stopGroup('QA'), [IPC.stopGroup, 'QA']],
     ['openUrl', () => api.openUrl('web'), [IPC.openUrl, 'web']],
     ['listBackground', () => api.listBackground(), [IPC.listBackground]],
     ['openLogs', () => api.openLogs('web', 'c1'), [IPC.openLogs, 'web', 'c1']],

@@ -57,12 +57,17 @@ services:
     url: http://localhost:9000                  # "Open" link (http/https, no credentials)
     healthUrl: http://localhost:9000/api/system/status  # readiness check when no HEALTHCHECK
     pinned: true                                # listed even when no container exists
+    groups: [QA]                                # start / stop with the rest of the group
   - workingDir: /home/me/code/noisy-thing
     hidden: true                                # never listed
   - workingDir: /home/me/code/some-app
     project: some-app-qa                        # optional: one project of a shared directory
     name: Some app (QA)
 ```
+
+Every entry sharing a group name can be started or stopped in one action, from the tray's
+**Groups** submenu or the dashboard's **Groups** menu (shown only once a group exists). Members
+run in parallel; one that fails shows its error on its own row and the others carry on.
 
 Invalid entries are skipped and the problem is shown in the dashboard; invalid YAML or a file over
 64 KiB keeps the last valid pins. Full rules: [spec §8](docs/architecture/specs/v1-spec.md#8-pin-file--format-sketch).

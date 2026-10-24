@@ -18,7 +18,7 @@ function view(overrides: Partial<ServiceView> = {}): ServiceView {
 }
 
 function state(overrides: Partial<ControllerState> = {}): ControllerState {
-  return { dockerAvailable: true, dockerReason: null, pinErrors: [], services: [view()], homeDir: '/home/u', ...overrides }
+  return { dockerAvailable: true, dockerReason: null, pinErrors: [], services: [view()], groups: [], homeDir: '/home/u', ...overrides }
 }
 
 function recordingActions(): TrayActions & { calls: string[] } {
@@ -28,6 +28,8 @@ function recordingActions(): TrayActions & { calls: string[] } {
     start: (id) => calls.push(`start ${id}`),
     stop: (id) => calls.push(`stop ${id}`),
     restart: (id) => calls.push(`restart ${id}`),
+    startGroup: (name) => calls.push(`start group ${name}`),
+    stopGroup: (name) => calls.push(`stop group ${name}`),
     openUrl: (id) => calls.push(`open ${id}`),
     openDashboard: () => calls.push('dashboard'),
     quit: () => calls.push('quit'),
@@ -38,6 +40,25 @@ function recordingActions(): TrayActions & { calls: string[] } {
 const labels = (entries: readonly MenuEntry[]): string[] => entries.map((entry) => entry.label ?? `<${entry.type ?? '?'}>`)
 
 describe('buildTrayMenu — every action reachable from the menu (spec R5)', () => {
+  it('adds a Groups submenu with Start and Stop per group, only when a group exists (UC8, UC9)', () => {
+    const actions = recordingActions()
+    const menu = buildTrayMenu(state({ groups: ['QA'] }), actions)
+
+    expect(labels(menu)).toEqual(['🔴 Blog', '<separator>', 'Groups', '<separator>', 'Open dashboard', 'Quit'])
+    const qa = menu[2]?.submenu?.[0]
+    expect(qa?.label).toBe('QA')
+    expect(qa?.submenu?.map((item) => item.label)).toEqual(['Start all', 'Stop all'])
+    qa?.submenu?.[0]?.click?.()
+    qa?.submenu?.[1]?.click?.()
+    expect(actions.calls).toEqual(['start group QA', 'stop group QA'])
+  })
+
+  it('offers no group entry while Docker is unavailable', () => {
+    const menu = buildTrayMenu(state({ groups: ['QA'], dockerAvailable: false }), recordingActions())
+
+    expect(labels(menu)).not.toContain('Groups')
+  })
+
   it('lists each service with its status, then the dashboard and quit entries', () => {
     const menu = buildTrayMenu(state({ services: [view(), view({ id: 'b', displayName: 'SonarQube', status: 'on' })] }), recordingActions())
 

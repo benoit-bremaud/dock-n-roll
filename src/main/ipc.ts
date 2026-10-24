@@ -35,6 +35,8 @@ export function registerIpc({ controller, listBackground, isTrusted, logs }: Ipc
   command(IPC.start, (id) => controller.start(id))
   command(IPC.stop, (id) => controller.stop(id))
   command(IPC.restart, (id) => controller.restart(id))
+  command(IPC.startGroup, (name) => controller.startGroup(name))
+  command(IPC.stopGroup, (name) => controller.stopGroup(name))
   ipcMain.handle(IPC.openUrl, async (event, id: unknown) => {
     const valid = asId(id)
     // `urlOf` only returns the pin's http/https URL (spec R6), never one from the renderer.

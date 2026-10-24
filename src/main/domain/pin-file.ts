@@ -1,7 +1,7 @@
 import { isValidProjectName, normalizeAbsolutePath } from './names'
 import type { PinEntry, PinFileResult } from './types'
 
-const KNOWN_KEYS = new Set(['workingDir', 'project', 'name', 'url', 'healthUrl', 'pinned', 'hidden'])
+const KNOWN_KEYS = new Set(['workingDir', 'project', 'name', 'url', 'healthUrl', 'pinned', 'hidden', 'groups'])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -67,15 +67,26 @@ function validateEntry(raw: unknown, where: string, errors: string[]): PinEntry 
     return false
   }
 
+  const optionalGroups = (): readonly string[] | undefined => {
+    const value = raw['groups']
+    if (value === undefined) return undefined
+    const names = Array.isArray(value) ? value.map((item: unknown) => (typeof item === 'string' ? item.trim() : '')) : []
+    if (names.length > 0 && !names.includes('')) return [...new Set(names)]
+    errors.push(`${where}.groups: expected a list of non-empty names`)
+    return undefined
+  }
+
   const name = optionalName()
   const url = optionalUrl('url')
   const healthUrl = optionalUrl('healthUrl')
+  const groups = optionalGroups()
   return {
     workingDir,
     ...(rawProject === undefined ? {} : { project: rawProject }),
     ...(name === undefined ? {} : { name }),
     ...(url === undefined ? {} : { url }),
     ...(healthUrl === undefined ? {} : { healthUrl }),
+    ...(groups === undefined ? {} : { groups }),
     pinned: flag('pinned'),
     hidden: flag('hidden')
   }

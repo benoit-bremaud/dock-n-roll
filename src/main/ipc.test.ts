@@ -14,7 +14,7 @@ vi.mock('electron', () => ({
   shell: { openExternal: electron.openExternal }
 }))
 
-const STATE: ControllerState = { dockerAvailable: true, dockerReason: null, pinErrors: [], services: [], homeDir: '/home/me' }
+const STATE: ControllerState = { dockerAvailable: true, dockerReason: null, pinErrors: [], services: [], groups: [], homeDir: '/home/me' }
 const BACKGROUND: BackgroundView = { containers: [], ports: [] }
 // Partial fakes: the isTrusted stub below compares by identity, so two distinct empty events suffice.
 const TRUSTED = {} satisfies Partial<IpcMainInvokeEvent> as IpcMainInvokeEvent
@@ -31,6 +31,8 @@ function makeController() {
     start: vi.fn<(id: string) => Promise<void>>(() => Promise.resolve()),
     stop: vi.fn<(id: string) => Promise<void>>(() => Promise.resolve()),
     restart: vi.fn<(id: string) => Promise<void>>(() => Promise.resolve()),
+    startGroup: vi.fn<(name: string) => Promise<void>>(() => Promise.resolve()),
+    stopGroup: vi.fn<(name: string) => Promise<void>>(() => Promise.resolve()),
     urlOf: vi.fn((id: string) => (id === 'web' ? 'http://localhost:3000/' : null))
   }
   const controller: ServiceController = {
@@ -67,8 +69,18 @@ describe('registerIpc', () => {
 
   it('registers one handler per invoke channel', () => {
     expect([...electron.handlers.keys()].sort()).toEqual(
-      [IPC.getState, IPC.start, IPC.stop, IPC.restart, IPC.openUrl, IPC.listBackground, IPC.openLogs, IPC.closeLogs].sort()
+      [IPC.getState, IPC.start, IPC.stop, IPC.restart, IPC.startGroup, IPC.stopGroup, IPC.openUrl, IPC.listBackground, IPC.openLogs, IPC.closeLogs].sort()
     )
+  })
+
+  it('runs a group action for a trusted caller and a valid name only (UC8, UC9)', async () => {
+    await invoke(IPC.startGroup, TRUSTED, 'QA')
+    await invoke(IPC.stopGroup, TRUSTED, 'QA')
+    await invoke(IPC.startGroup, UNTRUSTED, 'QA')
+    await invoke(IPC.stopGroup, TRUSTED, 42)
+
+    expect(controller.startGroup.mock.calls).toEqual([['QA']])
+    expect(controller.stopGroup.mock.calls).toEqual([['QA']])
   })
 
   it('opens the logs of a valid service id, with a valid container id or none (UC7)', async () => {

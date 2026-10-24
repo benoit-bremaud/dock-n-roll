@@ -30,7 +30,7 @@ I want a small desktop tool, always reachable from the GNOME top bar, that:
 ### Out of V1 (backlog)
 
 - Shell-command services (`npm run dev`, …) and `systemd --user` units.
-- Live logs (done in v1.1, UC7), profiles/groups ("QA mode"), cleanup of exited containers, CPU/RAM stats.
+- Live logs (done in v1.1, UC7), profiles/groups ("QA mode", done: `groups` key, UC8/UC9, #77), cleanup of exited containers, CPU/RAM stats.
 - Any UI for editing the pin file (it is edited by hand).
 - Packaging for other users / other OSes.
 
@@ -207,6 +207,7 @@ services:
     url: http://localhost:9000
     healthUrl: http://localhost:9000/api/system/status
     pinned: true
+    groups: [QA]   # optional: started / stopped together (UC8, UC9, issue #77)
   - workingDir: /home/vev/Documents/Codex/bulle-de-je
     hidden: true
   - workingDir: /home/vev/Documents/02_personal/some-app
@@ -222,6 +223,7 @@ services:
 | `url` | no | `http:`/`https:` only (R6) — enables UC5 |
 | `healthUrl` | no | `http:`/`https:` only — readiness gate when no container has a `HEALTHCHECK` (§3) |
 | `pinned` / `hidden` | no | ordering / exclusion |
+| `groups` | no | non-empty list of non-empty names (trimmed, de-duplicated); each group gets Start all / Stop all (`diagrams/groups/`) |
 
 ## 9. Resolved questions (owner, 2026-10-09)
 

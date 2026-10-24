@@ -7,6 +7,12 @@ file format (`services.yaml`) and the installed package.
 
 ## [Unreleased]
 
+### Added
+
+- Service groups (profiles): a `groups: [QA]` key on pin-file entries; the tray's **Groups**
+  submenu and the dashboard's **Groups** menu start or stop every member at once, in parallel, each
+  failure on its own row. Neither shows until a group exists (#77).
+
 ### Fixed
 
 - Pin file: a FIFO, device or directory named `services.yaml` is refused at once ("not a regular
