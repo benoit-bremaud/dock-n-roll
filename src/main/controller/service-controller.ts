@@ -55,6 +55,13 @@ export interface ServiceController {
   stop(id: string): Promise<void>
   /** UC6, same contract as `start`: a stop then an `up` under one pending entry; a failed stop skips the `up` (diagram 12). */
   restart(id: string): Promise<void>
+  /**
+   * UC8 (groups diagram 02): `start` on every listed member of the group, in parallel. Each
+   * member keeps the `start` contract, so one failure lands on its row and stops no other.
+   */
+  startGroup(name: string): Promise<void>
+  /** UC9, same contract as `startGroup` with `stop`. */
+  stopGroup(name: string): Promise<void>
   /** The pin's validated URL (spec R6), never a URL from the caller. */
   urlOf(id: string): string | null
   /** Current containers, for the background view (UC4). */
@@ -98,6 +105,11 @@ function isHttpUrl(url: string): boolean {
   } catch {
     return false
   }
+}
+
+/** Groups of the listed services, sorted and de-duplicated: the UI offers group controls only when there is one. */
+function groupsOf(services: readonly Service[]): readonly string[] {
+  return [...new Set(services.flatMap((service) => service.pin?.groups ?? []))].sort((a, b) => a.localeCompare(b))
 }
 
 const NO_CONTROLS = { start: false, stop: false, restart: false } as const
@@ -146,7 +158,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   const stoppedAt = new Map<string, number>()
   const listeners = new Set<(state: ControllerState) => void>()
   const recomputeListeners = new Set<() => void>()
-  let current: ControllerState = { dockerAvailable, dockerReason, pinErrors, services: [], homeDir: deps.homeDir }
+  let current: ControllerState = { dockerAvailable, dockerReason, pinErrors, services: [], groups: [], homeDir: deps.homeDir }
   let currentJson = JSON.stringify(current)
   let chain = Promise.resolve()
   let disposed = false
@@ -241,7 +253,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   }
 
   const publish = (): void => {
-    const next: ControllerState = { dockerAvailable, dockerReason, pinErrors, services: services.map(viewOf), homeDir: deps.homeDir }
+    const next: ControllerState = { dockerAvailable, dockerReason, pinErrors, services: services.map(viewOf), groups: groupsOf(services), homeDir: deps.homeDir }
     const nextJson = JSON.stringify(next)
     for (const listener of recomputeListeners) {
       try {
@@ -468,11 +480,20 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   // (diagram 11); names resolve in the background and land through a later recomputation.
   applyPins(store.current())
 
+  const runGroup = async (name: string, request: 'start' | 'stop'): Promise<void> => {
+    // Members are read once the pending recomputation landed: an id it changes would be skipped.
+    await chain
+    const members = services.filter((service) => service.pin?.groups?.includes(name) === true)
+    await Promise.allSettled(members.map((service) => run(service.id, request)))
+  }
+
   return {
     state: () => current,
     start: (id) => run(id, 'start'),
     stop: (id) => run(id, 'stop'),
     restart: (id) => run(id, 'restart'),
+    startGroup: (name) => runGroup(name, 'start'),
+    stopGroup: (name) => runGroup(name, 'stop'),
     urlOf: (id) => {
       const url = services.find((service) => service.id === id)?.pin?.url ?? null
       // Validated by the pin file (spec R6) and checked again here, for every caller (tray and IPC).

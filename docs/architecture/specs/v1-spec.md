@@ -30,7 +30,7 @@ I want a small desktop tool, always reachable from the GNOME top bar, that:
 ### Out of V1 (backlog)
 
 - Shell-command services (`npm run dev`, …) and `systemd --user` units.
-- Live logs (done in v1.1, UC7), profiles/groups ("QA mode"), cleanup of exited containers, CPU/RAM stats.
+- Live logs (done in v1.1, UC7), profiles/groups ("QA mode", done: `groups` key, UC8/UC9, #77), cleanup of exited containers, CPU/RAM stats.
 - Any UI for editing the pin file (it is edited by hand).
 - Packaging for other users / other OSes.
 
@@ -164,6 +164,17 @@ Primary actor for all: **Developer**. Supporting actor: **Docker Engine**.
   before the panel opened → "Service no longer listed".
 - **Note**: text only (no HTML, ANSI removed, a `\r`-redrawn line shows its last state); only one panel open at a time; read-only.
 
+### UC8 — Start a group / UC9 — Stop a group (#77)
+
+- **Precondition**: at least one listed service declares the group in the pin file (`groups`, §8).
+- **Main success scenario**: Developer chooses Start all (Stop all) on a group, from the tray's
+  Groups submenu or the dashboard's Groups menu → system runs UC1 (UC2) on every listed member,
+  in parallel; members that cannot start (stop) are skipped. Diagrams `groups/01`, `groups/02`.
+- **Extensions**: a member fails → its error shows on its own row as in UC1 3a, the others carry
+  on; Docker unavailable → no group control (tray) or disabled ones (dashboard).
+- **Note**: a pin without `project` covers every project of its dir, so all of them join its groups.
+  Group names are case-sensitive.
+
 ## 6. Risks and constraints (from the brainstorm, verified on the workstation 2026-10-09)
 
 - **R1 — Project-name collision** (observed): containers `sonarqube` and `sonar-db` both carry
@@ -207,6 +218,7 @@ services:
     url: http://localhost:9000
     healthUrl: http://localhost:9000/api/system/status
     pinned: true
+    groups: [QA]   # optional: started / stopped together (UC8, UC9, issue #77)
   - workingDir: /home/vev/Documents/Codex/bulle-de-je
     hidden: true
   - workingDir: /home/vev/Documents/02_personal/some-app
@@ -222,6 +234,7 @@ services:
 | `url` | no | `http:`/`https:` only (R6) — enables UC5 |
 | `healthUrl` | no | `http:`/`https:` only — readiness gate when no container has a `HEALTHCHECK` (§3) |
 | `pinned` / `hidden` | no | ordering / exclusion |
+| `groups` | no | non-empty list of names of 1 to 64 characters (trimmed, de-duplicated); each group gets Start all / Stop all (`diagrams/groups/`) |
 
 ## 9. Resolved questions (owner, 2026-10-09)
 

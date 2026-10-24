@@ -1231,3 +1231,138 @@ describe('review fixes — health gate and dispose', () => {
     expect(f.counters.filesChecks).toBe(checks)
   })
 })
+
+describe('groups — UC8, UC9, groups diagram 02', () => {
+  const api = container({ id: 'a', state: 'exited', exitCode: 0, labels: composeLabels('api', '/srv/api') })
+  const apiRunning = container({ id: 'a', state: 'running', labels: composeLabels('api', '/srv/api') })
+  const API = '/srv/api\0api'
+  const db = container({ id: 'd', state: 'exited', exitCode: 0, labels: composeLabels('db', '/srv/db') })
+  const withGroups = (f: ReturnType<typeof fakes>): void => {
+    f.setInitialPins([
+      pin({ workingDir: '/srv/blog', groups: ['QA', 'demo'] }),
+      pin({ workingDir: '/srv/api', groups: ['QA'] })
+    ])
+  }
+
+  it('lists the sorted, de-duplicated groups of the listed services', async () => {
+    const { f, controller } = await controllerWith(withGroups)
+    f.snapshot([webStopped, api, db])
+    await settle()
+
+    expect(controller.state().groups).toEqual(['demo', 'QA'])
+  })
+
+  it('lists no group when no pin declares one', async () => {
+    const { f, controller } = await controllerWith()
+    f.snapshot([webStopped])
+    await settle()
+
+    expect(controller.state().groups).toEqual([])
+  })
+
+  it('starts every member in parallel and leaves the other services alone', async () => {
+    const { f, controller, row } = await controllerWith(withGroups)
+    f.snapshot([webStopped, api, db])
+    await settle()
+
+    void controller.startGroup('QA')
+    await settle()
+
+    expect(f.runs.map((run) => run.options.cwd).sort()).toEqual(['/srv/api', '/srv/blog'])
+    expect(row(BLOG)?.status).toBe('starting')
+    expect(row(API)?.status).toBe('starting')
+  })
+
+  it('keeps starting the other members when one fails, and shows the error on its row only', async () => {
+    const { f, controller, row } = await controllerWith(withGroups)
+    f.snapshot([webStopped, api])
+    await settle()
+
+    const done = controller.startGroup('QA')
+    await settle()
+    const blogRun = f.runs.find((run) => run.options.cwd === '/srv/blog')
+    const apiRun = f.runs.find((run) => run.options.cwd === '/srv/api')
+    blogRun?.finish({ exitCode: 1, stderr: 'port is already allocated' })
+    f.snapshot([webStopped, apiRunning])
+    apiRun?.finish()
+    await done
+    await settle()
+
+    expect(row(BLOG)).toMatchObject({ status: 'off', reason: 'port is already allocated' })
+    expect(row(API)).toMatchObject({ status: 'on', reason: null })
+  })
+
+  it('starts only the members that can start', async () => {
+    const { f, controller } = await controllerWith(withGroups)
+    f.snapshot([web, api])
+    await settle()
+
+    void controller.startGroup('QA')
+    await settle()
+
+    expect(f.runs.map((run) => run.options.cwd)).toEqual(['/srv/api'])
+  })
+
+  it('stops only the running members', async () => {
+    const { f, controller } = await controllerWith(withGroups)
+    f.snapshot([web, api])
+    await settle()
+
+    void controller.stopGroup('QA')
+    await settle()
+
+    expect(f.runs.map((run) => run.args)).toEqual([['compose', '--project-name=blog', 'stop']])
+  })
+
+  it('runs nothing while Docker is unavailable', async () => {
+    const { f, controller, row } = await controllerWith(withGroups)
+    f.snapshot([webStopped, api])
+    await settle()
+    f.dockerDown('socket gone')
+    await settle()
+
+    await controller.startGroup('QA')
+
+    expect(f.runs).toEqual([])
+    expect(row(BLOG)?.reason).toBeNull()
+  })
+
+  it('leaves hidden pins out of the groups and of the group action', async () => {
+    const { f, controller } = await controllerWith((setup) => {
+      setup.setInitialPins([pin({ workingDir: '/srv/blog', hidden: true, groups: ['QA'] }), pin({ workingDir: '/srv/api', groups: ['demo'] })])
+    })
+    f.snapshot([webStopped, api])
+    await settle()
+
+    await controller.startGroup('QA')
+
+    expect(controller.state().groups).toEqual(['demo'])
+    expect(f.runs).toEqual([])
+  })
+
+  it('starts a member whose id changes in the recomputation pending at the call', async () => {
+    const { f, controller } = await controllerWith((setup) => {
+      setup.resolved.set('/srv/blog', 'blog')
+      setup.setInitialPins([pin({ workingDir: '/srv/blog', pinned: true, groups: ['QA'] })])
+    })
+    f.snapshot([])
+    await settle()
+
+    // The first container appears (id '/srv/blog' → BLOG) and the call comes before the rebuild.
+    f.snapshot([webStopped])
+    void controller.startGroup('QA')
+    await settle()
+
+    expect(f.runs.map((run) => run.options.cwd)).toEqual(['/srv/blog'])
+  })
+
+  it('does nothing for an unknown group', async () => {
+    const { f, controller } = await controllerWith(withGroups)
+    f.snapshot([webStopped, api])
+    await settle()
+
+    await controller.startGroup('nope')
+
+    expect(f.runs).toEqual([])
+  })
+})

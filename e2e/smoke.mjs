@@ -1,7 +1,7 @@
 // E2E smoke of the packaged app (ADR-0010, diagram 10): run under a display, e.g. `xvfb-run -a pnpm e2e:smoke`.
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -64,6 +64,9 @@ async function main() {
   check(fuses[FuseV1Options.GrantFileProtocolExtraPrivileges] === FuseState.DISABLE, 'fuse GrantFileProtocolExtraPrivileges is off')
 
   const configHome = await mkdtemp(join(tmpdir(), 'dock-n-roll-smoke-'))
+  // A pinned entry in a group: the pin file reaches the dashboard whether Docker runs or not (#77).
+  await mkdir(join(configHome, 'dock-n-roll'))
+  await writeFile(join(configHome, 'dock-n-roll', 'services.yaml'), 'services:\n  - workingDir: /nonexistent/smoke\n    pinned: true\n    groups: [QA]\n')
   const env = { ...process.env, XDG_CONFIG_HOME: configHome }
   const port = await freePort()
   const first = spawn(BINARY, [`--remote-debugging-port=${port}`, '--remote-debugging-address=127.0.0.1'], { env, stdio: 'inherit' })
@@ -93,6 +96,8 @@ async function main() {
     console.log('ok - React root renders')
     const state = await page.evaluate(() => window.dockNRoll.getState().then(() => 'answered'))
     check(state === 'answered', 'window.dockNRoll.getState() answers (Docker may be unavailable)')
+    await page.getByText('Groups', { exact: true }).waitFor({ timeout: TIMEOUT_MS })
+    console.log('ok - the pin file group shows a Groups menu')
     // Checked before the 404 probe, which Chromium logs as a failed resource.
     check(errors.length === 0, `no console or CSP error${errors.length ? `: ${errors.join(' | ')}` : ''}`)
     const statusOf = (url) => page.evaluate((target) => fetch(target).then((response) => response.status), url)

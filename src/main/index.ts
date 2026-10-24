@@ -135,6 +135,8 @@ function renderTray(trayIcon: Tray, controller: ServiceController, state: Contro
     start: (id) => void controller.start(id),
     stop: (id) => void controller.stop(id),
     restart: (id) => void controller.restart(id),
+    startGroup: (name) => void controller.startGroup(name),
+    stopGroup: (name) => void controller.stopGroup(name),
     openUrl: (id) => {
       // `urlOf` only returns the pin's http/https URL (spec R6).
       const url = controller.urlOf(id)

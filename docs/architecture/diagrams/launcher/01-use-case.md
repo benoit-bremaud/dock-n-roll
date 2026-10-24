@@ -54,4 +54,5 @@ flowchart LR
   telling the developer about a status change they did not ask for (`13-sequence-crash-notification.md`).
 - UC7 (v1.1) follows the logs of one container of a service in a dashboard panel, see
   `14-sequence-service-logs.md`.
-- Backlog goals (start a profile, clean exited containers) are deliberately absent.
+- Backlog goals (clean exited containers) are deliberately absent.
+- Groups (UC8 / UC9, `startGroup` / `stopGroup`, `ControllerState.groups`, #77) extend this diagram: see `../groups/`.

@@ -15,6 +15,8 @@ export interface TrayActions {
   start(id: string): void
   stop(id: string): void
   restart(id: string): void
+  startGroup(name: string): void
+  stopGroup(name: string): void
   openUrl(id: string): void
   openDashboard(): void
   quit(): void
@@ -63,6 +65,19 @@ function serviceEntry(service: ServiceView, actions: TrayActions): MenuEntry {
   return { label: `${BADGE[service.status]} ${menuLabel(service.displayName)}`, submenu }
 }
 
+/** UC8 / UC9: one entry per group; none while Docker is unavailable, as no control would act. */
+function groupEntries(state: ControllerState, actions: TrayActions): MenuEntry[] {
+  if (!state.dockerAvailable || state.groups.length === 0) return []
+  const submenu = state.groups.map((name) => ({
+    label: menuLabel(name),
+    submenu: [
+      { label: 'Start all', click: () => { actions.startGroup(name) } },
+      { label: 'Stop all', click: () => { actions.stopGroup(name) } }
+    ]
+  }))
+  return [{ type: 'separator' }, { label: 'Groups', submenu }]
+}
+
 /**
  * The tray menu for a state. On Linux the tray click is not guaranteed (spec R5, ADR-0001), so
  * every action is reachable from here; the main process re-checks each control anyway.
@@ -79,6 +94,7 @@ export function buildTrayMenu(state: ControllerState, actions: TrayActions, opti
   }
   return [
     ...head,
+    ...groupEntries(state, actions),
     { type: 'separator' },
     { label: 'Open dashboard', click: () => { actions.openDashboard() } },
     ...(options.autostart === undefined

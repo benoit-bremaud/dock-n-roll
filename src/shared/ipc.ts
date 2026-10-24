@@ -24,6 +24,8 @@ export interface ControllerState {
   /** Pin-file problems, shown as a banner; the last valid pins stay in use. */
   readonly pinErrors: readonly string[]
   readonly services: readonly ServiceView[]
+  /** Groups declared by the listed services' pins (issue #77), sorted; empty → no group control. */
+  readonly groups: readonly string[]
   /** The user's home folder, so the sandboxed renderer can show paths as `~/…`. */
   readonly homeDir: string
 }
@@ -72,6 +74,12 @@ export interface DockNRollApi {
   start(id: string): Promise<void>
   stop(id: string): Promise<void>
   restart(id: string): Promise<void>
+  /**
+   * UC8 / UC9: start / stop every listed member of the group. Resolves once all settle; an
+   * unknown name is a no-op and a member's failure shows on its own row, never as a rejection.
+   */
+  startGroup(name: string): Promise<void>
+  stopGroup(name: string): Promise<void>
   openUrl(id: string): Promise<void>
   /** `null` when the main process refuses the caller. */
   listBackground(): Promise<BackgroundView | null>
@@ -92,6 +100,8 @@ export const IPC = {
   start: 'dock-n-roll:start',
   stop: 'dock-n-roll:stop',
   restart: 'dock-n-roll:restart',
+  startGroup: 'dock-n-roll:start-group',
+  stopGroup: 'dock-n-roll:stop-group',
   openUrl: 'dock-n-roll:open-url',
   listBackground: 'dock-n-roll:list-background',
   stateChanged: 'dock-n-roll:state-changed',

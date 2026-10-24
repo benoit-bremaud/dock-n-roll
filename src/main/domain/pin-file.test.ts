@@ -113,4 +113,23 @@ describe('validatePinFile', () => {
       errors: ['services[1]: duplicate of an earlier entry for the same workingDir and project; entry ignored']
     })
   })
+
+  it('accepts a group name of 64 characters', () => {
+    expect(validatePinFile({ services: [{ workingDir: '/srv/app', groups: ['x'.repeat(64)] }] }).errors).toEqual([])
+  })
+
+  it('keeps group names trimmed and de-duplicated', () => {
+    const result = validatePinFile({ services: [{ workingDir: '/srv/app', groups: [' QA', 'demo', 'QA '] }] })
+
+    expect(result).toEqual({ entries: [{ workingDir: '/srv/app', groups: ['QA', 'demo'], pinned: false, hidden: false }], errors: [] })
+  })
+
+  it.each([['QA'], [['QA', '']], [['QA', 3]], [[]], [['x'.repeat(65)]]])('ignores a groups field that is not a non-empty list of names: %j', (groups) => {
+    const result = validatePinFile({ services: [{ workingDir: '/srv/app', groups }] })
+
+    expect(result).toEqual({
+      entries: [{ workingDir: '/srv/app', pinned: false, hidden: false }],
+      errors: ['services[0].groups: expected a list of names of 1 to 64 characters']
+    })
+  })
 })

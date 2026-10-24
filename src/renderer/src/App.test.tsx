@@ -18,7 +18,7 @@ function view(overrides: Partial<ServiceView> = {}): ServiceView {
 }
 
 function state(overrides: Partial<ControllerState> = {}): ControllerState {
-  return { dockerAvailable: true, dockerReason: null, pinErrors: [], services: [view()], homeDir: '/home/u', ...overrides }
+  return { dockerAvailable: true, dockerReason: null, pinErrors: [], services: [view()], groups: [], homeDir: '/home/u', ...overrides }
 }
 
 /** Stand-in for the preload API (a boundary already tested in the main process). */
@@ -42,6 +42,14 @@ function fakeApi(initial: ControllerState, backgrounds: (BackgroundView | Error)
     },
     restart: (id) => {
       calls.push(`restart ${id}`)
+      return Promise.resolve()
+    },
+    startGroup: (name) => {
+      calls.push(`startGroup ${name}`)
+      return Promise.resolve()
+    },
+    stopGroup: (name) => {
+      calls.push(`stopGroup ${name}`)
       return Promise.resolve()
     },
     openUrl: (id) => {
@@ -425,6 +433,54 @@ describe('App — running tab (UC4)', () => {
     await rowOf('Blog')
 
     expect(fake.calls).not.toContain('listBackground')
+  })
+})
+
+describe('App — groups (UC8, UC9, groups diagram 01)', () => {
+  it('shows no group control when no group exists', async () => {
+    render(<App api={fakeApi(state()).api} />)
+    await rowOf('Blog')
+
+    expect(screen.queryByText('Groups')).toBeNull()
+  })
+
+  it('reveals Start all / Stop all per group behind one Groups disclosure, and sends the name', async () => {
+    const fake = fakeApi(state({ groups: ['QA', 'demo'] }))
+    render(<App api={fake.api} />)
+    const user = userEvent.setup()
+    await user.click(await screen.findByText('Groups'))
+
+    await user.click(button('Start all QA'))
+    await user.click(button('Stop all demo'))
+
+    expect(fake.calls.filter((call) => call.includes('Group'))).toEqual(['startGroup QA', 'stopGroup demo'])
+  })
+
+  it('closes the open Groups menu on Escape and on a click outside it, as it covers the list', async () => {
+    render(<App api={fakeApi(state({ groups: ['QA'] })).api} />)
+    const user = userEvent.setup()
+    const summary = await screen.findByText('Groups')
+    const menu = summary.closest('details')
+
+    await user.click(summary)
+    await user.keyboard('{Escape}')
+    expect(menu?.open).toBe(false)
+
+    await user.click(summary)
+    await user.click(await screen.findByText('Blog'))
+    expect(menu?.open).toBe(false)
+
+    await user.click(summary)
+    await user.click(button('Start all QA'))
+    expect(menu?.open).toBe(true)
+  })
+
+  it('disables group controls while Docker is unavailable', async () => {
+    render(<App api={fakeApi(state({ groups: ['QA'], dockerAvailable: false, dockerReason: 'down' })).api} />)
+    await userEvent.setup().click(await screen.findByText('Groups'))
+
+    expect(button('Start all QA').disabled).toBe(true)
+    expect(button('Stop all QA').disabled).toBe(true)
   })
 })
 

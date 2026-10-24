@@ -1,6 +1,7 @@
 import { useRef, useState, type KeyboardEvent } from 'react'
 import type { ControllerState, DockNRollApi } from '../../shared/ipc'
 import { Banners } from './components/Banners'
+import { GroupsMenu } from './components/GroupsMenu'
 import { RunningTab } from './components/RunningTab'
 import { ServiceRow } from './components/ServiceRow'
 import { runningSummary } from './format'
@@ -77,6 +78,7 @@ export function App({ api }: { readonly api: DockNRollApi }): React.JSX.Element 
         <h1 className="app__title">dock-n-roll</h1>
         {/* Hidden while Docker is down: the last known statuses may be wrong (spec §4). */}
         {summary !== null && <p className="app__summary">{summary}</p>}
+        {state !== null && <GroupsMenu groups={state.groups} dockerAvailable={state.dockerAvailable} api={api} />}
       </header>
       <div role="tablist" aria-label="Views" className="tabs">
         {TABS.map((candidate, index) => (
