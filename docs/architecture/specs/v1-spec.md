@@ -234,7 +234,7 @@ services:
 | `url` | no | `http:`/`https:` only (R6) — enables UC5 |
 | `healthUrl` | no | `http:`/`https:` only — readiness gate when no container has a `HEALTHCHECK` (§3) |
 | `pinned` / `hidden` | no | ordering / exclusion |
-| `groups` | no | non-empty list of non-empty names (trimmed, de-duplicated); each group gets Start all / Stop all (`diagrams/groups/`) |
+| `groups` | no | non-empty list of names of 1 to 64 characters (trimmed, de-duplicated); each group gets Start all / Stop all (`diagrams/groups/`) |
 
 ## 9. Resolved questions (owner, 2026-10-09)
 
