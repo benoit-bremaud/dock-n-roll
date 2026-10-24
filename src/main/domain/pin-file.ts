@@ -70,6 +70,8 @@ function validateEntry(raw: unknown, where: string, errors: string[]): PinEntry 
   const optionalGroups = (): readonly string[] | undefined => {
     const value = raw['groups']
     if (value === undefined) return undefined
+    // Non-strings map to '' so one check rejects them and blank names alike. All or nothing: a
+    // dropped name would silently take the entry out of a group the owner meant it in.
     const names = Array.isArray(value) ? value.map((item: unknown) => (typeof item === 'string' ? item.trim() : '')) : []
     if (names.length > 0 && !names.includes('')) return [...new Set(names)]
     errors.push(`${where}.groups: expected a list of non-empty names`)

@@ -19,9 +19,9 @@ sequenceDiagram
 
   Dev->>UI: Choose "Start group QA"
   UI->>SC: ipc startGroup("QA")
-  SC->>SC: members = services whose groups contain "QA" and controls.start
+  SC->>SC: await the pending recomputation, then members = services whose groups contain "QA"
   par each member, in parallel
-    SC->>SC: run(member.id, start) — same guard and pending as UC1
+    SC->>SC: run(member.id, start) — claim skips it without controls.start, as in UC1
     SC->>CR: up(member)
     CR-->>SC: ok or failure(stderr)
     SC-->>UI: push statusChanged for that row (error on that row only)
@@ -32,7 +32,8 @@ sequenceDiagram
 ## Notes
 
 - No new state: the group action is a fan-out of the existing `run`, so the pending guard,
-  health gate and error reporting stay per service (`Promise.allSettled`).
-- Members already on or pending are skipped by the `controls.start` filter, so starting a
+  health gate and error reporting stay per service (`Promise.allSettled`: `run` never rejects today, and a future rejection must not cut the others short).
+- Members are read after the pending recomputation, so an id that changes in it (never-started pin
+  getting its first container) is not skipped. Members already on or pending are skipped by `claim`, so starting a
   half-running group only starts what is missing.
 - Order is not guaranteed; ordering inside a project stays Compose's `depends_on`.

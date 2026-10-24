@@ -481,8 +481,10 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   applyPins(store.current())
 
   const runGroup = async (name: string, request: 'start' | 'stop'): Promise<void> => {
+    // Members are read once the pending recomputation landed: an id it changes would be skipped.
+    await chain
     const members = services.filter((service) => service.pin?.groups?.includes(name) === true)
-    await Promise.all(members.map((service) => run(service.id, request)))
+    await Promise.allSettled(members.map((service) => run(service.id, request)))
   }
 
   return {

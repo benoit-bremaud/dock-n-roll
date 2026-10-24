@@ -164,6 +164,17 @@ Primary actor for all: **Developer**. Supporting actor: **Docker Engine**.
   before the panel opened → "Service no longer listed".
 - **Note**: text only (no HTML, ANSI removed, a `\r`-redrawn line shows its last state); only one panel open at a time; read-only.
 
+### UC8 — Start a group / UC9 — Stop a group (#77)
+
+- **Precondition**: at least one listed service declares the group in the pin file (`groups`, §8).
+- **Main success scenario**: Developer chooses Start all (Stop all) on a group, from the tray's
+  Groups submenu or the dashboard's Groups menu → system runs UC1 (UC2) on every listed member,
+  in parallel; members that cannot start (stop) are skipped. Diagrams `groups/01`, `groups/02`.
+- **Extensions**: a member fails → its error shows on its own row as in UC1 3a, the others carry
+  on; Docker unavailable → no group control (tray) or disabled ones (dashboard).
+- **Note**: a pin without `project` covers every project of its dir, so all of them join its groups.
+  Group names are case-sensitive.
+
 ## 6. Risks and constraints (from the brainstorm, verified on the workstation 2026-10-09)
 
 - **R1 — Project-name collision** (observed): containers `sonarqube` and `sonar-db` both carry

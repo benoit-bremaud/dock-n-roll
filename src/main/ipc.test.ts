@@ -77,7 +77,10 @@ describe('registerIpc', () => {
     await invoke(IPC.startGroup, TRUSTED, 'QA')
     await invoke(IPC.stopGroup, TRUSTED, 'QA')
     await invoke(IPC.startGroup, UNTRUSTED, 'QA')
-    await invoke(IPC.stopGroup, TRUSTED, 42)
+    for (const invalid of ['', 42, null, 'x'.repeat(4096)]) {
+      await invoke(IPC.startGroup, TRUSTED, invalid)
+      await invoke(IPC.stopGroup, TRUSTED, invalid)
+    }
 
     expect(controller.startGroup.mock.calls).toEqual([['QA']])
     expect(controller.stopGroup.mock.calls).toEqual([['QA']])

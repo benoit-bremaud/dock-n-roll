@@ -195,3 +195,4 @@ classDiagram
   full `LogsState` at most every 200 ms. The stream closes on `closeLogs`, a new `openLogs`,
   the dashboard hiding or reloading, and quit.
 - `ContainerRow` = name, image, state, health, Compose project (UC4); built from the snapshot.
+- Groups (UC8 / UC9, `startGroup` / `stopGroup`, `ControllerState.groups`, #77) extend this diagram: see `../groups/`.

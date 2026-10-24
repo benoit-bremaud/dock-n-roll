@@ -453,7 +453,7 @@ describe('App — groups (UC8, UC9, groups diagram 01)', () => {
     await user.click(button('Start all QA'))
     await user.click(button('Stop all demo'))
 
-    expect(fake.calls).toEqual(expect.arrayContaining(['startGroup QA', 'stopGroup demo']))
+    expect(fake.calls.filter((call) => call.includes('Group'))).toEqual(['startGroup QA', 'stopGroup demo'])
   })
 
   it('disables group controls while Docker is unavailable', async () => {

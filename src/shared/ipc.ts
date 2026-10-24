@@ -74,7 +74,10 @@ export interface DockNRollApi {
   start(id: string): Promise<void>
   stop(id: string): Promise<void>
   restart(id: string): Promise<void>
-  /** UC8 / UC9: every listed member of the group named in `ControllerState.groups`. */
+  /**
+   * UC8 / UC9: start / stop every listed member of the group. Resolves once all settle; an
+   * unknown name is a no-op and a member's failure shows on its own row, never as a rejection.
+   */
   startGroup(name: string): Promise<void>
   stopGroup(name: string): Promise<void>
   openUrl(id: string): Promise<void>

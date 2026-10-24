@@ -27,7 +27,7 @@ classDiagram
     +stopGroup(name) Promise~void~
   }
   class ControllerState {
-    +services: Service[]
+    +services: ServiceView[]
     +groups: readonly string[]
   }
   Service --> PinEntry : pin

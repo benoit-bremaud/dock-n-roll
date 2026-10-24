@@ -1,6 +1,6 @@
 # Use case diagram — groups — start and stop a named set of services
 
-> **Source specs**: issue #77, `docs/architecture/specs/v1-spec.md` §5
+> **Source specs**: issue #77, `docs/architecture/specs/v1-spec.md` §5 UC8 / UC9
 > **Related ADRs**: none yet (owner MCDA 2026-10-24: storage B 450, semantics A 485)
 
 ## Context

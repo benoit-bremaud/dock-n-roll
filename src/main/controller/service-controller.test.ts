@@ -1292,18 +1292,68 @@ describe('groups — UC8, UC9, groups diagram 02', () => {
     expect(row(API)).toMatchObject({ status: 'on', reason: null })
   })
 
-  it('skips members that cannot start, and stops only the running members', async () => {
+  it('starts only the members that can start', async () => {
     const { f, controller } = await controllerWith(withGroups)
     f.snapshot([web, api])
     await settle()
 
     void controller.startGroup('QA')
     await settle()
-    expect(f.runs.map((run) => run.options.cwd)).toEqual(['/srv/api'])
 
-    void controller.stopGroup('demo')
+    expect(f.runs.map((run) => run.options.cwd)).toEqual(['/srv/api'])
+  })
+
+  it('stops only the running members', async () => {
+    const { f, controller } = await controllerWith(withGroups)
+    f.snapshot([web, api])
     await settle()
-    expect(f.runs[1]?.args).toEqual(['compose', '--project-name=blog', 'stop'])
+
+    void controller.stopGroup('QA')
+    await settle()
+
+    expect(f.runs.map((run) => run.args)).toEqual([['compose', '--project-name=blog', 'stop']])
+  })
+
+  it('runs nothing while Docker is unavailable', async () => {
+    const { f, controller, row } = await controllerWith(withGroups)
+    f.snapshot([webStopped, api])
+    await settle()
+    f.dockerDown('socket gone')
+    await settle()
+
+    await controller.startGroup('QA')
+
+    expect(f.runs).toEqual([])
+    expect(row(BLOG)?.reason).toBeNull()
+  })
+
+  it('leaves hidden pins out of the groups and of the group action', async () => {
+    const { f, controller } = await controllerWith((setup) => {
+      setup.setInitialPins([pin({ workingDir: '/srv/blog', hidden: true, groups: ['QA'] }), pin({ workingDir: '/srv/api', groups: ['demo'] })])
+    })
+    f.snapshot([webStopped, api])
+    await settle()
+
+    await controller.startGroup('QA')
+
+    expect(controller.state().groups).toEqual(['demo'])
+    expect(f.runs).toEqual([])
+  })
+
+  it('starts a member whose id changes in the recomputation pending at the call', async () => {
+    const { f, controller } = await controllerWith((setup) => {
+      setup.resolved.set('/srv/blog', 'blog')
+      setup.setInitialPins([pin({ workingDir: '/srv/blog', pinned: true, groups: ['QA'] })])
+    })
+    f.snapshot([])
+    await settle()
+
+    // The first container appears (id '/srv/blog' → BLOG) and the call comes before the rebuild.
+    f.snapshot([webStopped])
+    void controller.startGroup('QA')
+    await settle()
+
+    expect(f.runs.map((run) => run.options.cwd)).toEqual(['/srv/blog'])
   })
 
   it('does nothing for an unknown group', async () => {
