@@ -483,3 +483,22 @@ Sensitivity: C and A stay top two and G last under value 45 or effort 35; E pass
   #41 + #61 also takes #57; #52 right after G (due 2026-10-28). New idea #75: more options for the local
   SonarQube stack, to brainstorm later.
 - Next: brick G (#77).
+
+## 2026-10-24 — Brick G: service groups (PR #81), brick closed
+
+- Owner MCDA: groups stored as a `groups: [..]` key on each pin entry (B 450 vs A 420 vs C 290); group
+  actions run in parallel, best effort (A 485 vs C 325 vs B 285). UML first: `diagrams/groups/`
+  (UC8/UC9, sequence, class), spec §5 UC8/UC9 and §8.
+- PR #81 (merge `eadcd04`, closes #77): `ServiceController.startGroup/stopGroup` await the pending
+  recomputation, then fan out the existing `run` (`Promise.allSettled`); tray Groups submenu and
+  dashboard Groups disclosure (absent without a group, disabled while Docker is down, closes on Escape
+  or a click outside); IPC `start-group`/`stop-group`; group names 1–64 chars.
+- review-local: 3 Must (docs) + 9 Should applied, incl. a stale-snapshot race where a member whose id
+  changed in the pending rebuild was skipped silently (test proven red without the fix). Nice → #80.
+- CI `audit` turned red on advisories published meanwhile: electron 44.9.3, happy-dom 21.0.4, pnpm
+  overrides for transitive undici and zod (drop once their parents ship the fix).
+- Codex: one P3 (names ≥ 4096 chars refused by IPC) → 64-char cap; then no findings. Inspector pass
+  (CDP) on the packaged build: CSP, isolation, a11y, keyboard, contrast, 360 px all conform.
+- Gate: 625 tests, coverage ≈ 97 / 93 / 97 / 98 %, Sonar OK (new coverage 97.7 %, 0 issues), gitleaks
+  clean, E2E smoke 9/9, QA screenshots `docs/architecture/qa/2026-10-24-77-groups-*.png`.
+- Next: #52 (Vite 8 + electron-vite 6 lockstep, due 2026-10-28).
