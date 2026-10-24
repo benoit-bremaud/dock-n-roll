@@ -467,3 +467,38 @@ Sensitivity: C and A stay top two and G last under value 45 or effort 35; E pass
 - The tray showed "POSTGRES_PASSWORD required" for the sonarqube stack: it was started from an unmerged
   sonarqube-stack worktree that has no `.env`, and dock-n-roll runs compose in the project directory
   (ADR-0002) without the `environment_file` label. Database encryption was moved to sonarqube-stack#3.
+
+## 2026-10-23 — #72: SonarQube 26.10 rule issues (PR #76), brick closed
+
+- Owner MCDAs: S9382 → `NOSONAR` with the reason inline (A 500 vs Accepted-in-UI 330 vs rewrite 190);
+  split → one PR, one commit per rule (A 470).
+- PR #76 (`5fdb445`): S8786 → `bareAddress` and `shortenPath` trim with linear string scans (pinning tests
+  added first: zone inside brackets, lone brackets, repeated trailing slashes); S9381 → `index.ts` awaits
+  `start()` in a try/catch; S9382 → the pin file read loop and the sync inspects stay sequential on purpose.
+  Closes #72.
+- Gate: lint, typecheck, 599 tests, coverage 97.13 / 92.51 %, Sonar gate OK (0 issues, also on main after
+  merge), gitleaks clean, E2E smoke 8/8, review-local Must 0 / Should 0 / 3 Nice (filed as #78),
+  CI green, Codex: no findings.
+- Backlog triage (owner MCDA A 440): brick G filed as #77; brick #68 also takes #64 #59 #63; brick
+  #41 + #61 also takes #57; #52 right after G (due 2026-10-28). New idea #75: more options for the local
+  SonarQube stack, to brainstorm later.
+- Next: brick G (#77).
+
+## 2026-10-24 — Brick G: service groups (PR #81), brick closed
+
+- Owner MCDA: groups stored as a `groups: [..]` key on each pin entry (B 450 vs A 420 vs C 290); group
+  actions run in parallel, best effort (A 485 vs C 325 vs B 285). UML first: `diagrams/groups/`
+  (UC8/UC9, sequence, class), spec §5 UC8/UC9 and §8.
+- PR #81 (merge `eadcd04`, closes #77): `ServiceController.startGroup/stopGroup` await the pending
+  recomputation, then fan out the existing `run` (`Promise.allSettled`); tray Groups submenu and
+  dashboard Groups disclosure (absent without a group, disabled while Docker is down, closes on Escape
+  or a click outside); IPC `start-group`/`stop-group`; group names 1–64 chars.
+- review-local: 3 Must (docs) + 9 Should applied, incl. a stale-snapshot race where a member whose id
+  changed in the pending rebuild was skipped silently (test proven red without the fix). Nice → #80.
+- CI `audit` turned red on advisories published meanwhile: electron 44.9.3, happy-dom 21.0.4, pnpm
+  overrides for transitive undici and zod (drop once their parents ship the fix).
+- Codex: one P3 (names ≥ 4096 chars refused by IPC) → 64-char cap; then no findings. Inspector pass
+  (CDP) on the packaged build: CSP, isolation, a11y, keyboard, contrast, 360 px all conform.
+- Gate: 625 tests, coverage ≈ 97 / 93 / 97 / 98 %, Sonar OK (new coverage 97.7 %, 0 issues), gitleaks
+  clean, E2E smoke 9/9, QA screenshots `docs/architecture/qa/2026-10-24-77-groups-*.png`.
+- Next: #52 (Vite 8 + electron-vite 6 lockstep, due 2026-10-28).
