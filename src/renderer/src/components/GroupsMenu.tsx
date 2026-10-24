@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import type { DockNRollApi } from '../../../shared/ipc'
 
 type Props = {
@@ -11,9 +12,31 @@ type Props = {
  * group controls only show once asked for. The main process re-checks every member's controls.
  */
 export function GroupsMenu({ groups, dockerAvailable, api }: Props): React.ReactNode {
+  const menu = useRef<HTMLDetailsElement>(null)
+
+  // The open list covers the service rows: Escape or a click elsewhere closes it, like a menu.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      const details = menu.current
+      if (event.key !== 'Escape' || details?.open !== true) return
+      details.open = false
+      details.querySelector('summary')?.focus()
+    }
+    const onPointer = (event: PointerEvent): void => {
+      const details = menu.current
+      if (details?.open === true && !details.contains(event.target as Node)) details.open = false
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('pointerdown', onPointer)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('pointerdown', onPointer)
+    }
+  }, [])
+
   if (groups.length === 0) return null
   return (
-    <details className="groups">
+    <details ref={menu} className="groups">
       <summary>Groups</summary>
       <ul className="groups__list">
         {groups.map((name) => (

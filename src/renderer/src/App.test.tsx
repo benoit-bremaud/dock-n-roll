@@ -456,6 +456,25 @@ describe('App — groups (UC8, UC9, groups diagram 01)', () => {
     expect(fake.calls.filter((call) => call.includes('Group'))).toEqual(['startGroup QA', 'stopGroup demo'])
   })
 
+  it('closes the open Groups menu on Escape and on a click outside it, as it covers the list', async () => {
+    render(<App api={fakeApi(state({ groups: ['QA'] })).api} />)
+    const user = userEvent.setup()
+    const summary = await screen.findByText('Groups')
+    const menu = summary.closest('details')
+
+    await user.click(summary)
+    await user.keyboard('{Escape}')
+    expect(menu?.open).toBe(false)
+
+    await user.click(summary)
+    await user.click(await screen.findByText('Blog'))
+    expect(menu?.open).toBe(false)
+
+    await user.click(summary)
+    await user.click(button('Start all QA'))
+    expect(menu?.open).toBe(true)
+  })
+
   it('disables group controls while Docker is unavailable', async () => {
     render(<App api={fakeApi(state({ groups: ['QA'], dockerAvailable: false, dockerReason: 'down' })).api} />)
     await userEvent.setup().click(await screen.findByText('Groups'))

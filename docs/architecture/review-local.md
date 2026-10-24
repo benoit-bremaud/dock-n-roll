@@ -14,6 +14,7 @@
 | 3 SonarQube | ✅ PASSED — new_coverage 97.6 %, new duplication 0.0 %, new violations 0; 0 open issues |
 | 4 Secrets | ✅ gitleaks clean (origin/main..HEAD) · no tracked .env · diff read: only temp paths under the scratchpad in QA screenshots, nothing sensitive |
 | 5 QA pass | ✅ full, packaged build + real Docker: Start all QA (2 members up, Gamma untouched), Stop all demo (only Beta), Stop all QA; light + dark; console clean · screenshots: `docs/architecture/qa/2026-10-24-77-groups-{1-closed,2-open,3-qa-on,4-demo-stopped,5-dark}.png` |
+| 5b Inspector pass (b991c01, CDP) | ✅ CSP meta (`script-src 'self'`, `object-src 'none'`), injected inline script blocked · no `require`/`process` in the page, `window.dockNRoll` frozen with the 12 expected methods · no request outside `app://` · native details/summary, per-group accessible names, no duplicate id · keyboard: Tab → Enter → first button, focus ring visible · contrast text ≥ 6.1:1, borders ≥ 6.1:1 (light and dark) · targets 73×30 px · 360 px wide fits · screenshots `-6-keyboard-focus`, `-7-narrow-360` · finding: open menu covering the list did not close on Escape / outside click → **fixed** (Should) |
 - Gate: **GREEN — merge authorised** (pending CI and owner approval)
 
 ## 🔴 Must Have
