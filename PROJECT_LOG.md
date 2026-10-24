@@ -502,3 +502,24 @@ Sensitivity: C and A stay top two and G last under value 45 or effort 35; E pass
 - Gate: 625 tests, coverage ≈ 97 / 93 / 97 / 98 %, Sonar OK (new coverage 97.7 %, 0 issues), gitleaks
   clean, E2E smoke 9/9, QA screenshots `docs/architecture/qa/2026-10-24-77-groups-*.png`.
 - Next: #52 (Vite 8 + electron-vite 6 lockstep, due 2026-10-28).
+
+## 2026-10-24 — #52: Vite 8 + electron-vite 6 + plugin-react 6 (PR #83), brick closed; full QA of main
+
+- Lockstep bump (electron-vite 5 peers `vite <=7`, plugin-react 6 peers `vite ^8`): vite 7.3.7 → 8.3.4
+  (8.3.5 skipped, 3 days old), electron-vite 5.0.0 → 6.0.0, @vitejs/plugin-react 5.2.0 → 6.1.2.
+  `electron.vite.config.ts` unchanged (no `rollupOptions` / `manualChunks`; v6 breaking changes are on
+  bytecode and esmShim). `allowBuilds.esbuild` and the undici/zod overrides kept (esbuild is still an
+  optional peer of vite 8). Renderer gzip −4 %, CSS identical, preload still CJS.
+- Gate: 625 tests, coverage 97.2 / 92.9 / 97.7 / 98.5 %, Sonar OK, gitleaks clean, audit high clean,
+  CSP-strict bundle, E2E smoke 9/9, QA pass + inspector (`qa/2026-10-24-vite8-lockstep.md`), CI 4/4,
+  Codex: no findings.
+- Owner MCDA on timing: prepare now, merge on 2026-10-28 (A 470), confirmed after a deeper analysis
+  (A 420 vs C 400 vs B 380). The "2-week age rule" is the owner MCDA of 2026-10-19, not codified
+  (Dependabot cooldown is 5 days). Then, once the full QA below had found 3 Must on main, the owner
+  merged on 2026-10-24 as a documented exception (B 395 = A 395, tie broken by resuming tomorrow:
+  waiting would have frozen the project under the one-chat rule). Merge `9c99d3f`, closes #52.
+- Full QA of the installed main build (owner request, `qa/2026-10-24-full-installed-main.md`): gate ❌.
+  Must #84 (narrow width / 200 % zoom overflow), #85 (failed start/stop not announced), #95 (Chromium
+  spellchecker downloads a dictionary from a Google host at launch: breaks R4; public issue per owner
+  MCDA A 450 vs private advisory 275). Should #86–#91, Nice #92–#94; #82 still reproduces.
+- Next: pause; on resume, re-plan the roadmap by MCDA (QA Must #84 #85 #95 vs brick #41 + #61 + #57).
