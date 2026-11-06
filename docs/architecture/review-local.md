@@ -1,45 +1,48 @@
-# Local review — dock-n-roll (fix/95-disable-spellchecker)
-
-Pre-push review of the #95 fix that stops the Chromium spellcheck dictionary download on launch.
+# Local review — dock-n-roll (#99)
 
 - Date: 2026-11-06
-- Commit: 1afe780
-- Scope: branch diff origin/main...HEAD
-- Checks run: adversarial (Opus, 4 rounds) · design/tests/docs (architecture-guardian) · security and correctness (adversarial + diff read)
-- Verdict: ship as-is · Must 0 · Should 0 open · Nice 3 open
+- Commit: 039fa53
+- Scope: branch diff origin/main...feat/99-pin-match-project-name (`--push`)
+- Checks run: adversarial (Opus, 2 rounds) · design · docs · tests · security · correctness
+- Verdict: ship as-is · Must 0 · Should 0 · Nice 2
 
 ## Adversarial review (#236)
-- Round 1 on `5d40a4e`: Must 0 · Should 2 · Nice 3 · unverified 1 · Push gate: open
-- Round 2 on `629edc2`: 3 fixed · 1 partly fixed (module name, accepted) · 1 not fixed (Nice, docs) · new Must 0 · new Should 2 (fixed in `b26cece`) · Push gate: open
-- Round 3 on `a8b0356` (net-log check after Codex): all prior findings fixed · new Must 0 · new Should 2 (net log must be complete JSON; this report refreshed), both fixed · **Push gate: open**. Note: `b26cece` and `a8b0356` were pushed before their verify round; it found no Must.
-- Round 4 on `1afe780`: both fixed · Must 0 · Should 0 · **Push gate: open**
-- Hosted reviewers (filled at the pre-merge run): Copilot pending · Codex reviewed `3192976` (1 P2: detect the request, not the file — fixed in `a8b0356`, thread resolved)
 
-## Pre-merge gate (head SHA 1afe780)
+- Round 1 on `4686dd8`: Must 3 · Should 3 · Nice 2 · unverified 0 · Push gate: closed
+- Round 2 on `039fa53`: 8 fixed · 0 not fixed · 0 regressed · new Must 0 · **Push gate: open**
+- Hosted reviewers (filled at the pre-merge run): Copilot pending (422, not a collaborator) · Codex pending
+
+## Pre-merge gate (head SHA 039fa53)
+
 | Step | Result |
 |---|---|
-| 0 CI mirror | ✅ ci.yml: lint, typecheck, test:coverage, build, dist + `xvfb-run -a pnpm e2e:smoke` · dependency-audit.yml: `pnpm audit --audit-level=high` · gitleaks.yml: gitleaks |
-| 1 Tests | ✅ 630 unit/integration · ✅ E2E smoke on the packaged build (net-log check: red without `setSpellCheckerLanguages([])`, green with it; a truncated log fails) |
-| 2 Coverage | tests 97.25 % stmts / 92.85 % branches / 97.66 % funcs / 98.52 % lines (thresholds 90/85/90/90) · docs ⏸ deferred to the pre-merge run |
+| 0 CI mirror | ✅ lint · typecheck · test:coverage · build; dist + `e2e:smoke` on `ee4d0a9` (later commits: docs, tests, one message string) |
+| 1 Tests | ✅ 636 unit/integration |
+| 2 Coverage | ✅ runner thresholds (90/85/90/90) passed · docs ⏸ deferred to the pre-merge run (`--push`) |
 | 3 SonarQube | ⏸ deferred to the pre-merge run (`--push`) |
-| 4 Secrets | ✅ gitleaks clean (origin/main..HEAD) · no tracked .env · diff read: nothing sensitive (no request URL or IP committed) |
-| 5 E2E/smoke | ✅ smoke on the local packaged build · QA pass: on the installed build after merge |
-- Gate: `--push`: **pre-push green** — SonarQube and doc coverage deferred (never GREEN)
+| 4 Secrets | ✅ gitleaks clean (origin/main..HEAD) · no tracked .env · diff read: nothing sensitive |
+| 5 E2E/smoke | ✅ `e2e:smoke` on the packaged build (Xvfb) · manual QA: pin at dir `a` with `project: qa99`, stack run from dir `b` → one row "QA99 pinned", on |
+
+- Gate: `--push`: **pre-push green** — Sonar and doc coverage deferred (never GREEN)
 
 ## 🔴 Must Have
-_None._
+
+_None._ (Round 1: breaking change not marked → `feat(pins)!` + footer + CHANGELOG migration, owner MCDA A 460; Start-dir wording false → aligned in 5 places + test; stale never-started conflict rule copies → reworded.)
 
 ## 🟡 Should Have
-_None open._ Fixed: CI guard on the request itself via Chromium's net log (`e2e/smoke.mjs`), completeness of that log, ADR-0010 assertion list.
+
+_None._ (Round 1: lost invalid-copy test, `isCoveredBy` comment, dir-only duplicate message — fixed.)
 
 ## 🔵 Nice to Have
-- `docs/architecture/diagrams/launcher/11-sequence-startup.md:24` `[adversarial]` · startup sequence does not show `hardenSession(defaultSession)`; spec R4 does not state "no outbound request of its own at launch" · file an issue.
-- `src/main/session-hardening.ts:24` `[design|adversarial]` · `DASHBOARD_WEB_PREFERENCES` is window-level in a `session-` module · JSDoc now explains it; rename optional.
-- `src/main/session-hardening.test.ts:28` `[design]` · one test checks both permission handlers with `@ts-expect-error` · split with `it.each` and a typed cast.
+
+- `src/main/domain/service-catalog.ts:96-98` `[adversarial]` · the #99 comment line splits a sentence · move it after the sentence (folded into the #98 branch).
+- `CHANGELOG.md:30-35`, `docs/architecture/decisions/0003-service-discovery.md:26,42`, `src/main/domain/types.ts:60` `[adversarial]` · over-long lines · reflow (folded into the #98 branch).
 
 ## ⚪ Disagree / Intentional
-- `src/main/session-hardening.ts:15-16` `[adversarial]` · both `setSpellCheckerLanguages([])` and `setSpellCheckerEnabled(false)` kept, plus `spellcheck: false`: defense in depth, one line each.
-- `src/main/session-hardening.ts:4` `[design]` · `HardenableSession` structural type: testability seam, precedent `trusted-sender.ts` (`index.ts` excluded from coverage, ADR-0007).
+
+- `docs/architecture/decisions/0003-service-discovery.md` `[adversarial]` · a hidden project pin hides that project in every dir · owner MCDA (#99 option A).
 
 ## Per-dimension summary
-- Adversarial: no Must; CI guard added after round 1. · Design: flat, no over-engineering. · Docs: exports documented with the why. · Tests: boundary-only fakes, each line guarded. · Security: permissions and isolation unchanged, no secret. · Correctness: preferences unchanged apart from `spellcheck: false`.
+
+- Adversarial: 3 Must in round 1, all fixed in round 2 · Design: two-rule `findPin`, no new abstraction · Docs: ADR-0003 amended, spec §8, class diagram, README, CHANGELOG · Tests: 6 new catalog cases + 1 pin-file case · Security: no new input path · Correctness: consumers use `service.workingDir`; ids and pending keys unchanged.
+- Out of scope (pre-existing): `PinEntry` class box lacks `groups`; no tray action to remove stopped containers of a deleted worktree.

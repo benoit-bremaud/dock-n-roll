@@ -29,7 +29,7 @@ describe('validatePinFile', () => {
     })
   })
 
-  it('keeps the optional project key that narrows a pin to one project of a shared dir', () => {
+  it('keeps the optional project key that ties a pin to one project', () => {
     const result = validatePinFile({ services: [{ workingDir: '/srv/app', project: 'app-qa', pinned: true }] })
 
     expect(result).toEqual({ entries: [{ workingDir: '/srv/app', project: 'app-qa', pinned: true, hidden: false }], errors: [] })
@@ -110,7 +110,21 @@ describe('validatePinFile', () => {
 
     expect(result).toEqual({
       entries: [{ workingDir: '/srv/app', pinned: false, hidden: false }],
-      errors: ['services[1]: duplicate of an earlier entry for the same workingDir and project; entry ignored']
+      errors: ['services[1]: duplicate of an earlier entry for the same workingDir; entry ignored']
+    })
+  })
+
+  it('rejects a second entry naming the same project, whatever its working dir (#99)', () => {
+    const result = validatePinFile({
+      services: [
+        { workingDir: '/hh', project: 'happihub-local' },
+        { workingDir: '/hh/.claude/worktrees/w', project: 'happihub-local' }
+      ]
+    })
+
+    expect(result).toEqual({
+      entries: [{ workingDir: '/hh', project: 'happihub-local', pinned: false, hidden: false }],
+      errors: ['services[1]: duplicate of an earlier entry for the same project; entry ignored']
     })
   })
 

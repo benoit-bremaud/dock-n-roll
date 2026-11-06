@@ -38,8 +38,8 @@ I want a small desktop tool, always reachable from the GNOME top bar, that:
 
 | Term | Definition |
 |---|---|
-| **Service** | One Docker Compose project, identified by the pair *(project name, working dir)* — never by the project name alone (see §6, R1). A pinned project with no container yet is identified by its working dir (plus its pin `project`, if any) until its first container is seen. Such a pin is shown in conflict when a discovered project in another dir already uses the project name it would start with (its `project`, or the name Compose derives from its dir); the running project itself is not affected. |
-| **Pin file** | `~/.config/dock-n-roll/services.yaml` — owner-edited overrides keyed by working dir, optionally narrowed by `project` (§8). Watched: reloaded on change. |
+| **Service** | One Docker Compose project, identified by the pair *(project name, working dir)* — never by the project name alone (see §6, R1). A pinned project with no container yet is identified by its working dir (plus its pin `project`, if any) until its first container is seen. A pin without `project` is shown in conflict when a discovered project in another dir already uses the project name it would start with (the name Compose resolves or derives from its dir); the running project itself is not affected. A pin naming a project is never in that case: it attaches to that project wherever it runs (#99). |
+| **Pin file** | `~/.config/dock-n-roll/services.yaml` — owner-edited overrides keyed by working dir, or by `project` when the entry names one: such a pin covers that project whatever dir it runs from (§8, ADR-0003 amendment #99). Watched: reloaded on change. |
 | **Relevant container** | A container of the project, excluding one-off containers (label `com.docker.compose.oneoff=True`). A relevant container exited with code 0 counts as *done* (init / migration job) when at least one other relevant container runs. |
 | **Health source** | Per container, its Docker `HEALTHCHECK` status wins. Only when **no** relevant container has a `HEALTHCHECK`, the service-level `healthUrl` from the pin file gates readiness (HTTP 2xx/3xx, polled every 2 s while all relevant containers run or are done and the gate has not passed yet, whatever started them). Health is read on running containers only: a stopped container may keep a stale value. Otherwise: container `running`. |
 | **Pending operation** | Per service, `start` or `stop` requested by the app and not finished yet. Owned by ServiceController; at most one at a time. |
@@ -222,14 +222,14 @@ services:
   - workingDir: /home/vev/Documents/Codex/bulle-de-je
     hidden: true
   - workingDir: /home/vev/Documents/02_personal/some-app
-    project: some-app-qa   # optional: narrows the pin to one project of a shared dir
+    project: some-app-qa   # optional: this project, from any dir
     name: Some app (QA)
 ```
 
 | Key | Required | Meaning |
 |---|---|---|
-| `workingDir` | yes | absolute path; matches the `com.docker.compose.project.working_dir` label |
-| `project` | no | narrows the entry to one project name; absent → applies to every project of that dir |
+| `workingDir` | yes | absolute path; matches the `com.docker.compose.project.working_dir` label (for an entry with `project`: only where Start runs, see below) |
+| `project` | no | ties the entry to one project name, whatever dir runs it (a worktree, another clone); `workingDir` is then where Start runs while no container of that project exists in any dir; a stopped copy elsewhere keeps the row, and Start, on its dir until it is removed (`docker compose down`). One entry per project name. Absent → applies to every project of that dir |
 | `name` | no | display name |
 | `url` | no | `http:`/`https:` only (R6) — enables UC5 |
 | `healthUrl` | no | `http:`/`https:` only — readiness gate when no container has a `HEALTHCHECK` (§3) |

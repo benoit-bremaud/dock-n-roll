@@ -22,8 +22,8 @@ working dirs (`02_personal/sonarqube-stack` and `02_personal/dev-infra/sonarqube
   the service is shown with status `conflict` and its controls are disabled, because
   `docker compose --project-name=<name>` would act on containers of both folders.
 - The pin file (`~/.config/dock-n-roll/services.yaml`, watched) overrides by `workingDir`,
-  optionally narrowed by `project` (one dir may host several projects, e.g. `-p qa1` /
-  `-p qa2`): `name`, `url`, `healthUrl`, `pinned`, `hidden`. `url` / `healthUrl` must be
+  or by `project` when the entry names one (see the #99 amendment; one dir may host several
+  projects, e.g. `-p qa1` / `-p qa2`): `name`, `url`, `healthUrl`, `pinned`, `hidden`. `url` / `healthUrl` must be
   `http:` or `https:`.
 
 ### Consequences
@@ -32,3 +32,16 @@ working dirs (`02_personal/sonarqube-stack` and `02_personal/dev-infra/sonarqube
 - Bad: a project never started (no container yet) is invisible until pinned — accepted
   for V1. Pinning its `workingDir` makes it appear as `off`; it is identified by that dir
   until its first container is seen, and started with Compose defaults (ADR-0002).
+
+## Amendment 2026-11-06 — a pin naming a project follows it (#99)
+
+The same compose project is often started from several dirs of one app (a git worktree, a
+second clone), so the pin stayed `off` next to an unpinned running copy. A pin with `project`
+now covers that project **whatever dir it runs from**; its `workingDir` is only where Start
+runs while no container of that project exists in any dir (a stopped copy elsewhere keeps
+the row on its dir until `docker compose down`). It also attaches to an `invalid` copy. Identity is unchanged: each running dir is still one service,
+and ≥ 2 dirs running the name still show `conflict`. The pin file keeps one entry per project
+name (a second one is refused with an error), and a pin naming the project wins over the
+dir-only pin of its dir. A hidden project pin hides that project in every dir. Rejected: detecting git
+worktrees (`git rev-parse --git-common-dir`; covers worktrees only, adds a git call) and an
+opt-in `anyDir` key (same effect, one more key) — owner MCDA 450 / 335 / 445.
