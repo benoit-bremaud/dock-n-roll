@@ -1,48 +1,52 @@
-# Local review — dock-n-roll (#99)
+# Local review — dock-n-roll (#98)
 
 - Date: 2026-11-06
-- Commit: 039fa53
-- Scope: branch diff origin/main...feat/99-pin-match-project-name (`--push`)
-- Checks run: adversarial (Opus, 2 rounds) · design · docs · tests · security · correctness
-- Verdict: ship as-is · Must 0 · Should 0 · Nice 2
+- Commit: 8882e57
+- Scope: branch diff origin/main...feat/98-group-members-in-tray (`--push`)
+- Checks run: adversarial (Opus, 3 rounds) · design · docs · tests · accessibility · security · correctness
+- Verdict: ship as-is · Must 0 · Should 0 · Nice 6 (deferred, follow-up issue)
 
 ## Adversarial review (#236)
 
-- Round 1 on `4686dd8`: Must 3 · Should 3 · Nice 2 · unverified 0 · Push gate: closed
-- Round 2 on `039fa53`: 8 fixed · 0 not fixed · 0 regressed · new Must 0 · **Push gate: open**
+- Round 1 on `2053495`: Must 0 · Should 4 · Nice 5 · unverified 0 · Push gate: open
+- Round 2 on `89353fa`: 4 Should + 4 Nice fixed · 1 Nice deferred · new Must 1 (diagram 09 stale after `runningSummary` moved) · Push gate: closed
+- Round 3 on `8882e57`: Must and Should fixed · new Nice 1 · **Push gate: open**
 - Hosted reviewers (filled at the pre-merge run): Copilot pending (422, not a collaborator) · Codex pending
 
-## Pre-merge gate (head SHA 039fa53)
+## Pre-merge gate (head SHA 8882e57)
 
 | Step | Result |
 |---|---|
-| 0 CI mirror | ✅ lint · typecheck · test:coverage · build; dist + `e2e:smoke` on `ee4d0a9` (later commits: docs, tests, one message string) |
-| 1 Tests | ✅ 636 unit/integration |
-| 2 Coverage | ✅ runner thresholds (90/85/90/90) passed · docs ⏸ deferred to the pre-merge run (`--push`) |
+| 0 CI mirror | ✅ lint · typecheck · test:coverage · build · dist (`electron-builder --linux dir`) + `e2e:smoke` on `89353fa` (later commit: diagrams and one comment) |
+| 1 Tests | ✅ 642 unit/integration |
+| 2 Coverage | ✅ 97.3 % stmts / 92.74 % branches / 98.59 % lines (thresholds 90/85/90/90) · docs ⏸ deferred to the pre-merge run (`--push`) |
 | 3 SonarQube | ⏸ deferred to the pre-merge run (`--push`) |
 | 4 Secrets | ✅ gitleaks clean (origin/main..HEAD) · no tracked .env · diff read: nothing sensitive |
-| 5 E2E/smoke | ✅ `e2e:smoke` on the packaged build (Xvfb) · manual QA: pin at dir `a` with `project: qa99`, stack run from dir `b` → one row "QA99 pinned", on |
+| 5 E2E/smoke | ✅ `e2e:smoke` (group section holds its member row) · packaged QA under Xvfb: sections "Demo 1 of 2 on" [QA API, QA Web], "QA 0 of 1 on" [QA Web], screenshot checked |
 
 - Gate: `--push`: **pre-push green** — Sonar and doc coverage deferred (never GREEN)
 
 ## 🔴 Must Have
 
-_None._ (Round 1: breaking change not marked → `feat(pins)!` + footer + CHANGELOG migration, owner MCDA A 460; Start-dir wording false → aligned in 5 places + test; stale never-started conflict rule copies → reworded.)
+_None._ (Round 2: diagram 09 still placed `runningSummary` in `format.ts` → fixed in `8882e57`.)
 
 ## 🟡 Should Have
 
-_None._ (Round 1: lost invalid-copy test, `isCoveredBy` comment, dir-only duplicate message — fixed.)
+_None._ (Fixed: group count hidden while Docker is down; per-section button names; diagrams 09, 07, 03, use case 01; README tray line; CHANGELOG folded into the unreleased #77 entry; one summary rule in `src/shared/groups.ts`; smoke checks a member row; collapsed-section test.)
 
-## 🔵 Nice to Have
+## 🔵 Nice to Have (deferred to one follow-up issue)
 
-- `src/main/domain/service-catalog.ts:96-98` `[adversarial]` · the #99 comment line splits a sentence · move it after the sentence (folded into the #98 branch).
-- `CHANGELOG.md:30-35`, `docs/architecture/decisions/0003-service-discovery.md:26,42`, `src/main/domain/types.ts:60` `[adversarial]` · over-long lines · reflow (folded into the #98 branch).
+- `src/renderer/src/App.tsx:41,49` `[adversarial]` · a stale `logsFor` key can reopen a logs panel when a service comes back into a group · clear it when its key is no longer rendered.
+- `src/renderer/src/components/GroupSection.tsx` `[design]` · Start all / Stop all hide with a collapsed section; collapsed state resets on a tab change.
+- `src/main/controller/tray-menu.ts:79-80` `[adversarial]` · Start all / Stop all always enabled, even when no member can act (pre-existing).
+- `docs/architecture/diagrams/launcher/09-component-dashboard.md:21` `[adversarial]` · `GroupsView` drawn inside the renderer subgraph; no `LogPanel --> Format` edge (pre-existing).
+- `docs/architecture/diagrams/groups/02-sequence-start-group.md:20` `[adversarial]` · says "Start group QA", the button reads "Start all" (pre-existing).
+- `README.md:34-35` `[adversarial]` · over-long lines, reflow.
 
 ## ⚪ Disagree / Intentional
 
-- `docs/architecture/decisions/0003-service-discovery.md` `[adversarial]` · a hidden project pin hides that project in every dir · owner MCDA (#99 option A).
+- `src/renderer/src/components/GroupSection.tsx:19` `[adversarial]` · sections open by default with their controls visible · owner MCDA A 480 (#98); controls appear only once a group exists.
 
 ## Per-dimension summary
 
-- Adversarial: 3 Must in round 1, all fixed in round 2 · Design: two-rule `findPin`, no new abstraction · Docs: ADR-0003 amended, spec §8, class diagram, README, CHANGELOG · Tests: 6 new catalog cases + 1 pin-file case · Security: no new input path · Correctness: consumers use `service.workingDir`; ids and pending keys unchanged.
-- Out of scope (pre-existing): `PinEntry` class box lacks `groups`; no tray action to remove stopped containers of a deleted worktree.
+- Adversarial: 0 Must in round 1, 1 docs Must in round 2 fixed, gate open in round 3 · Design: small shared pure module, no new IPC channel · Docs: README, CHANGELOG, spec UC8, diagrams 01/03/07/09 · Tests: tray, shared helpers, dashboard sections, logs per section, collapse kept · Accessibility: native details/summary, per-section button names · Security: no new input path; labels go through `menuLabel` · Correctness: keys unique per list, logs keyed by section.
