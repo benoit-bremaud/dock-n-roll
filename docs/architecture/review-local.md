@@ -1,33 +1,43 @@
-# Local review — dock-n-roll (branch chore/52-vite8-lockstep)
+# Local review — dock-n-roll (fix/95-disable-spellchecker)
 
-- Date: 2026-10-24
-- Commit: 4e76e67
-- Scope: branch diff origin/main...HEAD (issue #52) — `package.json` + `pnpm-lock.yaml` only
-- Checks run: security (lockfile read) · correctness (build output) · design/docs/tests n/a (no source change)
-- Verdict: ship as-is · Must 0 · Should 0 (1 pre-existing → #82) · Nice 1
+Pre-push review of the #95 fix that stops the Chromium spellcheck dictionary download on launch.
 
-## Pre-merge gate (head SHA 4e76e67)
+- Date: 2026-11-06
+- Commit: b26cece
+- Scope: branch diff origin/main...HEAD
+- Checks run: adversarial (Opus, 2 rounds) · design/tests/docs (architecture-guardian) · security and correctness (adversarial + diff read)
+- Verdict: ship as-is · Must 0 · Should 0 open · Nice 3 open
+
+## Adversarial review (#236)
+- Round 1 on `5d40a4e`: Must 0 · Should 2 · Nice 3 · unverified 1 · Push gate: open
+- Round 2 on `629edc2`: 3 fixed · 1 partly fixed (module name, accepted) · 1 not fixed (Nice, docs) · new Must 0 · new Should 2 (fixed in `b26cece`) · **Push gate: open**
+- Hosted reviewers (filled at the pre-merge run): Copilot pending · Codex not requested
+
+## Pre-merge gate (head SHA b26cece)
 | Step | Result |
 |---|---|
-| 1 Tests | ✅ 625 unit/integration · ✅ 9/9 E2E smoke on the packaged build (`electron-builder --linux dir`) |
-| 2 Coverage | tests 97.23 % stmts / 92.85 % branches / 97.65 % funcs / 98.52 % lines (floor 80, runner gate 90/85/90/90) · docs unchanged (no source diff) |
-| 3 SonarQube | ✅ PASSED (new_coverage 97.7, duplication 0.0, violations 0) |
-| 4 Secrets | ✅ gitleaks clean (origin/main..HEAD) · no tracked .env · diff read: version bumps only, all tarballs from registry.npmjs.org |
-| 5 QA pass | ✅ pass · inspector clean (console 0, network 3 × 200 app://) · CSP enforced, sandbox + contextIsolation intact, app:// traversal 404 ×7 · domains FON, UI, A11Y, SEC · finding → #82 (pre-existing) · report: docs/architecture/qa/2026-10-24-vite8-lockstep.md |
-- Gate: **GREEN — merge authorised** once electron-vite 6.0.0 reaches the 2-week age rule (2026-10-28, owner MCDA A 470)
+| 0 CI mirror | ✅ ci.yml: lint, typecheck, test:coverage, build, dist + `xvfb-run -a pnpm e2e:smoke` · dependency-audit.yml: `pnpm audit --audit-level=high` · gitleaks.yml: gitleaks |
+| 1 Tests | ✅ 630 unit/integration · ✅ E2E smoke on the packaged build (new check red without `setSpellCheckerLanguages([])`, green with it) |
+| 2 Coverage | tests 97.25 % stmts / 92.85 % branches / 97.66 % funcs / 98.52 % lines (thresholds 90/85/90/90) · docs ⏸ deferred to the pre-merge run |
+| 3 SonarQube | ⏸ deferred to the pre-merge run (`--push`) |
+| 4 Secrets | ✅ gitleaks clean (origin/main..HEAD) · no tracked .env · diff read: nothing sensitive (no request URL or IP committed) |
+| 5 E2E/smoke | ✅ smoke on the local packaged build · QA pass: on the installed build after merge |
+- Gate: `--push`: **pre-push green** — SonarQube and doc coverage deferred (never GREEN)
 
 ## 🔴 Must Have
 _None._
 
 ## 🟡 Should Have
-_None from this diff._ (Pre-existing: empty Logs panel on a silent running service → #82.)
+_None open._ Fixed: CI guard for the download (`e2e/smoke.mjs`), ADR-0010 assertion list, missing `Dictionaries/` tolerated.
 
 ## 🔵 Nice to Have
-- `out/main/index.js` `[correctness]` · Rolldown keeps source comments in the main bundle (+16 kB), no security impact · no action
+- `docs/architecture/diagrams/launcher/11-sequence-startup.md:24` `[adversarial]` · startup sequence does not show `hardenSession(defaultSession)`; spec R4 does not state "no outbound request of its own at launch" · file an issue.
+- `src/main/session-hardening.ts:24` `[design|adversarial]` · `DASHBOARD_WEB_PREFERENCES` is window-level in a `session-` module · JSDoc now explains it; rename optional.
+- `src/main/session-hardening.test.ts:28` `[design]` · one test checks both permission handlers with `@ts-expect-error` · split with `it.each` and a typed cast.
 
 ## ⚪ Disagree / Intentional
-- `pnpm-workspace.yaml` `[security]` · `allowBuilds.esbuild` kept: esbuild is still an optional peer of vite 8 in the tree · undici/zod overrides kept (parents unchanged)
-- `pnpm audit` `[security]` · `fast-uri@3.1.8` 2 moderate / 2 low via electron-builder, dev-only, same as main, below the `high` gate
+- `src/main/session-hardening.ts:15-16` `[adversarial]` · both `setSpellCheckerLanguages([])` and `setSpellCheckerEnabled(false)` kept, plus `spellcheck: false`: defense in depth, one line each.
+- `src/main/session-hardening.ts:4` `[design]` · `HardenableSession` structural type: testability seam, precedent `trusted-sender.ts` (`index.ts` excluded from coverage, ADR-0007).
 
 ## Per-dimension summary
-- Design: n/a (no source) · Docs: n/a · Tests: suite unchanged, 625 green · Security: CSP-strict bundle, no new high advisory · Correctness: renderer gzip −4 %, CSS identical, preload still CJS
+- Adversarial: no Must; CI guard added after round 1. · Design: flat, no over-engineering. · Docs: exports documented with the why. · Tests: boundary-only fakes, each line guarded. · Security: permissions and isolation unchanged, no secret. · Correctness: preferences unchanged apart from `spellcheck: false`.
