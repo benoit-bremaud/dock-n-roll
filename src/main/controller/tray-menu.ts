@@ -1,4 +1,5 @@
 import type { ServiceStatus } from '../domain/types'
+import { failedLabel, lastLine } from '../../shared/failure'
 import { groupSummary, membersOf, ungrouped } from '../../shared/groups'
 import type { ControllerState, ServiceView } from '../../shared/ipc'
 
@@ -63,6 +64,8 @@ function serviceEntry(service: ServiceView, actions: TrayActions): MenuEntry {
   ]
   if (service.hasUrl) submenu.push({ label: 'Open in browser', enabled: true, click: () => { actions.openUrl(service.id) } })
   if (service.reason !== null) submenu.push({ label: menuLabel(service.reason), enabled: false })
+  // #85: the last line says why; the dashboard shows the others.
+  if (service.failure !== null) submenu.push({ label: menuLabel(`${failedLabel(service.failure)}: ${lastLine(service.failure)}`), enabled: false })
   return { label: `${BADGE[service.status]} ${menuLabel(service.displayName)} — ${menuLabel(service.status)}`, submenu }
 }
 

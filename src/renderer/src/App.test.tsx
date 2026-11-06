@@ -14,6 +14,7 @@ function view(overrides: Partial<ServiceView> = {}): ServiceView {
     hasUrl: false,
     groups: [],
     reason: null,
+    failure: null,
     ...overrides
   }
 }
@@ -145,6 +146,77 @@ describe('App — header and paths (diagram 09)', () => {
   })
 })
 
+describe('App — failed command (#85)', () => {
+  const failure = { operation: 'start', message: 'Container a Waiting\ncontainer a exited (3)', occurrence: 1 } as const
+  const announcer = (): HTMLElement => {
+    const region = screen.getAllByRole('status').find((node) => node.getAttribute('aria-atomic') === 'false')
+    if (region === undefined) throw new Error('no failure announcer')
+    return region
+  }
+
+  it('labels a failed Start on its row in the error style, one Compose line per line', async () => {
+    render(<App api={fakeApi(state({ services: [view({ failure })] })).api} />)
+
+    const shown = (await rowOf('Blog')).querySelector('.service__failure')
+    expect(within(shown as HTMLElement).getByText('Start failed:').tagName).toBe('STRONG')
+    // The newline survives in the DOM; `white-space: pre-line` shows it.
+    expect(shown?.textContent).toBe('Start failed: Container a Waiting\ncontainer a exited (3)')
+    expect(shown?.closest('[role="status"]')).toBeNull()
+  })
+
+  it.each([
+    ['stop', 'Stop failed:'],
+    ['restart', 'Restart failed:']
+  ] as const)('names a failed %s', async (operation, label) => {
+    render(<App api={fakeApi(state({ services: [view({ failure: { operation, message: 'boom', occurrence: 1 } })] })).api} />)
+
+    expect(within(await rowOf('Blog')).getByText(label)).toBeTruthy()
+  })
+
+  it('announces the failure once, naming the service, from a region mounted before it', async () => {
+    const fake = fakeApi(state())
+    render(<App api={fake.api} />)
+    await rowOf('Blog')
+    const region = announcer()
+    expect([region.getAttribute('aria-live'), region.textContent]).toEqual(['polite', ''])
+
+    fake.push(state({ services: [view({ failure })] }))
+    fake.push(state({ services: [view({ failure })] }))
+
+    expect(announcer()).toBe(region)
+    expect([...region.querySelectorAll('p')].map((p) => p.textContent)).toEqual(['Blog: Start failed: container a exited (3)'])
+  })
+
+  it('announces a repeat of the same failure again (a new occurrence)', async () => {
+    const fake = fakeApi(state({ services: [view({ failure })] }))
+    render(<App api={fake.api} />)
+    await rowOf('Blog')
+    const first = announcer().querySelector('p')
+
+    fake.push(state({ services: [view({ failure: { ...failure, occurrence: 2 } })] }))
+
+    const lines = announcer().querySelectorAll('p')
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).not.toBe(first)
+  })
+
+  it('announces a service of two groups once, though both rows show the failure', async () => {
+    const service = view({ groups: ['A', 'B'], failure })
+    render(<App api={fakeApi(state({ services: [service], groups: ['A', 'B'] })).api} />)
+
+    expect(await screen.findAllByText('Start failed:')).toHaveLength(2)
+    expect(announcer().querySelectorAll('p')).toHaveLength(1)
+  })
+
+  it('shows another reason apart from the failure', async () => {
+    render(<App api={fakeApi(state({ services: [view({ reason: 'project name also used by /x', failure })] })).api} />)
+
+    const row = await rowOf('Blog')
+    expect(within(row).getByText('project name also used by /x').closest('.service__failure')).toBeNull()
+    expect(within(row).getByText('Start failed:')).toBeTruthy()
+  })
+})
+
 describe('App — services tab (spec §4, UC1–UC3, UC5)', () => {
   it('subscribes before reading the initial state, then lists the services', async () => {
     const fake = fakeApi(state({ services: [view(), view({ id: 'sq', displayName: 'SonarQube', status: 'on' })] }))
@@ -179,7 +251,7 @@ describe('App — services tab (spec §4, UC1–UC3, UC5)', () => {
     render(<App api={fake.api} />)
 
     expect((await screen.findByRole('alert')).textContent).toBe('Could not read the state: IPC closed')
-    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.queryByText('Loading…')).toBeNull()
   })
 
   it('shows the status as a word next to the colour badge', async () => {
@@ -278,14 +350,15 @@ describe('App — loading (#14)', () => {
     const { api } = fakeApi(state({ services: [view()] }))
     render(<App api={{ ...api, getState: () => new Promise(() => undefined) }} />)
 
-    expect(screen.getByRole('status').textContent).toBe('Loading…')
+    expect(screen.getByText('Loading…').tagName).toBe('OUTPUT')
   })
 
   it('drops the loading notice once the state arrives', async () => {
     render(<App api={fakeApi(state({ services: [view()] })).api} />)
 
     await rowOf('Blog')
-    expect(screen.queryByRole('status')).toBeNull()
+    // The failure announcer (#85) is a status region too.
+    expect(screen.queryByText('Loading…')).toBeNull()
   })
 })
 

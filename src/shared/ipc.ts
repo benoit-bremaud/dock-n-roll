@@ -3,6 +3,14 @@
 // it ends up in the preload or renderer bundles.
 import type { BackgroundPort, Controls, ServiceStatus } from '../main/domain/types'
 
+/** A failed command: which one, and the last lines of its Compose output (one per line). */
+export interface CommandFailure {
+  readonly operation: keyof Controls
+  readonly message: string
+  /** Counts failures across the controller: a repeat of the same text is still a new failure. */
+  readonly occurrence: number
+}
+
 /** One dashboard / tray row. The renderer only ever sends `id` back. */
 export interface ServiceView {
   readonly id: string
@@ -12,8 +20,10 @@ export interface ServiceView {
   readonly controls: Controls
   /** The pin has a validated `url` (spec UC5); the URL itself never leaves the main process. */
   readonly hasUrl: boolean
-  /** What the row must explain: invalid labels, conflict, missing folder or last failed command. */
+  /** What the row must explain: invalid labels, conflict, missing folder or unresolved name. */
   readonly reason: string | null
+  /** The last Start, Stop or Restart that failed (#85), cleared by the next one; `null` otherwise. */
+  readonly failure: CommandFailure | null
   /** The pin's groups (issue #77), empty without one: the list is laid out by group (#98). */
   readonly groups: readonly string[]
 }

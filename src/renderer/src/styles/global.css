@@ -245,6 +245,16 @@ button:focus-visible {
   color: var(--color-fg);
 }
 
+/* #85: a failed command, in the error colour and one Compose line per line. */
+.service__failure {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: var(--font-size-small);
+  color: var(--color-error);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
 .service__actions {
   flex: none;
   display: flex;

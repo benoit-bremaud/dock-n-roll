@@ -14,6 +14,7 @@ function view(overrides: Partial<ServiceView> = {}): ServiceView {
     hasUrl: false,
     groups: [],
     reason: null,
+    failure: null,
     ...overrides
   }
 }
@@ -115,6 +116,25 @@ describe('buildTrayMenu — every action reachable from the menu (spec R5)', () 
 
     expect(entry?.label).toBe('⚪ Blog — conflict')
     expect(entry?.submenu?.at(-1)).toEqual({ label: 'project name also used by /x', enabled: false })
+  })
+
+  it('names the failed action and the last Compose line, after the reason (#85)', () => {
+    const failure = { operation: 'start', message: 'Container a Waiting\ncontainer a exited (3)', occurrence: 1 } as const
+    const [entry] = buildTrayMenu(state({ services: [view({ status: 'off', reason: 'project name also used by /x', failure })] }), recordingActions())
+
+    expect(entry?.submenu?.slice(-2)).toEqual([
+      { label: 'project name also used by /x', enabled: false },
+      { label: 'Start failed: container a exited (3)', enabled: false }
+    ])
+  })
+
+  it('makes the failure line menu-safe', () => {
+    const failure = { operation: 'stop', message: `a & b ${'x'.repeat(100)}`, occurrence: 1 } as const
+    const [entry] = buildTrayMenu(state({ services: [view({ failure })] }), recordingActions())
+
+    const label = entry?.submenu?.at(-1)?.label ?? ''
+    expect(label.startsWith('Stop failed: a && b x')).toBe(true)
+    expect(label.endsWith('…')).toBe(true)
   })
 
   it('replaces the service list by the outage while Docker is unavailable', () => {

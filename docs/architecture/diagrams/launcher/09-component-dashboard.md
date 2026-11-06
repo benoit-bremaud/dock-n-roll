@@ -21,8 +21,10 @@ flowchart TB
     GroupsView["shared/groups.ts — membersOf, ungrouped, runningSummary, groupSummary (pure)"]
     Hook["useControllerState(api) — subscribe, then getState"]
     Banners["Banners — Docker unavailable, pin-file errors"]
+    Announcer["FailureAnnouncer — one polite status region, one line per failed service (#85)"]
+    FailureView["shared/failure.ts — failedLabel, lastLine (pure)"]
     Group["GroupSection — collapsible, summary, Start all / Stop all, member rows (#98)"]
-    Row["ServiceRow — badge, name, dir, reason, Start / Stop / Restart / Logs / Open"]
+    Row["ServiceRow — badge, name, dir, reason, failure, Start / Stop / Restart / Logs / Open"]
     LogPanel["LogPanel — container picker, pre of lines, Reopen"]
     Running["RunningTab — containers and ports, refresh"]
     Css[/"styles/global.css — status to colour mapping"/]
@@ -32,6 +34,9 @@ flowchart TB
   Root --> App
   App --> Hook
   App --> Banners
+  App --> Announcer
+  Announcer --> FailureView
+  Row --> FailureView
   App -->|"one per group"| Group
   Group --> Row
   Group -->|"startGroup(name) / stopGroup(name)"| Api
@@ -67,6 +72,9 @@ flowchart TB
 │ ● happihub-docker-audit      ~/…/happihub          [Start]    │  red
 │ ● SonarQube                  ~/…/sonarqube-stack   (greyed)   │  grey
 │     project name also used by ~/…/dev-infra/sonarqube         │  ← reason line
+│ ● Shop              ~/…/shop                       [Start]    │  red
+│     Start failed: Container shop-app-1 Waiting                │  ← failure, error colour,
+│     container shop-app-1 exited (3)                           │    announced by FailureAnnouncer (#85)
 │ ● Blog              ~/…/blog   [Stop] [Restart] [Logs] [Open ↗]│  orange while starting
 │   ┌ Logs — app-web-1 ▾ ──────────────────────────────────────┐ │  ← one panel at a time
 │   │ listening on :3000                                        │ │  ← text only, last 500 lines
@@ -85,6 +93,10 @@ flowchart TB
   logs panel keyed by section. The group count is hidden while Docker is down.
 - **Docker unavailable**: rows are greyed without badge or status word (spec §4) — the last
   known status may be wrong; every control is already off in the pushed state.
+- **Failure** (#85): the row shows "Start failed:" and the last Compose lines (error colour token
+  `--color-error`, `white-space: pre-line`). One always-mounted, visually hidden `role="status"`
+  region (`FailureAnnouncer`, polite, not atomic) says "<service>: Start failed: <last line>"
+  once per service, also for a service listed under two groups or inside a collapsed one.
 - **Banners**: one `role="alert"` region stays mounted, so an unchanged message is not announced
   again on every push.
 - **`Root`** shows an alert instead of a blank window when `window.dockNRoll` is missing (wrong

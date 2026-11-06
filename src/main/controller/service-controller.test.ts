@@ -258,6 +258,7 @@ describe('createServiceController — one way in, one way out (diagram 07)', () 
       controls: { start: false, stop: true, restart: true },
       hasUrl: true,
       reason: null,
+      failure: null,
       groups: ['QA']
     })
   })
@@ -365,7 +366,7 @@ describe('start / stop — spec UC1, UC2, ADR-0002', () => {
     await done
     await settle()
 
-    expect(row(BLOG)).toMatchObject({ status: 'off', reason: 'Error response from daemon: port is already allocated' })
+    expect(row(BLOG)).toMatchObject({ status: 'off', reason: null, failure: { operation: 'start', message: 'Error response from daemon: port is already allocated' } })
   })
 
   it('stops by project label from cwd /', async () => {
@@ -440,7 +441,7 @@ describe('restart — UC6, diagram 12', () => {
     await settle()
 
     expect(f.runs).toHaveLength(1)
-    expect(row(BLOG)).toMatchObject({ status: 'on', reason: 'boom', controls: { restart: true } })
+    expect(row(BLOG)).toMatchObject({ status: 'on', reason: null, failure: { operation: 'restart', message: 'boom' }, controls: { restart: true } })
   })
 
   it('refuses a start or stop clicked between the stop and the `up`', async () => {
@@ -470,7 +471,7 @@ describe('restart — UC6, diagram 12', () => {
     await settle()
 
     expect(f.runs).toEqual([])
-    expect(row(BLOG)).toMatchObject({ status: 'on', reason: 'socket gone', controls: { stop: true, restart: true } })
+    expect(row(BLOG)).toMatchObject({ status: 'on', failure: { operation: 'restart', message: 'socket gone' }, controls: { stop: true, restart: true } })
   })
 
   it('probes the healthUrl again after a restart, even when Docker never showed it down', async () => {
@@ -556,7 +557,7 @@ describe('restart — UC6, diagram 12', () => {
     await done
     await settle()
 
-    expect(row(BLOG)).toMatchObject({ status: 'off', reason: 'port is already allocated' })
+    expect(row(BLOG)).toMatchObject({ status: 'off', failure: { operation: 'restart', message: 'port is already allocated' } })
   })
 
   it('refuses a restart of a stopped service, and runs a single one on a double click', async () => {
@@ -949,10 +950,10 @@ describe('review fixes — races and failures', () => {
     await controller.start(BLOG)
     await settle()
 
-    expect(row(BLOG)).toMatchObject({ status: 'off', controls: { start: true, stop: false }, reason: 'spawn docker ENOENT' })
+    expect(row(BLOG)).toMatchObject({ status: 'off', controls: { start: true, stop: false }, failure: { operation: 'start', message: 'spawn docker ENOENT' } })
   })
 
-  it('shows the stderr of a failed stop, and clears the reason on the next operation', async () => {
+  it('shows the stderr of a failed stop, and clears it on the next operation', async () => {
     const { f, controller, row } = await controllerWith()
     f.snapshot([web])
     await settle()
@@ -962,14 +963,93 @@ describe('review fixes — races and failures', () => {
     f.runs[0]?.finish({ exitCode: 1, stderr: 'boom' })
     await done
     await settle()
-    expect(row(BLOG)).toMatchObject({ status: 'on', reason: 'boom' })
+    expect(row(BLOG)).toMatchObject({ status: 'on', failure: { operation: 'stop', message: 'boom' } })
 
     void controller.stop(BLOG)
     await settle()
-    expect(row(BLOG)?.reason).toBeNull()
+    expect(row(BLOG)?.failure).toBeNull()
   })
 
-  it('caps a long stderr in the row reason', async () => {
+  it('keeps the last lines of a long Compose output, one per line (#85)', async () => {
+    const { f, controller, row } = await controllerWith()
+    f.snapshot([webStopped])
+    await settle()
+
+    const done = controller.start(BLOG)
+    await settle()
+    f.runs[0]?.finish({ exitCode: 1, stderr: ' Container a Creating\n Container a Created\n\n Container a Starting\r\n Container a Started\n Container a Waiting\n container a exited (3)\n' })
+    await done
+    await settle()
+
+    expect(row(BLOG)?.failure?.message).toBe('Container a Created\nContainer a Starting\nContainer a Started\nContainer a Waiting\ncontainer a exited (3)')
+  })
+
+  it('keeps the runner cause, written last, behind many progress lines', async () => {
+    const { f, controller, row } = await controllerWith()
+    f.snapshot([webStopped])
+    await settle()
+
+    const done = controller.start(BLOG)
+    await settle()
+    f.runs[0]?.finish({ exitCode: -1, stderr: `${'Container a Waiting\n'.repeat(8)}timed out after 200 s` })
+    await done
+    await settle()
+
+    expect(row(BLOG)?.failure?.message.split('\n').at(-1)).toBe('timed out after 200 s')
+  })
+
+  it('counts each failure, so the same text twice is two failures', async () => {
+    const { f, controller, row } = await controllerWith()
+    f.snapshot([webStopped])
+    await settle()
+    const occurrences: (number | undefined)[] = []
+    for (const index of [0, 1]) {
+      const done = controller.start(BLOG)
+      await settle()
+      f.runs[index]?.finish({ exitCode: 1, stderr: 'boom' })
+      await done
+      await settle()
+      occurrences.push(row(BLOG)?.failure?.occurrence)
+    }
+
+    expect(occurrences[1]).toBeGreaterThan(occurrences[0] ?? Infinity)
+  })
+
+  it('names the exit code when the stderr is blank', async () => {
+    const { f, controller, row } = await controllerWith()
+    f.snapshot([webStopped])
+    await settle()
+
+    const done = controller.start(BLOG)
+    await settle()
+    f.runs[0]?.finish({ exitCode: 2, stderr: ' \n\n ' })
+    await done
+    await settle()
+
+    expect(row(BLOG)?.failure).toMatchObject({ operation: 'start', message: 'docker compose exited with 2' })
+  })
+
+  it('clears the failure once the next command succeeds', async () => {
+    const { f, controller, row } = await controllerWith()
+    f.snapshot([webStopped])
+    await settle()
+    const first = controller.start(BLOG)
+    await settle()
+    f.runs[0]?.finish({ exitCode: 1, stderr: 'boom' })
+    await first
+    await settle()
+
+    const second = controller.start(BLOG)
+    await settle()
+    f.snapshot([web])
+    f.runs[1]?.finish()
+    await second
+    await settle()
+
+    expect(row(BLOG)).toMatchObject({ status: 'on', failure: null })
+  })
+
+  it('caps a long stderr in the failure message', async () => {
     const { f, controller, row } = await controllerWith()
     f.snapshot([webStopped])
     await settle()
@@ -980,7 +1060,7 @@ describe('review fixes — races and failures', () => {
     await done
     await settle()
 
-    expect(row(BLOG)?.reason).toBe(`…${'x'.repeat(500)}`)
+    expect(row(BLOG)?.failure?.message).toBe(`…${'x'.repeat(500)}`)
   })
 
   it('puts the error of a never-started pin on its new row once its id changes', async () => {
@@ -996,7 +1076,7 @@ describe('review fixes — races and failures', () => {
     await done
     await settle()
 
-    expect(controller.state().services).toEqual([expect.objectContaining({ id: BLOG, reason: 'boom' })])
+    expect(controller.state().services).toMatchObject([{ id: BLOG, failure: { operation: 'start', message: 'boom' } }])
   })
 
   it('disables every control while Docker is unavailable', async () => {
@@ -1137,7 +1217,7 @@ describe('review fixes — state publication', () => {
     errors.mockRestore()
   })
 
-  it('ranks reasons: invalid, then conflict, then missing, then the last error', async () => {
+  it('ranks reasons: invalid, then conflict, then missing', async () => {
     const { f, controller } = await controllerWith((setup) => {
       setup.missing.add('/srv/blog')
     })
@@ -1289,8 +1369,8 @@ describe('groups — UC8, UC9, groups diagram 02', () => {
     await done
     await settle()
 
-    expect(row(BLOG)).toMatchObject({ status: 'off', reason: 'port is already allocated' })
-    expect(row(API)).toMatchObject({ status: 'on', reason: null })
+    expect(row(BLOG)).toMatchObject({ status: 'off', failure: { operation: 'start', message: 'port is already allocated' } })
+    expect(row(API)).toMatchObject({ status: 'on', failure: null })
   })
 
   it('starts only the members that can start', async () => {

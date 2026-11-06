@@ -1,4 +1,5 @@
-import type { DockNRollApi, ServiceView } from '../../../shared/ipc'
+import type { CommandFailure, DockNRollApi, ServiceView } from '../../../shared/ipc'
+import { failedLabel } from '../../../shared/failure'
 import { shortenPath, shortenReason } from '../format'
 import { LogPanel } from './LogPanel'
 
@@ -13,6 +14,15 @@ function Reason({ reason, homeDir }: { readonly reason: string; readonly homeDir
       </span>
       <span className="visually-hidden">{reason}</span>
     </span>
+  )
+}
+
+/** #85: what failed and the last Compose lines; the dashboard's `FailureAnnouncer` says it aloud. */
+function Failure({ failure }: { readonly failure: CommandFailure }): React.JSX.Element {
+  return (
+    <p className="service__failure">
+      <strong>{failedLabel(failure)}:</strong> {failure.message}
+    </p>
   )
 }
 
@@ -53,6 +63,7 @@ export function ServiceRow({
           {shortenPath(service.workingDir, homeDir)}
         </span>
         {service.reason !== null && <Reason reason={service.reason} homeDir={homeDir} />}
+        {service.failure !== null && <Failure failure={service.failure} />}
       </div>
       <div className="service__actions">
         <button type="button" className="button--primary" aria-label={`Start ${target}`} disabled={!service.controls.start} onClick={() => void api.start(service.id)}>

@@ -22,7 +22,14 @@ classDiagram
     +Controls controls
     +boolean hasUrl
     +string|null reason
+    +CommandFailure|null failure
     +readonly string[] groups
+  }
+  class CommandFailure {
+    <<shared/ipc.ts, crosses IPC>>
+    +start|stop|restart operation
+    +string message
+    +number occurrence
   }
   class ControllerState {
     <<shared/ipc.ts, crosses IPC>>
@@ -80,7 +87,7 @@ classDiagram
     -pending Pending[]
     -gates Map~serviceId, HealthGate~
     -missingPaths Map~serviceId, MissingPath|null~
-    -lastError Map~serviceId, string~
+    -lastError Map~serviceId, CommandFailure~
     -nameCache Map~workingDir, name~
     -notifiedAt Map~serviceId, time~
     +state() ControllerState
@@ -124,6 +131,7 @@ classDiagram
   ServiceController ..> ControllerDeps : uses
   ServiceController ..> ControllerState : produces
   ControllerState o-- ServiceView
+  ServiceView o-- CommandFailure
   BackgroundMonitor ..> BackgroundView : produces
   TrayMenu ..> ServiceView : renders
   DockNRollApi ..> ControllerState
@@ -170,7 +178,11 @@ classDiagram
   URL in development). Pure function of the event, the dashboard and the expected origin, so it
   is unit-tested without Electron; `index.ts` only supplies the live values.
 - **`reason`** carries what the row must explain: `invalidReason`, the conflicting dirs, a
-  missing folder, or the stderr excerpt of the last failed command (spec UC1-4a, UC2-3a).
+  missing folder or an unresolved Compose name.
+- **`failure`** (#85) is the last failed Start, Stop or Restart (spec UC1-4a, UC2-3a): the
+  request and the last 5 non-blank lines of its stderr (cut to its last 500 characters), cleared when the
+  next command starts; `occurrence` counts failures, so a repeat of the same text is
+  announced again. Kept apart from `reason` so the dashboard can label and announce it.
 - **Name resolution (spec §10 P1)**: `resolveProjectName` runs only for pin dirs (without
   `project`) not resolved yet (failures retried after 30 s), outside the serialized chain and
   one batch at a time, so a slow `docker compose config` never holds another input; its result

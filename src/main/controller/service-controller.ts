@@ -7,7 +7,7 @@ import { allowedControls, deriveStatus } from '../domain/derive-status'
 import { crashedContainers, crashMessage } from '../domain/crash'
 import { buildServices } from '../domain/service-catalog'
 import type { ContainerSnapshot, Controls, HealthGate, MissingPath, PendingOperation, PinEntry, PinFileResult, Service, StatusInputs } from '../domain/types'
-import type { ControllerState, ServiceView } from '../../shared/ipc'
+import type { CommandFailure, ControllerState, ServiceView } from '../../shared/ipc'
 
 // Application layer of class diagram 07: orchestrates domain and adapters, holds no rule of
 // its own. Every input updates state and runs one serialized recomputation.
@@ -15,6 +15,7 @@ import type { ControllerState, ServiceView } from '../../shared/ipc'
 const HEALTH_POLL_MS = 2000
 const HEALTH_TIMEOUT_MS = 1500
 const MAX_REASON_CHARS = 500
+const MAX_REASON_LINES = 5
 /** A failed `docker compose config` (slow daemon at boot, file mid-edit) is retried after this. */
 const NAME_RETRY_MS = 30_000
 /** At most one crash notification per service in this window, so a crash loop does not flood. */
@@ -114,8 +115,10 @@ function groupsOf(services: readonly Service[]): readonly string[] {
 
 const NO_CONTROLS = { start: false, stop: false, restart: false } as const
 
+/** The last lines of a Compose output, trimmed and without blank lines: where the error is (#85). */
 function excerpt(text: string): string {
-  const trimmed = text.trim()
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== '')
+  const trimmed = lines.slice(-MAX_REASON_LINES).join('\n')
   return trimmed.length > MAX_REASON_CHARS ? `…${trimmed.slice(-MAX_REASON_CHARS)}` : trimmed
 }
 
@@ -153,7 +156,8 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   const isMissing = (id: string): boolean => (missingPaths.get(id) ?? null) !== null
   const gates = new Map<string, HealthGate>()
   const probing = new Map<string, () => void>()
-  const lastError = new Map<string, string>()
+  const lastError = new Map<string, CommandFailure>()
+  let failures = 0
   const notifiedAt = new Map<string, number>()
   const stoppedAt = new Map<string, number>()
   const listeners = new Set<(state: ControllerState) => void>()
@@ -189,7 +193,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     const missing = missingPaths.get(service.id)
     if (missing) return `${missing.kind} ${JSON.stringify(missing.path)} is missing`
     if (unresolved(service)) return 'Compose project name could not be resolved'
-    return lastError.get(service.id) ?? null
+    return null
   }
 
   const viewOf = (service: Service): ServiceView => {
@@ -208,7 +212,8 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
       controls,
       hasUrl: service.pin?.url !== undefined,
       groups: service.pin?.groups ?? [],
-      reason: reasonOf(service, inputs)
+      reason: reasonOf(service, inputs),
+      failure: lastError.get(service.id) ?? null
     }
   }
 
@@ -428,7 +433,8 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     if (failure !== null) {
       // Keyed by the row the developer now sees: the id may have changed during the run.
       const row = services.find((candidate) => candidate.workingDir === service.workingDir && candidate.projectName === name)
-      lastError.set(row?.id ?? service.id, failure)
+      failures += 1
+      lastError.set(row?.id ?? service.id, { operation: request, message: failure, occurrence: failures })
     }
     recompute()
     await chain

@@ -3,7 +3,7 @@ import { groupSummary, membersOf, runningSummary, ungrouped } from './groups'
 import type { ServiceView } from './ipc'
 
 function view(id: string, groups: readonly string[], status: ServiceView['status'] = 'off'): ServiceView {
-  return { id, displayName: id, workingDir: `/srv/${id}`, status, controls: { start: true, stop: false, restart: false }, hasUrl: false, reason: null, groups }
+  return { id, displayName: id, workingDir: `/srv/${id}`, status, controls: { start: true, stop: false, restart: false }, hasUrl: false, reason: null, failure: null, groups }
 }
 
 describe('groups view (#98)', () => {
