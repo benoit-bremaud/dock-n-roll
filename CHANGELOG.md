@@ -22,7 +22,8 @@ file format (`services.yaml`) and the installed package.
 - A missing project now names what is gone: `folder "/srv/x" is missing` or
   `compose file "/srv/x/compose.yaml" is missing` (#12); paths in reasons are quoted, spaces included.
 - Privacy: the app no longer downloads a spellcheck dictionary from a Google host on launch; the
-  Chromium spellchecker is turned off and its languages cleared, so nothing leaves the machine (#95).
+  Chromium spellchecker is turned off and its languages cleared, so the app makes no request of its
+  own to a third party at launch (#95).
 
 ### Changed
 

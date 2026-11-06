@@ -7,8 +7,9 @@ export type HardenableSession = Pick<
 >
 
 /**
- * Locks the session down before any window loads. The builtin spellchecker downloads a Hunspell
- * dictionary from a Google host on launch, which breaks R4 (local-only app, #95); the dashboard
+ * Locks the session down; call it before any window loads. Even disabled, the builtin spellchecker
+ * downloads a Hunspell dictionary from a Google host on launch unless its languages are cleared,
+ * which breaks R4 (no remote input, #95); the dashboard
  * needs no browser permission (camera, notifications, ...), so they are all denied.
  */
 export function hardenSession(session: HardenableSession): void {
@@ -20,7 +21,10 @@ export function hardenSession(session: HardenableSession): void {
   session.setPermissionCheckHandler(() => false)
 }
 
-/** Dashboard renderer preferences, minus the build-dependent preload path. */
+/**
+ * Dashboard renderer preferences, minus the build-dependent preload path. `spellcheck: false`
+ * backs up `hardenSession` on purpose (defense in depth, #95).
+ */
 export const DASHBOARD_WEB_PREFERENCES = {
   spellcheck: false,
   contextIsolation: true,

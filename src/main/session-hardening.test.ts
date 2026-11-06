@@ -4,8 +4,8 @@ import { DASHBOARD_WEB_PREFERENCES, hardenSession, type HardenableSession } from
 // Electron is the boundary: the session is replaced by a recorder of the calls made on it.
 function fakeSession() {
   return {
-    setSpellCheckerEnabled: vi.fn<(enable: boolean) => void>(),
-    setSpellCheckerLanguages: vi.fn<(languages: string[]) => void>(),
+    setSpellCheckerEnabled: vi.fn<HardenableSession['setSpellCheckerEnabled']>(),
+    setSpellCheckerLanguages: vi.fn<HardenableSession['setSpellCheckerLanguages']>(),
     setPermissionRequestHandler: vi.fn<HardenableSession['setPermissionRequestHandler']>(),
     setPermissionCheckHandler: vi.fn<HardenableSession['setPermissionCheckHandler']>()
   }
