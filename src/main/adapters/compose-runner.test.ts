@@ -109,12 +109,11 @@ describe('runCompose', () => {
     expect(result.stderr).toContain('ENOENT')
   })
 
-  it('names the timeout as the cause, ahead of the progress Compose wrote', async () => {
+  it('names the timeout as the cause, after the progress Compose wrote', async () => {
     const result = await runCompose(['compose', '--hang'], { cwd: root, docker, socketPath: SOCKET, env: baseEnv(), timeoutMs: 200 })
 
     expect(result.exitCode).toBe(-1)
-    expect(result.stderr).toMatch(/^timed out after 0\.2 s/)
-    expect(result.stderr).toContain('Container app-web-1 Starting')
+    expect(result.stderr).toMatch(/Container app-web-1 Starting\n+timed out after 0\.2 s$/)
   })
 
   it('kills a run that ignores SIGTERM after the grace period', async () => {

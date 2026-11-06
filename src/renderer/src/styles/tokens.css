@@ -11,6 +11,8 @@
   --color-banner: color-mix(in srgb, var(--color-warning) 14%, transparent);
   /* Banners report a degraded state (Docker down, pin-file error), not a failed action. */
   --color-warning: #9a6700;
+  /* A failed action (#85): Start, Stop or Restart; 5.4:1 on --color-bg. */
+  --color-error: #cf222e;
 
   --status-on: #1a7f37;
   --status-off: #cf222e;
@@ -43,6 +45,7 @@
     --color-fg: #e6edf3;
     --color-muted: #9198a1;
     --color-warning: #d29922;
+    --color-error: #ff7b72;
 
     --status-on: #3fb950;
     --status-off: #f85149;

@@ -2,6 +2,7 @@ import { useRef, useState, type KeyboardEvent } from 'react'
 import { membersOf, runningSummary, ungrouped } from '../../shared/groups'
 import type { ControllerState, DockNRollApi, ServiceView } from '../../shared/ipc'
 import { Banners } from './components/Banners'
+import { FailureAnnouncer } from './components/FailureAnnouncer'
 import { GroupSection } from './components/GroupSection'
 import { RunningTab } from './components/RunningTab'
 import { ServiceRow } from './components/ServiceRow'
@@ -121,6 +122,7 @@ export function App({ api }: { readonly api: DockNRollApi }): React.JSX.Element 
         ))}
       </div>
       <Banners state={state} error={error} />
+      <FailureAnnouncer services={state?.services ?? []} />
       <section role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
         {tab === 'running' ? <RunningTab api={api} /> : (
           <ServicesPanel

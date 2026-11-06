@@ -5,7 +5,7 @@ import { isValidProjectName } from '../domain/names'
 export interface ComposeResult {
   readonly exitCode: number
   readonly stdout: string
-  /** CLI output; prefixed with the cause when the run was stopped or could not start. */
+  /** CLI output; the cause comes last when the run was stopped or could not start (#85: the row keeps the last lines). */
   readonly stderr: string
 }
 
@@ -47,7 +47,7 @@ export function composeEnv(env: NodeJS.ProcessEnv, socketPath: string): Record<s
 }
 
 function failure(cause: string, stdout = '', stderr = ''): ComposeResult {
-  return { exitCode: -1, stdout, stderr: stderr === '' ? cause : `${cause}\n${stderr}` }
+  return { exitCode: -1, stdout, stderr: stderr === '' ? cause : `${stderr}\n${cause}` }
 }
 
 /**

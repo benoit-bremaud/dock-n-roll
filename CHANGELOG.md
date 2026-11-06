@@ -17,6 +17,9 @@ file format (`services.yaml`) and the installed package.
 
 ### Fixed
 
+- Dashboard: a failed Start, Stop or Restart is labelled ("Start failed:"), shown in an error
+  colour with the last Compose lines one per line, and announced by screen readers through a
+  polite status region; the tray names it too (#85).
 - Pin file: a FIFO, device or directory named `services.yaml` is refused at once ("not a regular
   file") instead of after the 5 s read timeout, and a file swapped or grown after the check is still
   refused unread (#20).
