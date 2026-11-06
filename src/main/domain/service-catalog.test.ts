@@ -241,6 +241,24 @@ describe('buildServices — pin file merge and ordering', () => {
     expect(services.map((s) => s.displayName)).toEqual(['Foo'])
   })
 
+  it('keeps a project pin on a stopped copy in another dir, so Start runs there (#99)', () => {
+    const services = buildServices(
+      [container({ state: 'exited', labels: composeLabels('hh', '/hh/.claude/worktrees/w') })],
+      [pin({ workingDir: '/hh', project: 'hh', name: 'HH' })]
+    )
+
+    expect(services.map((s) => [s.workingDir, s.displayName])).toEqual([['/hh/.claude/worktrees/w', 'HH']])
+  })
+
+  it('attaches a project pin to an invalid copy in another dir (#99)', () => {
+    const services = buildServices(
+      [container({ labels: composeLabels('app', '/srv/app', 'x.yml') })],
+      [pin({ workingDir: '/other/app', project: 'app', name: 'App' })]
+    )
+
+    expect(services.map((s) => [s.workingDir, s.displayName, s.invalidReason !== null])).toEqual([['/srv/app', 'App', true]])
+  })
+
   it('hides a project wherever it runs when its project pin is hidden (#99)', () => {
     expect(buildServices([container({ labels: composeLabels('foo', '/x') })], [pin({ workingDir: '/y', project: 'foo', hidden: true })])).toEqual([])
   })

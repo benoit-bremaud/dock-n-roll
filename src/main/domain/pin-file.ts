@@ -119,7 +119,7 @@ export function validatePinFile(document: unknown): PinFileResult {
     // naming a project covers it in every dir (#99), so a second one could never apply.
     const key = entry.project === undefined ? `${entry.workingDir}\0` : `\0${entry.project}`
     if (seen.has(key)) {
-      const same = entry.project === undefined ? 'workingDir and project' : 'project'
+      const same = entry.project === undefined ? 'workingDir' : 'project'
       errors.push(`${where}: duplicate of an earlier entry for the same ${same}; entry ignored`)
       return
     }

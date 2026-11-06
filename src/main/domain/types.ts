@@ -57,7 +57,7 @@ export interface PinEntry {
   readonly workingDir: string
   /**
    * Ties the pin to this Compose project whatever dir runs it (#99); `workingDir` is then where
-   * Start runs while nothing runs. Absent → applies to every project of `workingDir`.
+   * Start runs while no container of that project exists in any dir. Absent → applies to every project of `workingDir`.
    */
   readonly project?: string
   readonly name?: string

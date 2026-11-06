@@ -57,7 +57,7 @@ function findPin(pins: readonly PinEntry[], workingDir: string, projectName: str
   )
 }
 
-/** Whether a discovered project carries this pin's settings (same rule as `findPin`). */
+/** Whether a pin is consumed by a project it could apply to; `findPin` picks which one wins. */
 function isCoveredBy(pin: PinEntry, project: DiscoveredProject): boolean {
   return pin.project === undefined ? project.workingDir === pin.workingDir : project.name === pin.project
 }
@@ -94,6 +94,7 @@ export function buildServices(
   const otherDirs = (name: string | null, dir: string): string[] =>
     name === null ? [] : (dirsByName.get(name) ?? []).filter((other) => other !== dir)
   // A never-started pin would run `up` under its own project name, or the one Compose derives
+  // (only a pin without `project` can be flagged: a pin naming a discovered project attaches to it)
   // from its dir: if that name is already used by another dir, `up` would take over its
   // containers. Only the pin is flagged — it must never block the running project's Stop.
   // The name comes from the pin, else from what Compose resolves (compose file `name:`, spec

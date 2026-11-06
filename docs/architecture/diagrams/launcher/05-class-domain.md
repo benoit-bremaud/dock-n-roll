@@ -155,12 +155,13 @@ classDiagram
 - **`conflictingDirs`** is non-empty iff the project name is used by ≥ 2 discovered working
   dirs (ADR-0003); an `invalid` project with a valid name still holds that name, but its own
   row shows `invalid`, never `conflict`. A never-started pin is flagged when a discovered project in another dir
-  already uses the name it would start with — its `project`, or the name Compose derives from
-  its dir (`defaultProjectName`). Only the pin is flagged: it never blocks the running
+  already uses the name it would start with — the name Compose resolves or derives from its
+  dir (`defaultProjectName`); a pin naming a project attaches to it instead (#99). Only the pin is flagged: it never blocks the running
   project, and two never-started pins never flag each other.
 - **Pin lookup** (`findPin`, #99): the pin naming the project (one per project in the pin
   file), else the dir-only pin of its dir. A pin naming a project is never-started only while no
-  dir runs that project.
+  dir holds a container (running or stopped) of that project. A dir-only pin covered by a
+  project of its dir is consumed even when another pin wins there.
 - **`ComposeLabels`** = `none` (not a Compose container) | `valid(ComposeProjectRef)` |
   `invalid(rawProject, rawWorkingDir, reason)` (spec §10 P2). Invalid containers are grouped
   by their raw labels like valid ones; a project with ≥ 1 invalid container gets a non-null
