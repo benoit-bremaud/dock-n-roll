@@ -577,3 +577,26 @@ Sensitivity: C and A stay top two and G last under value 45 or effort 35; E pass
   clean, CI 4/4, smoke + packaged QA under Xvfb, Codex no finding; Copilot 422 waived by owner.
   Merge `ef3fc20`, closes #98.
 - Next: #85, then #84.
+
+## 2026-11-06 — #85: a failed Start or Stop is labelled, coloured and announced (PR #113)
+
+- Need (QA A11Y-03, USA-03): a failed `docker compose up` showed as a plain reason line, not
+  announced, no error style, Compose lines run together.
+- Owner MCDA: A — a typed `ServiceView.failure` (operation + last 5 Compose lines) kept apart from
+  `reason` (460) vs a typed union `reason` (345) vs a text prefix (300). Row: "Start failed:" in a
+  new `--color-error` token, `white-space: pre-line`; tray line "Start failed: <last line>";
+  `src/shared/failure.ts` (failedLabel, lastLine). Diagrams 07 and 09 updated.
+- Adversarial review round 1: 2 Must — the runner wrote its cause (timeout, signal) first, so the
+  last-lines excerpt dropped it (runner now writes it last); one `role=status` per row announced a
+  service of two groups twice. Owner MCDA A (460): one always-mounted polite, non-atomic
+  `FailureAnnouncer` for the dashboard, "<service>: Start failed: <last line>", one line per
+  service. Gotcha: `display: none` on an empty live region drops it from the accessibility tree.
+- Codex P2 after the push: the same failure repeated before the cleared state is published kept
+  the same key and text, so no announcement; `CommandFailure.occurrence` now keys the line.
+- Gate: 660 tests, coverage 97.33 / 92.81 / 97.95 / 98.6 %, Sonar OK (new coverage 97.5 %),
+  gitleaks clean, CI 4/4, smoke + packaged QA under Xvfb (accessibility tree via CDP, no screen
+  reader: `docs/architecture/qa/2026-11-06-85-failed-start.md`), adversarial review 4 rounds.
+  Copilot 422 waived by owner ("si tout est vert"). Merge `79e9923`, closes #85. Also merged log
+  PR #111 (`bf32fd5`) for #98.
+- Nice filed as #112 (stale failures re-read on dashboard load, rename re-announces).
+- Next: pause; then #84 (narrow width / 200 % zoom overflow).
