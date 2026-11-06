@@ -27,6 +27,9 @@ file format (`services.yaml`) and the installed package.
 
 ### Changed
 
+- Pin file: an entry with `project` now follows that Compose project whatever directory runs it
+  (a git worktree, another clone), so the tray no longer shows the pin `off` next to an unpinned
+  running copy; `workingDir` is where Start runs while nothing is running (#99).
 - Logs panel: a line redrawn with `\r` (pull or build progress) shows its last state instead of
   every step glued together; stdout and stderr are decoded apart, so a character split across
   frames of one is not broken by the other; a service removed from the pin file meanwhile ends

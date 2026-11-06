@@ -46,12 +46,22 @@ function discoverProjects(containers: readonly ContainerSnapshot[]): DiscoveredP
   return [...projects.values()]
 }
 
-/** A project-specific pin wins over a pin that covers the whole dir. */
+/**
+ * A pin naming a project follows it whatever dir it runs from (#99, e.g. a git worktree);
+ * the one pinned at the running dir wins. A pin naming the project wins over a pin that
+ * covers the whole dir.
+ */
 function findPin(pins: readonly PinEntry[], workingDir: string, projectName: string): PinEntry | undefined {
   return (
     pins.find((pin) => pin.workingDir === workingDir && pin.project === projectName) ??
+    pins.find((pin) => pin.project === projectName) ??
     pins.find((pin) => pin.workingDir === workingDir && pin.project === undefined)
   )
+}
+
+/** Whether a discovered project carries this pin's settings (same rule as `findPin`). */
+function isCoveredBy(pin: PinEntry, project: DiscoveredProject): boolean {
+  return pin.project === undefined ? project.workingDir === pin.workingDir : project.name === pin.project
 }
 
 function byNameThenId(a: Service, b: Service): number {
@@ -74,10 +84,7 @@ export function buildServices(
   resolvedNames: ResolvedNames
 ): Service[] {
   const projects = discoverProjects(containers)
-  const neverStartedPins = pins.filter(
-    (pin) =>
-      !projects.some((project) => project.workingDir === pin.workingDir && (pin.project === undefined || pin.project === project.name))
-  )
+  const neverStartedPins = pins.filter((pin) => !projects.some((project) => isCoveredBy(pin, project)))
 
   // Name ownership is what Docker sees: every discovered project whose name Compose would
   // accept holds it — an `invalid` one too (a bad config_files label does not free the name;

@@ -61,7 +61,7 @@ services:
   - workingDir: /home/me/code/noisy-thing
     hidden: true                                # never listed
   - workingDir: /home/me/code/some-app
-    project: some-app-qa                        # optional: one project of a shared directory
+    project: some-app-qa                        # optional: this project, from any directory (worktree, clone)
     name: Some app (QA)
 ```
 

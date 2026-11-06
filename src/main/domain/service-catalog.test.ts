@@ -121,7 +121,7 @@ describe('buildServices — containers with invalid labels (spec §10 P2)', () =
         container({ id: 'a', labels: composeLabels('app', '/srv/app') }),
         container({ id: 'b', labels: composeLabels('app', '/srv/app', 'x.yml') })
       ],
-      [pin({ workingDir: '/other/app', project: 'app' })]
+      [pin({ workingDir: '/other/app' })]
     )
 
     expect(services.find((s) => s.workingDir === '/other/app')?.conflictingDirs).toEqual(['/srv/app'])
@@ -205,13 +205,53 @@ describe('buildServices — pin file merge and ordering', () => {
     expect(service).toMatchObject({ id: '/srv/app\0app-qa', projectName: 'app-qa', displayName: 'app-qa' })
   })
 
-  it('flags a never-started pin whose project name already runs from another dir', () => {
+  it('attaches a project pin to that project when it runs from another dir (#99)', () => {
     const services = buildServices(
-      [container({ labels: composeLabels('foo', '/x') })],
-      [pin({ workingDir: '/y', project: 'foo' })]
+      [container({ labels: composeLabels('happihub-local', '/hh/.claude/worktrees/w') })],
+      [pin({ workingDir: '/hh', project: 'happihub-local', name: 'HappiHub', pinned: true })]
     )
 
-    expect(services.find((s) => s.workingDir === '/y')?.conflictingDirs).toEqual(['/x'])
+    expect(services).toHaveLength(1)
+    expect(services[0]).toMatchObject({
+      id: '/hh/.claude/worktrees/w\0happihub-local',
+      workingDir: '/hh/.claude/worktrees/w',
+      displayName: 'HappiHub',
+      conflictingDirs: []
+    })
+  })
+
+  it('attaches a project pin to every dir running that project, each flagged as a conflict (#99)', () => {
+    const services = buildServices(
+      [container({ labels: composeLabels('foo', '/x') }), container({ labels: composeLabels('foo', '/z') })],
+      [pin({ workingDir: '/y', project: 'foo', name: 'Foo' })]
+    )
+
+    expect(services.map((s) => [s.workingDir, s.displayName, s.conflictingDirs])).toEqual([
+      ['/x', 'Foo', ['/z']],
+      ['/z', 'Foo', ['/x']]
+    ])
+  })
+
+  it('prefers the pin of the running dir over a project pin of another dir (#99)', () => {
+    const services = buildServices(
+      [container({ labels: composeLabels('foo', '/x') })],
+      [pin({ workingDir: '/y', project: 'foo', name: 'Main' }), pin({ workingDir: '/x', project: 'foo', name: 'Worktree' })]
+    )
+
+    expect(services.map((s) => s.displayName)).toEqual(['Worktree'])
+  })
+
+  it('prefers a project pin of another dir over a dir-only pin of the running dir (#99)', () => {
+    const services = buildServices(
+      [container({ labels: composeLabels('foo', '/x') })],
+      [pin({ workingDir: '/x', name: 'Whole dir' }), pin({ workingDir: '/y', project: 'foo', name: 'Foo' })]
+    )
+
+    expect(services.map((s) => s.displayName)).toEqual(['Foo'])
+  })
+
+  it('hides a project wherever it runs when its project pin is hidden (#99)', () => {
+    expect(buildServices([container({ labels: composeLabels('foo', '/x') })], [pin({ workingDir: '/y', project: 'foo', hidden: true })])).toEqual([])
   })
 
   it('never blocks the running project because of a pin elsewhere', () => {
