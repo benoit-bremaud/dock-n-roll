@@ -19,7 +19,8 @@ export function GroupSection({ name, members, dockerAvailable, api, children }: 
     <details className="group" open>
       <summary className="group__summary">
         <span className="group__name">{name}</span>
-        <span className="group__count">{groupSummary(members)}</span>
+        {/* Hidden while Docker is down, like the header summary: the last statuses may be wrong. */}
+        {dockerAvailable && <span className="group__count">{groupSummary(members)}</span>}
       </summary>
       <div className="group__actions">
         <button type="button" aria-label={`Start all ${name}`} disabled={!dockerAvailable} onClick={() => void api.startGroup(name)}>

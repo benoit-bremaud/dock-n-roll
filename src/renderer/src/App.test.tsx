@@ -460,7 +460,8 @@ describe('App — list by group (UC8, UC9, #98)', () => {
     await rowOf('Blog')
 
     const sections = [...document.querySelectorAll<HTMLDetailsElement>('details.group')]
-    expect(sections.map((section) => section.querySelector('summary')?.textContent)).toEqual(['HappiHub1 of 2 on', 'QA0 of 1 on'])
+    expect(sections.map((section) => section.querySelector('.group__name')?.textContent)).toEqual(['HappiHub', 'QA'])
+    expect(sections.map((section) => section.querySelector('.group__count')?.textContent)).toEqual(['1 of 2 on', '0 of 1 on'])
     expect(sections.every((section) => section.open)).toBe(true)
     expect(sections.map((section) => [...section.querySelectorAll('.service__name')].map((name) => name.textContent))).toEqual([['API', 'Web'], ['Web']])
     expect(document.querySelector('.services--ungrouped')?.textContent).toContain('Blog')
@@ -483,9 +484,10 @@ describe('App — list by group (UC8, UC9, #98)', () => {
     const user = userEvent.setup()
     await rowOf('Blog')
 
-    await user.click(screen.getAllByRole('button', { name: 'Logs of Web' })[0] as HTMLElement)
+    await user.click(button('Logs of Web, in HappiHub'))
 
-    expect(screen.getAllByRole('button', { name: 'Logs of Web' }).map((logs) => logs.getAttribute('aria-expanded'))).toEqual(['true', 'false'])
+    expect(button('Logs of Web, in HappiHub').getAttribute('aria-expanded')).toBe('true')
+    expect(button('Logs of Web, in QA').getAttribute('aria-expanded')).toBe('false')
   })
 
   it('disables group controls while Docker is unavailable', async () => {
@@ -494,6 +496,7 @@ describe('App — list by group (UC8, UC9, #98)', () => {
 
     expect(button('Start all HappiHub').disabled).toBe(true)
     expect(button('Stop all HappiHub').disabled).toBe(true)
+    expect(document.querySelector('.group__count')).toBeNull()
   })
 })
 

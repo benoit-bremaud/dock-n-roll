@@ -36,9 +36,9 @@ function ServicesPanel({
   // Before the first state: a short wait, said once to assistive tech. A read error is the banner.
   if (state === null) return error === null ? <output className="app__empty">Loading…</output> : null
   if (state.services.length === 0) return <p className="app__empty">No Compose project found.</p>
-  const rows = (services: readonly ServiceView[], section: string): React.ReactNode =>
+  const rows = (services: readonly ServiceView[], section: string | undefined): React.ReactNode =>
     services.map((service) => {
-      const key = `${section}\0${service.id}`
+      const key = `${section ?? ''}\0${service.id}`
       return (
         <ServiceRow
           key={service.id}
@@ -47,6 +47,7 @@ function ServicesPanel({
           dockerAvailable={state.dockerAvailable}
           homeDir={state.homeDir}
           logsOpen={logsFor === key}
+          section={section}
           onToggleLogs={() => {
             onToggleLogs(key)
           }}
@@ -64,7 +65,7 @@ function ServicesPanel({
           </GroupSection>
         )
       })}
-      {others.length > 0 && <ul className="services services--ungrouped">{rows(others, '')}</ul>}
+      {others.length > 0 && <ul className="services services--ungrouped">{rows(others, undefined)}</ul>}
     </>
   )
 }
