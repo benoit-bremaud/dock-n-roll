@@ -523,3 +523,23 @@ Sensitivity: C and A stay top two and G last under value 45 or effort 35; E pass
   spellchecker downloads a dictionary from a Google host at launch: breaks R4; public issue per owner
   MCDA A 450 vs private advisory 275). Should #86–#91, Nice #92–#94; #82 still reproduces.
 - Next: pause; on resume, re-plan the roadmap by MCDA (QA Must #84 #85 #95 vs brick #41 + #61 + #57).
+
+## 2026-11-06 — Resume audit; #95: no spellcheck dictionary download at launch (PR #105), brick closed
+
+- Resume audit after the pause. Dependabot #102 (minor-and-patch group, 10 updates) merged `dab1ed1`;
+  external contributor PR #97 (jay23606) merged `6159765`, closing #90. `pnpm audit` reports 2 moderate
+  vulnerabilities (none high, CI audit level): to track. Owner MCDA on the order: #95 → #99 + #98
+  (tray clarity) → #85 → #84.
+- #95 fix: new `src/main/session-hardening.ts` (`hardenSession`, `DASHBOARD_WEB_PREFERENCES`).
+  Finding: `setSpellCheckerEnabled(false)` + `webPreferences.spellcheck: false` **still downloaded**
+  `en-US-10-1.bdic` from `redirector.gvt1.com` on a fresh profile; `setSpellCheckerLanguages([])` is
+  what stops it (Chromium net log on the packaged build). All three are kept (defense in depth).
+- CI guard: `e2e/smoke.mjs` launches with `--log-net-log` and fails on any `gvt1.com` /
+  `dl.google.com` request or an incomplete log (Codex P2: check the request, not the downloaded file);
+  proven red without `setSpellCheckerLanguages([])`. ADR-0010 lists the check.
+- Gate: 630 tests, coverage 97.25 / 92.85 / 97.66 / 98.52 %, Sonar OK (new coverage 97.7 %), gitleaks
+  clean, audit high clean, CI 4/4, adversarial review 4 rounds (0 Must). `b26cece` and `a8b0356` were
+  pushed before their verify round (process slip, no Must found). Copilot 422 (not a collaborator):
+  owner waived it at the merge question. Merge `e3bfaad`, closes #95.
+- Open Nice filed as #106: startup sequence (diagram 11) and spec R4 do not show the session hardening.
+- Next: #99 + #98 (tray clarity: duplicate entries, members under their group).
