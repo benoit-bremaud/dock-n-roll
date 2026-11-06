@@ -62,7 +62,7 @@ function serviceEntry(service: ServiceView, actions: TrayActions): MenuEntry {
   ]
   if (service.hasUrl) submenu.push({ label: 'Open in browser', enabled: true, click: () => { actions.openUrl(service.id) } })
   if (service.reason !== null) submenu.push({ label: menuLabel(service.reason), enabled: false })
-  return { label: `${BADGE[service.status]} ${menuLabel(service.displayName)}`, submenu }
+  return { label: `${BADGE[service.status]} ${menuLabel(service.displayName)} — ${menuLabel(service.status)}`, submenu }
 }
 
 /** UC8 / UC9: one entry per group; none while Docker is unavailable, as no control would act. */

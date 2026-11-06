@@ -44,7 +44,7 @@ describe('buildTrayMenu — every action reachable from the menu (spec R5)', () 
     const actions = recordingActions()
     const menu = buildTrayMenu(state({ groups: ['QA'] }), actions)
 
-    expect(labels(menu)).toEqual(['🔴 Blog', '<separator>', 'Groups', '<separator>', 'Open dashboard', 'Quit'])
+    expect(labels(menu)).toEqual(['🔴 Blog — off', '<separator>', 'Groups', '<separator>', 'Open dashboard', 'Quit'])
     const qa = menu[2]?.submenu?.[0]
     expect(qa?.label).toBe('QA')
     expect(qa?.submenu?.map((item) => item.label)).toEqual(['Start all', 'Stop all'])
@@ -62,7 +62,23 @@ describe('buildTrayMenu — every action reachable from the menu (spec R5)', () 
   it('lists each service with its status, then the dashboard and quit entries', () => {
     const menu = buildTrayMenu(state({ services: [view(), view({ id: 'b', displayName: 'SonarQube', status: 'on' })] }), recordingActions())
 
-    expect(labels(menu)).toEqual(['🔴 Blog', '🟢 SonarQube', '<separator>', 'Open dashboard', 'Quit'])
+    expect(labels(menu)).toEqual(['🔴 Blog — off', '🟢 SonarQube — on', '<separator>', 'Open dashboard', 'Quit'])
+  })
+
+  it('includes status text in each service label', () => {
+    const statuses = ['on', 'off', 'starting', 'stopping', 'partial', 'missing', 'conflict', 'invalid'] as const
+    const menu = buildTrayMenu(state({ services: statuses.map((status) => view({ displayName: status, status })) }), recordingActions())
+
+    expect(labels(menu).slice(0, statuses.length)).toEqual([
+      '🟢 on — on',
+      '🔴 off — off',
+      '🟠 starting — starting',
+      '🟠 stopping — stopping',
+      '🟠 partial — partial',
+      '⚪ missing — missing',
+      '⚪ conflict — conflict',
+      '⚪ invalid — invalid'
+    ])
   })
 
   it('offers only the controls the derived status allows, and the URL when there is one', () => {
@@ -84,7 +100,7 @@ describe('buildTrayMenu — every action reachable from the menu (spec R5)', () 
   it('shows the reason of a greyed row as a disabled line', () => {
     const [entry] = buildTrayMenu(state({ services: [view({ status: 'conflict', controls: { start: false, stop: false, restart: false }, reason: 'project name also used by /x' })] }), recordingActions())
 
-    expect(entry?.label).toBe('⚪ Blog')
+    expect(entry?.label).toBe('⚪ Blog — conflict')
     expect(entry?.submenu?.at(-1)).toEqual({ label: 'project name also used by /x', enabled: false })
   })
 
@@ -139,7 +155,7 @@ describe('menuLabel — text from Docker labels, pins and stderr is untrusted', 
       state({ services: [view({ displayName: 'R&D', reason: 'line 1\nline 2' })] }),
       recordingActions()
     )
-    expect(menu[0]?.label).toBe('🔴 R&&D')
+    expect(menu[0]?.label).toBe('🔴 R&&D — off')
     expect(menu[0]?.submenu?.at(-1)?.label).toBe('line 1 line 2')
     expect(buildTrayMenu(state({ dockerAvailable: false, dockerReason: 'a\nb' }), recordingActions())[0]?.label).toBe('Docker unavailable: a b')
   })
