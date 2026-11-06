@@ -19,6 +19,7 @@ import { appIconPath, trayIconPath } from './controller/resources'
 import { buildTrayMenu, type MenuEntry } from './controller/tray-menu'
 import { pushLogsTo, pushStateTo, registerIpc } from './ipc'
 import { showNotification } from './notifier'
+import { DASHBOARD_WEB_PREFERENCES, hardenSession } from './session-hardening'
 import { isTrustedSender, type DashboardOrigin } from './trusted-sender'
 import type { ControllerState } from '../shared/ipc'
 
@@ -51,10 +52,8 @@ function createDashboard(): BrowserWindow {
     autoHideMenuBar: true,
     icon: appIconPath({ isPackaged: app.isPackaged, resourcesPath: process.resourcesPath, mainDir: __dirname }),
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      sandbox: true,
-      nodeIntegration: false
+      ...DASHBOARD_WEB_PREFERENCES,
+      preload: join(__dirname, '../preload/index.js')
     }
   })
 
@@ -243,11 +242,7 @@ if (app.requestSingleInstanceLock()) {
   // A tray app keeps running with no window open.
   app.on('window-all-closed', () => undefined)
   void app.whenReady().then(async () => {
-    // The dashboard needs no browser permission (camera, notifications, ...): deny them all.
-    session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
-      callback(false)
-    })
-    session.defaultSession.setPermissionCheckHandler(() => false)
+    hardenSession(session.defaultSession)
     if (DASHBOARD_ORIGIN.kind === 'app') protocol.handle(APP_SCHEME, createAppProtocolHandler(RENDERER_DIR, readFile))
     // A hidden default menu still opens with Alt (Reload, Toggle DevTools): remove it in builds.
     if (app.isPackaged) {

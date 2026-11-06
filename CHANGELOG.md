@@ -21,6 +21,8 @@ file format (`services.yaml`) and the installed package.
 - Pin file: the size-cap error reads in KiB, like ADR-0005 (#21).
 - A missing project now names what is gone: `folder "/srv/x" is missing` or
   `compose file "/srv/x/compose.yaml" is missing` (#12); paths in reasons are quoted, spaces included.
+- Privacy: the app no longer downloads a spellcheck dictionary from a Google host on launch; the
+  Chromium spellchecker is turned off and its languages cleared, so nothing leaves the machine (#95).
 
 ### Changed
 
