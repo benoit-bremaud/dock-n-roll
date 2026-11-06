@@ -559,3 +559,21 @@ Sensitivity: C and A stay top two and G last under value 45 or effort 35; E pass
 - Gate: 636 tests, Sonar OK (new coverage 97.7 %), gitleaks clean, CI 4/4, smoke + packaged QA under
   Xvfb, Codex no finding; Copilot 422 waived by owner. Merge `2446d1f`, closes #99.
 - Owner removed the temporary "HappiHub (worktree)" pin (now a refused duplicate).
+
+## 2026-11-06 — #98: the list is laid out by group (PR #109), tray clarity brick closed
+
+- Owner MCDA A 480 (vs flat headers 355, submenus + Groups menu 350): tray gets one submenu per
+  group (`HappiHub — 2 of 3 on`, Start all / Stop all, members), a separator, then the ungrouped
+  services; dashboard gets one collapsible section per group (open by default). The separate
+  Groups submenu / menu are gone. A service in several groups is listed under each, its buttons
+  named per section ("Logs of Web, in QA"), its logs panel keyed by section.
+- `ServiceView.groups` added; `src/shared/groups.ts` holds `membersOf`, `ungrouped` and the single
+  `n of m on` rule (`runningSummary`, moved from the renderer). Diagrams groups 01/03, launcher
+  07/09, spec UC8, README, CHANGELOG (#77 entry, still unreleased) updated.
+- Review: adversarial 3 rounds (round 2 found a stale diagram 09 Must, fixed); combined review 4
+  Should fixed (count hidden while Docker is down, per-section button names, diagrams).
+  Nice deferred to #110.
+- Gate: 642 tests, coverage 97.3 / 92.74 / 98.59 % lines, Sonar OK (new coverage 97.8 %), gitleaks
+  clean, CI 4/4, smoke + packaged QA under Xvfb, Codex no finding; Copilot 422 waived by owner.
+  Merge `ef3fc20`, closes #98.
+- Next: #85, then #84.
