@@ -17,9 +17,11 @@ flowchart TB
   subgraph Renderer ["src/renderer/src"]
     Root["Root — explains a missing preload API"]
     App["App — header summary, tabs Services / Running (WAI-ARIA tabs)"]
-    Format["format.ts — shortenPath, runningSummary (pure)"]
+    Format["format.ts — shortenPath, shortenReason, isFollowing (pure)"]
+    GroupsView["shared/groups.ts — membersOf, ungrouped, runningSummary, groupSummary (pure)"]
     Hook["useControllerState(api) — subscribe, then getState"]
     Banners["Banners — Docker unavailable, pin-file errors"]
+    Group["GroupSection — collapsible, summary, Start all / Stop all, member rows (#98)"]
     Row["ServiceRow — badge, name, dir, reason, Start / Stop / Restart / Logs / Open"]
     LogPanel["LogPanel — container picker, pre of lines, Reopen"]
     Running["RunningTab — containers and ports, refresh"]
@@ -30,9 +32,13 @@ flowchart TB
   Root --> App
   App --> Hook
   App --> Banners
-  App -->|"services.map"| Row
+  App -->|"one per group"| Group
+  Group --> Row
+  Group -->|"startGroup(name) / stopGroup(name)"| Api
+  App -->|"ungrouped services"| Row
   App --> Running
-  App --> Format
+  App --> GroupsView
+  Group --> GroupsView
   Row --> Format
   Hook --> Api
   Row -->|"start(id) / stop(id) / openUrl(id)"| Api
@@ -53,6 +59,10 @@ flowchart TB
 │ Docker unavailable: connect ENOENT /var/run/docker.sock       │  ← banner, only when down
 │ services.yaml: bad indentation at line 3                      │  ← banner, pin-file errors
 │                                                               │
+│ ▾ HappiHub   1 of 2 on                                        │  ← one section per group (#98)
+│   [Start all] [Stop all]                                      │
+│   │ ● API                    ~/…/happihub        [Stop]       │  ← member rows, indented
+│   │ ● Web                    ~/…/happihub-web    [Start]      │
 │ ● projet-ind-2-inscription   ~/…/docker-mysql      [Stop]     │  green
 │ ● happihub-docker-audit      ~/…/happihub          [Start]    │  red
 │ ● SonarQube                  ~/…/sonarqube-stack   (greyed)   │  grey
@@ -70,6 +80,9 @@ flowchart TB
 - **`useControllerState`** subscribes with `onStateChanged` **before** calling `getState`
   (contract of `DockNRollApi`); a push always wins over the initial read, also across a
   StrictMode re-run; a failed read shows an alert; it unsubscribes on unmount.
+- **Groups** (#98): one open `<details>` per group, then the ungrouped rows; a service of two
+  groups is listed under each, its buttons named per section ("Logs of Web, in QA") and its
+  logs panel keyed by section. The group count is hidden while Docker is down.
 - **Docker unavailable**: rows are greyed without badge or status word (spec §4) — the last
   known status may be wrong; every control is already off in the pushed state.
 - **Banners**: one `role="alert"` region stays mounted, so an unchanged message is not announced

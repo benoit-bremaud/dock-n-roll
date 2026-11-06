@@ -40,4 +40,6 @@ flowchart LR
   UC2 once per member that can stop. Members are run in parallel, best effort: one failure
   does not cancel the others, and each failure shows on its own row as today (MCDA A).
 - A group with no member present in the list (all dirs missing) offers no action.
+- Since #98, Start all / Stop all sit on the group's own tray submenu and dashboard section,
+  above its members; there is no separate Groups menu.
 - #41 "stop all" is UC9 on the implicit group of every service; it reuses the same flow.

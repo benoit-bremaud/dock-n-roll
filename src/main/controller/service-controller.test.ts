@@ -244,7 +244,7 @@ describe('createServiceController — one way in, one way out (diagram 07)', () 
 
   it('derives the rows from the Docker snapshot and the pins', async () => {
     const { f, controller, row } = await controllerWith((setup) => {
-      setup.setInitialPins([pin({ workingDir: '/srv/blog', name: 'Blog', url: 'http://localhost:8086/' })])
+      setup.setInitialPins([pin({ workingDir: '/srv/blog', name: 'Blog', url: 'http://localhost:8086/', groups: ['QA'] })])
     })
     f.snapshot([web])
     await settle()
@@ -257,7 +257,8 @@ describe('createServiceController — one way in, one way out (diagram 07)', () 
       status: 'on',
       controls: { start: false, stop: true, restart: true },
       hasUrl: true,
-      reason: null
+      reason: null,
+      groups: ['QA']
     })
   })
 

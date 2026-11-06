@@ -100,8 +100,8 @@ async function main() {
     console.log('ok - React root renders')
     const state = await page.evaluate(() => window.dockNRoll.getState().then(() => 'answered'))
     check(state === 'answered', 'window.dockNRoll.getState() answers (Docker may be unavailable)')
-    await page.getByText('Groups', { exact: true }).waitFor({ timeout: TIMEOUT_MS })
-    console.log('ok - the pin file group shows a Groups menu')
+    await page.locator('details.group', { hasText: 'QA' }).locator('.service').first().waitFor({ timeout: TIMEOUT_MS })
+    console.log('ok - the pin file group shows as a section holding its member (#98)')
     // Checked before the 404 probe, which Chromium logs as a failed resource.
     check(errors.length === 0, `no console or CSP error${errors.length ? `: ${errors.join(' | ')}` : ''}`)
     const statusOf = (url) => page.evaluate((target) => fetch(target).then((response) => response.status), url)

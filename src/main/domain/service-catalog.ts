@@ -94,9 +94,9 @@ export function buildServices(
   const otherDirs = (name: string | null, dir: string): string[] =>
     name === null ? [] : (dirsByName.get(name) ?? []).filter((other) => other !== dir)
   // A never-started pin would run `up` under its own project name, or the one Compose derives
-  // (only a pin without `project` can be flagged: a pin naming a discovered project attaches to it)
   // from its dir: if that name is already used by another dir, `up` would take over its
   // containers. Only the pin is flagged — it must never block the running project's Stop.
+  // Only a pin without `project` can be flagged: a pin naming a discovered project attaches to it.
   // The name comes from the pin, else from what Compose resolves (compose file `name:`, spec
   // §10 P1), else from the dir name Compose falls back to.
   const effectiveName = (pin: PinEntry): string | null =>

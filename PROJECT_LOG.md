@@ -543,3 +543,19 @@ Sensitivity: C and A stay top two and G last under value 45 or effort 35; E pass
   owner waived it at the merge question. Merge `e3bfaad`, closes #95.
 - Open Nice filed as #106: startup sequence (diagram 11) and spec R4 do not show the session hardening.
 - Next: #99 + #98 (tray clarity: duplicate entries, members under their group).
+
+## 2026-11-06 — #99: a pin naming a project follows it in any dir (PR #108), breaking
+
+- Need: one compose project started from several dirs (git worktree, second clone) showed twice in
+  the tray — the pin `off` and an unpinned running copy (HappiHub, iadaf-ydays).
+- Owner MCDA: A — a pin with `project` covers that project whatever dir runs it (450) vs opt-in
+  `anyDir` key (445) vs git-worktree detection (335). ADR-0003 amended; spec §8, class diagram 05,
+  README updated. `findPin`: the pin naming the project, else the dir-only pin of its dir; the pin
+  file refuses a second entry naming the same project (owner choice after review).
+- Adversarial review round 1: 3 Must — breaking change unmarked (owner MCDA A 460: `feat(pins)!` +
+  `BREAKING CHANGE:` footer + CHANGELOG migration; next release 2.0.0), false "Start runs while
+  nothing runs" wording (a stopped copy keeps the row on its dir until `docker compose down`), stale
+  never-started conflict rule copies. Round 2: push gate open, 2 cosmetic Nice folded into #98.
+- Gate: 636 tests, Sonar OK (new coverage 97.7 %), gitleaks clean, CI 4/4, smoke + packaged QA under
+  Xvfb, Codex no finding; Copilot 422 waived by owner. Merge `2446d1f`, closes #99.
+- Owner removed the temporary "HappiHub (worktree)" pin (now a refused duplicate).

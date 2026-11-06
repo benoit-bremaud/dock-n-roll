@@ -14,6 +14,8 @@ export interface ServiceView {
   readonly hasUrl: boolean
   /** What the row must explain: invalid labels, conflict, missing folder or last failed command. */
   readonly reason: string | null
+  /** The pin's groups (issue #77), empty without one: the list is laid out by group (#98). */
+  readonly groups: readonly string[]
 }
 
 export interface ControllerState {

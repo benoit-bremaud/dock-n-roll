@@ -167,8 +167,8 @@ Primary actor for all: **Developer**. Supporting actor: **Docker Engine**.
 ### UC8 — Start a group / UC9 — Stop a group (#77)
 
 - **Precondition**: at least one listed service declares the group in the pin file (`groups`, §8).
-- **Main success scenario**: Developer chooses Start all (Stop all) on a group, from the tray's
-  Groups submenu or the dashboard's Groups menu → system runs UC1 (UC2) on every listed member,
+- **Main success scenario**: Developer chooses Start all (Stop all) on a group, from the group's tray
+  submenu or its dashboard section (#98: the list is laid out by group) → system runs UC1 (UC2) on every listed member,
   in parallel; members that cannot start (stop) are skipped. Diagrams `groups/01`, `groups/02`.
 - **Extensions**: a member fails → its error shows on its own row as in UC1 3a, the others carry
   on; Docker unavailable → no group control (tray) or disabled ones (dashboard).

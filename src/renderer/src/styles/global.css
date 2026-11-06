@@ -29,42 +29,43 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* UC8 / UC9: closed by default, it opens over the list instead of pushing it down. */
-.groups {
-  position: relative;
+/* UC8 / UC9, #98: one section per group, its members indented under its summary. */
+.group {
+  margin-bottom: var(--space-3);
 }
 
-.groups > summary {
+.group__summary {
+  display: flex;
+  gap: var(--space-3);
   cursor: pointer;
+  font-weight: 600;
+}
+
+/* `display: flex` drops the native marker: draw it, so the section reads as collapsible. */
+.group__summary::before {
+  content: '▾';
   color: var(--color-muted);
 }
 
-.groups__list {
-  position: absolute;
-  right: 0;
-  z-index: 1;
-  margin: var(--space-2) 0 0;
-  padding: var(--space-3);
-  list-style: none;
-  background: var(--color-bg);
-  border: var(--divider);
-  border-radius: var(--radius);
+.group:not([open]) > .group__summary::before {
+  content: '▸';
 }
 
-.groups__item {
+.group__count {
+  color: var(--color-muted);
+  font-weight: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.group__actions {
   display: flex;
-  align-items: center;
   gap: var(--space-2);
-  white-space: nowrap;
+  margin: var(--space-2) 0;
 }
 
-.groups__item + .groups__item {
-  margin-top: var(--space-2);
-}
-
-.groups__name {
-  margin-right: auto;
-  padding-right: var(--space-3);
+.group > .services {
+  padding-left: var(--space-3);
+  border-left: var(--divider);
 }
 
 .app__empty {

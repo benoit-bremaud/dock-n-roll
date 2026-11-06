@@ -31,7 +31,7 @@ extracted archive, so run `sudo apt install ./dock-n-roll_*_amd64.deb` from that
 > login** is ticked the app runs at every login.
 
 Launch **dock-n-roll** from the app grid (press the Super key and type its name). The icon shows
-up in the top bar; its menu lists one entry per project (🟢 ON, 🔴 OFF, 🟠 starting, stopping or
+up in the top bar; its menu lists one submenu per group (see below), then one entry per other project (🟢 ON, 🔴 OFF, 🟠 starting, stopping or
 partial, ⚪ unusable) with Start/Stop/Restart, then **Open dashboard**, **Start at login** and **Quit**. In the dashboard, **Logs** shows the live logs of a service. Projects are discovered from the containers Docker knows about; pin the others (below).
 
 ## Uninstall
@@ -65,9 +65,11 @@ services:
     name: Some app (QA)
 ```
 
-Every entry sharing a group name can be started or stopped in one action, from the tray's
-**Groups** submenu or the dashboard's **Groups** menu (shown only once a group exists). Members
-run in parallel; one that fails shows its error on its own row and the others carry on.
+Entries sharing a group name are listed together: the tray shows one submenu per group
+(`HappiHub — 2 of 3 on`) holding **Start all**, **Stop all** and its members, and the dashboard
+one collapsible section per group; ungrouped projects follow. An entry in several groups is
+listed under each. Members run in parallel; one that fails shows its error on its own row and
+the others carry on.
 
 Invalid entries are skipped and the problem is shown in the dashboard; invalid YAML or a file over
 64 KiB keeps the last valid pins. Full rules: [spec §8](docs/architecture/specs/v1-spec.md#8-pin-file--format-sketch).

@@ -207,6 +207,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
       status,
       controls,
       hasUrl: service.pin?.url !== undefined,
+      groups: service.pin?.groups ?? [],
       reason: reasonOf(service, inputs)
     }
   }

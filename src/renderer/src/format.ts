@@ -1,7 +1,3 @@
-import type { ServiceView } from '../../shared/ipc'
-
-type ServiceStatus = ServiceView['status']
-
 /** `/home/u/x` → `~/x`. Only a whole home folder is replaced, never a prefix of another name. */
 export function shortenPath(path: string, homeDir: string): string {
   let end = homeDir.length
@@ -40,13 +36,6 @@ const REASON_PATH = /"(\/[^"]*)"|(?<![\w:/.~-])(\/[^\s"'`),;\]]*[^\s"'`),;:.!?\]
 export function shortenReason(reason: string, homeDir: string): string {
   const shorten = (path: string): string => middleEllipsis(shortenPath(path, homeDir), REASON_PATH_MAX)
   return reason.replaceAll(REASON_PATH, (_match, quoted: string | undefined, bare: string) => (quoted === undefined ? shorten(bare) : `"${shorten(quoted)}"`))
-}
-
-/** Header line, e.g. "2 of 4 on"; `null` when there is nothing to count. */
-export function runningSummary(statuses: readonly ServiceStatus[]): string | null {
-  if (statuses.length === 0) return null
-  const on = statuses.filter((status) => status === 'on').length
-  return `${String(on)} of ${String(statuses.length)} on`
 }
 
 /** How close to the bottom (px) still counts as following the logs: new lines then scroll into view. */

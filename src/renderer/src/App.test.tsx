@@ -12,6 +12,7 @@ function view(overrides: Partial<ServiceView> = {}): ServiceView {
     status: 'off',
     controls: { start: true, stop: false, restart: false },
     hasUrl: false,
+    groups: [],
     reason: null,
     ...overrides
   }
@@ -436,51 +437,82 @@ describe('App — running tab (UC4)', () => {
   })
 })
 
-describe('App — groups (UC8, UC9, groups diagram 01)', () => {
-  it('shows no group control when no group exists', async () => {
+describe('App — list by group (UC8, UC9, #98)', () => {
+  const grouped = (): ControllerState =>
+    state({
+      services: [
+        view({ id: 'a', displayName: 'API', status: 'on', groups: ['HappiHub'] }),
+        view({ id: 'w', displayName: 'Web', groups: ['HappiHub', 'QA'] }),
+        view()
+      ],
+      groups: ['HappiHub', 'QA']
+    })
+
+  it('shows no group section when no group exists', async () => {
     render(<App api={fakeApi(state()).api} />)
     await rowOf('Blog')
 
-    expect(screen.queryByText('Groups')).toBeNull()
+    expect(document.querySelector('.group')).toBeNull()
   })
 
-  it('reveals Start all / Stop all per group behind one Groups disclosure, and sends the name', async () => {
-    const fake = fakeApi(state({ groups: ['QA', 'demo'] }))
+  it('lists the members under an open section per group, with its summary, and the ungrouped rows after', async () => {
+    render(<App api={fakeApi(grouped()).api} />)
+    await rowOf('Blog')
+
+    const sections = [...document.querySelectorAll<HTMLDetailsElement>('details.group')]
+    expect(sections.map((section) => section.querySelector('.group__name')?.textContent)).toEqual(['HappiHub', 'QA'])
+    expect(sections.map((section) => section.querySelector('.group__count')?.textContent)).toEqual(['1 of 2 on', '0 of 1 on'])
+    expect(sections.every((section) => section.open)).toBe(true)
+    expect(sections.map((section) => [...section.querySelectorAll('.service__name')].map((name) => name.textContent))).toEqual([['API', 'Web'], ['Web']])
+    expect(document.querySelector('.services--ungrouped')?.textContent).toContain('Blog')
+  })
+
+  it('keeps a section the user collapsed closed when the next state arrives', async () => {
+    const fake = fakeApi(grouped())
+    render(<App api={fake.api} />)
+    await rowOf('Blog')
+    const section = document.querySelector<HTMLDetailsElement>('details.group')
+    if (section === null) throw new Error('no group section')
+
+    section.open = false
+    act(() => {
+      fake.push({ ...grouped(), services: grouped().services.map((service) => ({ ...service, status: 'on' as const })) })
+    })
+
+    expect(section.open).toBe(false)
+    expect(section.querySelector('.group__count')?.textContent).toBe('2 of 2 on')
+  })
+
+  it('sends Start all / Stop all with the group name', async () => {
+    const fake = fakeApi(grouped())
     render(<App api={fake.api} />)
     const user = userEvent.setup()
-    await user.click(await screen.findByText('Groups'))
+    await rowOf('Blog')
 
-    await user.click(button('Start all QA'))
-    await user.click(button('Stop all demo'))
+    await user.click(button('Start all HappiHub'))
+    await user.click(button('Stop all QA'))
 
-    expect(fake.calls.filter((call) => call.includes('Group'))).toEqual(['startGroup QA', 'stopGroup demo'])
+    expect(fake.calls.filter((call) => call.includes('Group'))).toEqual(['startGroup HappiHub', 'stopGroup QA'])
   })
 
-  it('closes the open Groups menu on Escape and on a click outside it, as it covers the list', async () => {
-    render(<App api={fakeApi(state({ groups: ['QA'] })).api} />)
+  it('opens the logs of a service listed twice under one group only', async () => {
+    render(<App api={fakeApi(grouped()).api} />)
     const user = userEvent.setup()
-    const summary = await screen.findByText('Groups')
-    const menu = summary.closest('details')
+    await rowOf('Blog')
 
-    await user.click(summary)
-    await user.keyboard('{Escape}')
-    expect(menu?.open).toBe(false)
+    await user.click(button('Logs of Web, in HappiHub'))
 
-    await user.click(summary)
-    await user.click(await screen.findByText('Blog'))
-    expect(menu?.open).toBe(false)
-
-    await user.click(summary)
-    await user.click(button('Start all QA'))
-    expect(menu?.open).toBe(true)
+    expect(button('Logs of Web, in HappiHub').getAttribute('aria-expanded')).toBe('true')
+    expect(button('Logs of Web, in QA').getAttribute('aria-expanded')).toBe('false')
   })
 
   it('disables group controls while Docker is unavailable', async () => {
-    render(<App api={fakeApi(state({ groups: ['QA'], dockerAvailable: false, dockerReason: 'down' })).api} />)
-    await userEvent.setup().click(await screen.findByText('Groups'))
+    render(<App api={fakeApi({ ...grouped(), dockerAvailable: false, dockerReason: 'down' }).api} />)
+    await rowOf('Blog')
 
-    expect(button('Start all QA').disabled).toBe(true)
-    expect(button('Stop all QA').disabled).toBe(true)
+    expect(button('Start all HappiHub').disabled).toBe(true)
+    expect(button('Stop all HappiHub').disabled).toBe(true)
+    expect(document.querySelector('.group__count')).toBeNull()
   })
 })
 
