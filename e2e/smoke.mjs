@@ -113,7 +113,10 @@ async function main() {
     await delay(DICTIONARY_WAIT_MS)
     await stop(second)
     await stop(first)
-    check(!GOOGLE_DICTIONARY_HOSTS.test(await readFile(netLog, 'utf8')), 'no request to a Google dictionary host (#95)')
+    // A log cut short by an unclean exit is not valid JSON: it must not pass as a clean one.
+    const log = await readFile(netLog, 'utf8')
+    check(Array.isArray(JSON.parse(log).events), 'the net log was flushed on exit')
+    check(!GOOGLE_DICTIONARY_HOSTS.test(log), 'no request to a Google dictionary host (#95)')
   } finally {
     await browser?.close().catch(() => undefined)
     // The app writes to its config dir until it exits: remove it afterwards.
