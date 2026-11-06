@@ -1,7 +1,7 @@
 // E2E smoke of the packaged app (ADR-0010, diagram 10): run under a display, e.g. `xvfb-run -a pnpm e2e:smoke`.
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { readdirSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -108,8 +108,9 @@ async function main() {
     check((await statusOf(TRAVERSAL_URL)) === 404, `${TRAVERSAL_URL} answers 404`)
     // Chromium fetched its spellcheck dictionary from a Google host about 3 s after launch (#95).
     await delay(DICTIONARY_WAIT_MS)
-    // Chromium creates the Dictionaries folder anyway: only a .bdic file inside it is a download.
-    const dictionaries = readdirSync(join(configHome, 'dock-n-roll', 'Dictionaries'), { recursive: true }).map(String)
+    // Chromium may create an empty Dictionaries folder: only a .bdic file inside it is a download.
+    const dictionaryDir = join(configHome, 'dock-n-roll', 'Dictionaries')
+    const dictionaries = existsSync(dictionaryDir) ? readdirSync(dictionaryDir, { recursive: true }).map(String) : []
     check(!dictionaries.some((name) => name.endsWith('.bdic')), 'no spellcheck dictionary downloaded (#95)')
   } finally {
     await browser?.close().catch(() => undefined)
