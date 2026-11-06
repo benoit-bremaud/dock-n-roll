@@ -65,9 +65,11 @@ services:
     name: Some app (QA)
 ```
 
-Every entry sharing a group name can be started or stopped in one action, from the tray's
-**Groups** submenu or the dashboard's **Groups** menu (shown only once a group exists). Members
-run in parallel; one that fails shows its error on its own row and the others carry on.
+Entries sharing a group name are listed together: the tray shows one submenu per group
+(`HappiHub — 2 of 3 on`) holding **Start all**, **Stop all** and its members, and the dashboard
+one collapsible section per group; ungrouped projects follow. An entry in several groups is
+listed under each. Members run in parallel; one that fails shows its error on its own row and
+the others carry on.
 
 Invalid entries are skipped and the problem is shown in the dashboard; invalid YAML or a file over
 64 KiB keeps the last valid pins. Full rules: [spec §8](docs/architecture/specs/v1-spec.md#8-pin-file--format-sketch).

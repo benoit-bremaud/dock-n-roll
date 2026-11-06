@@ -1,9 +1,10 @@
 import { useRef, useState, type KeyboardEvent } from 'react'
-import type { ControllerState, DockNRollApi } from '../../shared/ipc'
+import type { ControllerState, DockNRollApi, ServiceView } from '../../shared/ipc'
 import { Banners } from './components/Banners'
-import { GroupsMenu } from './components/GroupsMenu'
+import { GroupSection } from './components/GroupSection'
 import { RunningTab } from './components/RunningTab'
 import { ServiceRow } from './components/ServiceRow'
+import { membersOf, ungrouped } from '../../shared/groups'
 import { runningSummary } from './format'
 import { useControllerState } from './useControllerState'
 
@@ -14,7 +15,11 @@ const TABS = [
 
 type Tab = (typeof TABS)[number]['key']
 
-/** Services tab: a wait (nothing if the first read failed: the banner says it), an empty list, or one row per service. */
+/**
+ * Services tab: a wait (nothing if the first read failed: the banner says it), an empty list, or
+ * one section per group then the ungrouped rows (#98). A service of several groups is listed
+ * under each, so its logs panel is keyed by section too: only the clicked copy opens.
+ */
 function ServicesPanel({
   state,
   error,
@@ -26,27 +31,41 @@ function ServicesPanel({
   readonly error: string | null
   readonly api: DockNRollApi
   readonly logsFor: string | null
-  readonly onToggleLogs: (id: string) => void
+  readonly onToggleLogs: (key: string) => void
 }): React.ReactNode {
   // Before the first state: a short wait, said once to assistive tech. A read error is the banner.
   if (state === null) return error === null ? <output className="app__empty">Loading…</output> : null
   if (state.services.length === 0) return <p className="app__empty">No Compose project found.</p>
-  return (
-    <ul className="services">
-      {state.services.map((service) => (
+  const rows = (services: readonly ServiceView[], section: string): React.ReactNode =>
+    services.map((service) => {
+      const key = `${section}\0${service.id}`
+      return (
         <ServiceRow
           key={service.id}
           service={service}
           api={api}
           dockerAvailable={state.dockerAvailable}
           homeDir={state.homeDir}
-          logsOpen={logsFor === service.id}
+          logsOpen={logsFor === key}
           onToggleLogs={() => {
-            onToggleLogs(service.id)
+            onToggleLogs(key)
           }}
         />
-      ))}
-    </ul>
+      )
+    })
+  const others = ungrouped(state.services)
+  return (
+    <>
+      {state.groups.map((name) => {
+        const members = membersOf(state.services, name)
+        return (
+          <GroupSection key={name} name={name} members={members} dockerAvailable={state.dockerAvailable} api={api}>
+            {rows(members, name)}
+          </GroupSection>
+        )
+      })}
+      {others.length > 0 && <ul className="services services--ungrouped">{rows(others, '')}</ul>}
+    </>
   )
 }
 
@@ -78,7 +97,6 @@ export function App({ api }: { readonly api: DockNRollApi }): React.JSX.Element 
         <h1 className="app__title">dock-n-roll</h1>
         {/* Hidden while Docker is down: the last known statuses may be wrong (spec §4). */}
         {summary !== null && <p className="app__summary">{summary}</p>}
-        {state !== null && <GroupsMenu groups={state.groups} dockerAvailable={state.dockerAvailable} api={api} />}
       </header>
       <div role="tablist" aria-label="Views" className="tabs">
         {TABS.map((candidate, index) => (
@@ -110,8 +128,8 @@ export function App({ api }: { readonly api: DockNRollApi }): React.JSX.Element 
             error={error}
             api={api}
             logsFor={logsFor}
-            onToggleLogs={(id) => {
-              setLogsFor((open) => (open === id ? null : id))
+            onToggleLogs={(key) => {
+              setLogsFor((open) => (open === key ? null : key))
             }}
           />
         )}

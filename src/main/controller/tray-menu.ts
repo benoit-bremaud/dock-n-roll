@@ -1,4 +1,5 @@
 import type { ServiceStatus } from '../domain/types'
+import { groupSummary, membersOf, ungrouped } from '../../shared/groups'
 import type { ControllerState, ServiceView } from '../../shared/ipc'
 
 /** Subset of Electron's `MenuItemConstructorOptions`, kept Electron-free so it is unit-tested. */
@@ -65,17 +66,24 @@ function serviceEntry(service: ServiceView, actions: TrayActions): MenuEntry {
   return { label: `${BADGE[service.status]} ${menuLabel(service.displayName)} — ${menuLabel(service.status)}`, submenu }
 }
 
-/** UC8 / UC9: one entry per group; none while Docker is unavailable, as no control would act. */
-function groupEntries(state: ControllerState, actions: TrayActions): MenuEntry[] {
-  if (!state.dockerAvailable || state.groups.length === 0) return []
-  const submenu = state.groups.map((name) => ({
-    label: menuLabel(name),
-    submenu: [
-      { label: 'Start all', click: () => { actions.startGroup(name) } },
-      { label: 'Stop all', click: () => { actions.stopGroup(name) } }
-    ]
-  }))
-  return [{ type: 'separator' }, { label: 'Groups', submenu }]
+/**
+ * UC8 / UC9, #98: one submenu per group — its summary, Start all / Stop all, then its members —
+ * followed by the ungrouped services. A service of several groups is listed under each.
+ */
+function serviceEntries(state: ControllerState, actions: TrayActions): MenuEntry[] {
+  const groups = state.groups.map((name) => {
+    const members = membersOf(state.services, name)
+    return {
+      label: `${menuLabel(name)} — ${groupSummary(members)}`,
+      submenu: [
+        { label: 'Start all', click: () => { actions.startGroup(name) } },
+        { label: 'Stop all', click: () => { actions.stopGroup(name) } },
+        { type: 'separator' as const },
+        ...members.map((service) => serviceEntry(service, actions))
+      ]
+    }
+  })
+  return [...groups, ...ungrouped(state.services).map((service) => serviceEntry(service, actions))]
 }
 
 /**
@@ -90,11 +98,10 @@ export function buildTrayMenu(state: ControllerState, actions: TrayActions, opti
   } else if (state.services.length === 0) {
     head = [{ label: 'No Compose project found', enabled: false }]
   } else {
-    head = state.services.map((service) => serviceEntry(service, actions))
+    head = serviceEntries(state, actions)
   }
   return [
     ...head,
-    ...groupEntries(state, actions),
     { type: 'separator' },
     { label: 'Open dashboard', click: () => { actions.openDashboard() } },
     ...(options.autostart === undefined

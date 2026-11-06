@@ -12,6 +12,7 @@ function view(overrides: Partial<ServiceView> = {}): ServiceView {
     status: 'off',
     controls: { start: true, stop: false, restart: false },
     hasUrl: false,
+    groups: [],
     reason: null,
     ...overrides
   }
@@ -40,23 +41,34 @@ function recordingActions(): TrayActions & { calls: string[] } {
 const labels = (entries: readonly MenuEntry[]): string[] => entries.map((entry) => entry.label ?? `<${entry.type ?? '?'}>`)
 
 describe('buildTrayMenu — every action reachable from the menu (spec R5)', () => {
-  it('adds a Groups submenu with Start and Stop per group, only when a group exists (UC8, UC9)', () => {
+  it('lists each group as a submenu with its summary, Start all / Stop all and its members, then the ungrouped services (#98)', () => {
     const actions = recordingActions()
-    const menu = buildTrayMenu(state({ groups: ['QA'] }), actions)
+    const services = [
+      view({ id: 'a', displayName: 'API', status: 'on', groups: ['HappiHub'] }),
+      view({ id: 'w', displayName: 'Web', groups: ['HappiHub'] }),
+      view()
+    ]
+    const menu = buildTrayMenu(state({ services, groups: ['HappiHub'] }), actions)
 
-    expect(labels(menu)).toEqual(['🔴 Blog — off', '<separator>', 'Groups', '<separator>', 'Open dashboard', 'Quit'])
-    const qa = menu[2]?.submenu?.[0]
-    expect(qa?.label).toBe('QA')
-    expect(qa?.submenu?.map((item) => item.label)).toEqual(['Start all', 'Stop all'])
-    qa?.submenu?.[0]?.click?.()
-    qa?.submenu?.[1]?.click?.()
-    expect(actions.calls).toEqual(['start group QA', 'stop group QA'])
+    expect(labels(menu)).toEqual(['HappiHub — 1 of 2 on', '🔴 Blog — off', '<separator>', 'Open dashboard', 'Quit'])
+    const group = menu[0]?.submenu ?? []
+    expect(labels(group)).toEqual(['Start all', 'Stop all', '<separator>', '🟢 API — on', '🔴 Web — off'])
+    group[0]?.click?.()
+    group[1]?.click?.()
+    group[4]?.submenu?.[0]?.click?.()
+    expect(actions.calls).toEqual(['start group HappiHub', 'stop group HappiHub', 'start w'])
+  })
+
+  it('lists a service of several groups under each of them (#98)', () => {
+    const menu = buildTrayMenu(state({ services: [view({ groups: ['A', 'B'] })], groups: ['A', 'B'] }), recordingActions())
+
+    expect(labels(menu)).toEqual(['A — 0 of 1 on', 'B — 0 of 1 on', '<separator>', 'Open dashboard', 'Quit'])
   })
 
   it('offers no group entry while Docker is unavailable', () => {
-    const menu = buildTrayMenu(state({ groups: ['QA'], dockerAvailable: false }), recordingActions())
+    const menu = buildTrayMenu(state({ services: [view({ groups: ['QA'] })], groups: ['QA'], dockerAvailable: false }), recordingActions())
 
-    expect(labels(menu)).not.toContain('Groups')
+    expect(labels(menu).some((label) => label.startsWith('QA'))).toBe(false)
   })
 
   it('lists each service with its status, then the dashboard and quit entries', () => {
