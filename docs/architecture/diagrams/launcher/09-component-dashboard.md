@@ -21,6 +21,8 @@ flowchart TB
     GroupsView["shared/groups.ts — membersOf, ungrouped, runningSummary, groupSummary (pure)"]
     Hook["useControllerState(api) — subscribe, then getState"]
     Banners["Banners — Docker unavailable, pin-file errors"]
+    Announcer["FailureAnnouncer — one polite status region, one line per failed service (#85)"]
+    FailureView["shared/failure.ts — failedLabel, lastLine (pure)"]
     Group["GroupSection — collapsible, summary, Start all / Stop all, member rows (#98)"]
     Row["ServiceRow — badge, name, dir, reason, failure, Start / Stop / Restart / Logs / Open"]
     LogPanel["LogPanel — container picker, pre of lines, Reopen"]
@@ -32,6 +34,9 @@ flowchart TB
   Root --> App
   App --> Hook
   App --> Banners
+  App --> Announcer
+  Announcer --> FailureView
+  Row --> FailureView
   App -->|"one per group"| Group
   Group --> Row
   Group -->|"startGroup(name) / stopGroup(name)"| Api
@@ -69,7 +74,7 @@ flowchart TB
 │     project name also used by ~/…/dev-infra/sonarqube         │  ← reason line
 │ ● Shop              ~/…/shop                       [Start]    │  red
 │     Start failed: Container shop-app-1 Waiting                │  ← failure, error colour,
-│     container shop-app-1 exited (3)                           │    role=status (#85)
+│     container shop-app-1 exited (3)                           │    announced by FailureAnnouncer (#85)
 │ ● Blog              ~/…/blog   [Stop] [Restart] [Logs] [Open ↗]│  orange while starting
 │   ┌ Logs — app-web-1 ▾ ──────────────────────────────────────┐ │  ← one panel at a time
 │   │ listening on :3000                                        │ │  ← text only, last 500 lines

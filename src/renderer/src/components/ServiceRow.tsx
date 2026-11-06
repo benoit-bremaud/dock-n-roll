@@ -17,7 +17,7 @@ function Reason({ reason, homeDir }: { readonly reason: string; readonly homeDir
   )
 }
 
-/** #85: what failed and the last Compose lines; the panel's `FailureAnnouncer` says it aloud. */
+/** #85: what failed and the last Compose lines; the dashboard's `FailureAnnouncer` says it aloud. */
 function Failure({ failure }: { readonly failure: CommandFailure }): React.JSX.Element {
   return (
     <p className="service__failure">
