@@ -39,6 +39,7 @@ classDiagram
     <<shared module>>
     +membersOf(services, name) ServiceView[]
     +ungrouped(services) ServiceView[]
+    +runningSummary(statuses) string | null
     +groupSummary(members) string
   }
   Service --> PinEntry : pin

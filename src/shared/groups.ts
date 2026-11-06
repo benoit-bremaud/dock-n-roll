@@ -1,4 +1,5 @@
-// How the tray and the dashboard lay out the list by group (#98, groups class diagram 03).
+// Pure list helpers shared by the tray and the dashboard: layout by group (#98, groups class
+// diagram 03) and the `n of m on` summary.
 import type { ServiceView } from './ipc'
 
 /** Members of a group, in list order; a service of several groups is a member of each. */

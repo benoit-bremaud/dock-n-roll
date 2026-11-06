@@ -17,7 +17,8 @@ flowchart TB
   subgraph Renderer ["src/renderer/src"]
     Root["Root — explains a missing preload API"]
     App["App — header summary, tabs Services / Running (WAI-ARIA tabs)"]
-    Format["format.ts — shortenPath, runningSummary (pure)"]
+    Format["format.ts — shortenPath, shortenReason, isFollowing (pure)"]
+    GroupsView["shared/groups.ts — membersOf, ungrouped, runningSummary, groupSummary (pure)"]
     Hook["useControllerState(api) — subscribe, then getState"]
     Banners["Banners — Docker unavailable, pin-file errors"]
     Group["GroupSection — collapsible, summary, Start all / Stop all, member rows (#98)"]
@@ -36,7 +37,8 @@ flowchart TB
   Group -->|"startGroup(name) / stopGroup(name)"| Api
   App -->|"ungrouped services"| Row
   App --> Running
-  App --> Format
+  App --> GroupsView
+  Group --> GroupsView
   Row --> Format
   Hook --> Api
   Row -->|"start(id) / stop(id) / openUrl(id)"| Api
