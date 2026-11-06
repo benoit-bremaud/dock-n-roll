@@ -467,6 +467,22 @@ describe('App — list by group (UC8, UC9, #98)', () => {
     expect(document.querySelector('.services--ungrouped')?.textContent).toContain('Blog')
   })
 
+  it('keeps a section the user collapsed closed when the next state arrives', async () => {
+    const fake = fakeApi(grouped())
+    render(<App api={fake.api} />)
+    await rowOf('Blog')
+    const section = document.querySelector<HTMLDetailsElement>('details.group')
+    if (section === null) throw new Error('no group section')
+
+    section.open = false
+    act(() => {
+      fake.push({ ...grouped(), services: grouped().services.map((service) => ({ ...service, status: 'on' as const })) })
+    })
+
+    expect(section.open).toBe(false)
+    expect(section.querySelector('.group__count')?.textContent).toBe('2 of 2 on')
+  })
+
   it('sends Start all / Stop all with the group name', async () => {
     const fake = fakeApi(grouped())
     render(<App api={fake.api} />)

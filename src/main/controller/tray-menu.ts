@@ -83,7 +83,9 @@ function serviceEntries(state: ControllerState, actions: TrayActions): MenuEntry
       ]
     }
   })
-  return [...groups, ...ungrouped(state.services).map((service) => serviceEntry(service, actions))]
+  const others = ungrouped(state.services).map((service) => serviceEntry(service, actions))
+  // Group submenus carry no badge: a separator sets them apart from the ungrouped services.
+  return groups.length > 0 && others.length > 0 ? [...groups, { type: 'separator' }, ...others] : [...groups, ...others]
 }
 
 /**

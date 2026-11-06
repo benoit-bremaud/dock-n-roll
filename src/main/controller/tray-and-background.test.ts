@@ -50,7 +50,7 @@ describe('buildTrayMenu — every action reachable from the menu (spec R5)', () 
     ]
     const menu = buildTrayMenu(state({ services, groups: ['HappiHub'] }), actions)
 
-    expect(labels(menu)).toEqual(['HappiHub — 1 of 2 on', '🔴 Blog — off', '<separator>', 'Open dashboard', 'Quit'])
+    expect(labels(menu)).toEqual(['HappiHub — 1 of 2 on', '<separator>', '🔴 Blog — off', '<separator>', 'Open dashboard', 'Quit'])
     const group = menu[0]?.submenu ?? []
     expect(labels(group)).toEqual(['Start all', 'Stop all', '<separator>', '🟢 API — on', '🔴 Web — off'])
     group[0]?.click?.()
@@ -63,6 +63,7 @@ describe('buildTrayMenu — every action reachable from the menu (spec R5)', () 
     const menu = buildTrayMenu(state({ services: [view({ groups: ['A', 'B'] })], groups: ['A', 'B'] }), recordingActions())
 
     expect(labels(menu)).toEqual(['A — 0 of 1 on', 'B — 0 of 1 on', '<separator>', 'Open dashboard', 'Quit'])
+    expect([menu[0], menu[1]].map((group) => labels(group?.submenu ?? []).at(-1))).toEqual(['🔴 Blog — off', '🔴 Blog — off'])
   })
 
   it('offers no group entry while Docker is unavailable', () => {

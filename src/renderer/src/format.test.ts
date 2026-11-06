@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isFollowing, middleEllipsis, runningSummary, shortenPath, shortenReason } from './format'
+import { isFollowing, middleEllipsis, shortenPath, shortenReason } from './format'
 
 describe('shortenPath — home folder shown as ~', () => {
   it.each([
@@ -15,16 +15,6 @@ describe('shortenPath — home folder shown as ~', () => {
     ['/home//u/x', '/home//u', '~/x']
   ])('%s with home %j → %s', (path, home, expected) => {
     expect(shortenPath(path, home)).toBe(expected)
-  })
-})
-
-describe('runningSummary — header line', () => {
-  it('counts the services that are on', () => {
-    expect(runningSummary(['on', 'off', 'on', 'conflict'])).toBe('2 of 4 on')
-  })
-
-  it('says nothing when there is no service', () => {
-    expect(runningSummary([])).toBeNull()
   })
 })
 

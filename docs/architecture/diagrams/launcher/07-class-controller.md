@@ -22,6 +22,7 @@ classDiagram
     +Controls controls
     +boolean hasUrl
     +string|null reason
+    +readonly string[] groups
   }
   class ControllerState {
     <<shared/ipc.ts, crosses IPC>>

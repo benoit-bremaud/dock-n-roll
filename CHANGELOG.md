@@ -9,9 +9,11 @@ file format (`services.yaml`) and the installed package.
 
 ### Added
 
-- Service groups (profiles): a `groups: [QA]` key on pin-file entries; each group's tray
-  submenu and dashboard section start or stop every member at once, in parallel, each
-  failure on its own row. Neither shows until a group exists (#77).
+- Service groups (profiles): a `groups: [QA]` key on pin-file entries. The list is laid out by
+  group: one tray submenu per group (`HappiHub — 2 of 3 on`, Start all / Stop all, then its
+  members) and one collapsible dashboard section per group, ungrouped projects after. Start all /
+  Stop all act on every member at once, in parallel, each failure on its own row. Nothing changes
+  until a group exists (#77, #98).
 
 ### Fixed
 
@@ -27,10 +29,6 @@ file format (`services.yaml`) and the installed package.
 
 ### Changed
 
-- Tray and dashboard: the list is laid out by group — one tray submenu per group
-  (`HappiHub — 2 of 3 on`, Start all / Stop all, then its members) and one collapsible dashboard
-  section per group; ungrouped projects follow. The separate **Groups** submenu and menu are
-  gone (#98).
 - **BREAKING** — Pin file: an entry with `project` now follows that Compose project whatever
   directory runs it (a git worktree, another clone), so the tray no longer shows the pin `off`
   next to an unpinned running copy; `workingDir` is where Start runs while no container of that

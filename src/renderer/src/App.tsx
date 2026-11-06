@@ -1,11 +1,10 @@
 import { useRef, useState, type KeyboardEvent } from 'react'
+import { membersOf, runningSummary, ungrouped } from '../../shared/groups'
 import type { ControllerState, DockNRollApi, ServiceView } from '../../shared/ipc'
 import { Banners } from './components/Banners'
 import { GroupSection } from './components/GroupSection'
 import { RunningTab } from './components/RunningTab'
 import { ServiceRow } from './components/ServiceRow'
-import { membersOf, ungrouped } from '../../shared/groups'
-import { runningSummary } from './format'
 import { useControllerState } from './useControllerState'
 
 const TABS = [

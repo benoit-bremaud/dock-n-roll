@@ -31,7 +31,7 @@ extracted archive, so run `sudo apt install ./dock-n-roll_*_amd64.deb` from that
 > login** is ticked the app runs at every login.
 
 Launch **dock-n-roll** from the app grid (press the Super key and type its name). The icon shows
-up in the top bar; its menu lists one entry per project (🟢 ON, 🔴 OFF, 🟠 starting, stopping or
+up in the top bar; its menu lists one submenu per group (see below), then one entry per other project (🟢 ON, 🔴 OFF, 🟠 starting, stopping or
 partial, ⚪ unusable) with Start/Stop/Restart, then **Open dashboard**, **Start at login** and **Quit**. In the dashboard, **Logs** shows the live logs of a service. Projects are discovered from the containers Docker knows about; pin the others (below).
 
 ## Uninstall

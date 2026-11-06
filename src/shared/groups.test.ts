@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupSummary, membersOf, ungrouped } from './groups'
+import { groupSummary, membersOf, runningSummary, ungrouped } from './groups'
 import type { ServiceView } from './ipc'
 
 function view(id: string, groups: readonly string[], status: ServiceView['status'] = 'off'): ServiceView {
@@ -20,5 +20,15 @@ describe('groups view (#98)', () => {
 
   it('summarises how many members are on', () => {
     expect(groupSummary(membersOf(services, 'HappiHub'))).toBe('1 of 2 on')
+  })
+})
+
+describe('runningSummary — header line', () => {
+  it('counts the services that are on', () => {
+    expect(runningSummary(['on', 'off', 'on', 'conflict'])).toBe('2 of 4 on')
+  })
+
+  it('says nothing when there is no service', () => {
+    expect(runningSummary([])).toBeNull()
   })
 })
