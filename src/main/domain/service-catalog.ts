@@ -47,13 +47,11 @@ function discoverProjects(containers: readonly ContainerSnapshot[]): DiscoveredP
 }
 
 /**
- * A pin naming a project follows it whatever dir it runs from (#99, e.g. a git worktree);
- * the one pinned at the running dir wins. A pin naming the project wins over a pin that
- * covers the whole dir.
+ * A pin naming a project follows it whatever dir it runs from (#99, e.g. a git worktree;
+ * the pin file keeps one such pin per project) and wins over a pin covering the whole dir.
  */
 function findPin(pins: readonly PinEntry[], workingDir: string, projectName: string): PinEntry | undefined {
   return (
-    pins.find((pin) => pin.workingDir === workingDir && pin.project === projectName) ??
     pins.find((pin) => pin.project === projectName) ??
     pins.find((pin) => pin.workingDir === workingDir && pin.project === undefined)
   )

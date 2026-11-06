@@ -229,7 +229,7 @@ services:
 | Key | Required | Meaning |
 |---|---|---|
 | `workingDir` | yes | absolute path; matches the `com.docker.compose.project.working_dir` label |
-| `project` | no | ties the entry to one project name, whatever dir runs it (a worktree, another clone); `workingDir` is then where Start runs while nothing is running. Absent → applies to every project of that dir |
+| `project` | no | ties the entry to one project name, whatever dir runs it (a worktree, another clone); `workingDir` is then where Start runs while nothing is running. One entry per project name. Absent → applies to every project of that dir |
 | `name` | no | display name |
 | `url` | no | `http:`/`https:` only (R6) — enables UC5 |
 | `healthUrl` | no | `http:`/`https:` only — readiness gate when no container has a `HEALTHCHECK` (§3) |

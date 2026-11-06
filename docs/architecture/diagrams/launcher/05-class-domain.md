@@ -158,8 +158,8 @@ classDiagram
   already uses the name it would start with — its `project`, or the name Compose derives from
   its dir (`defaultProjectName`). Only the pin is flagged: it never blocks the running
   project, and two never-started pins never flag each other.
-- **Pin lookup** (`findPin`, #99): the pin of the project's dir naming it, else any pin naming
-  it, else the dir-only pin of its dir. A pin naming a project is never-started only while no
+- **Pin lookup** (`findPin`, #99): the pin naming the project (one per project in the pin
+  file), else the dir-only pin of its dir. A pin naming a project is never-started only while no
   dir runs that project.
 - **`ComposeLabels`** = `none` (not a Compose container) | `valid(ComposeProjectRef)` |
   `invalid(rawProject, rawWorkingDir, reason)` (spec §10 P2). Invalid containers are grouped

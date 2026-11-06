@@ -114,6 +114,20 @@ describe('validatePinFile', () => {
     })
   })
 
+  it('rejects a second entry naming the same project, whatever its working dir (#99)', () => {
+    const result = validatePinFile({
+      services: [
+        { workingDir: '/hh', project: 'happihub-local' },
+        { workingDir: '/hh/.claude/worktrees/w', project: 'happihub-local' }
+      ]
+    })
+
+    expect(result).toEqual({
+      entries: [{ workingDir: '/hh', project: 'happihub-local', pinned: false, hidden: false }],
+      errors: ['services[1]: duplicate of an earlier entry for the same project; entry ignored']
+    })
+  })
+
   it('accepts a group name of 64 characters', () => {
     expect(validatePinFile({ services: [{ workingDir: '/srv/app', groups: ['x'.repeat(64)] }] }).errors).toEqual([])
   })

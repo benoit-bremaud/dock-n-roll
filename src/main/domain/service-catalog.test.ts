@@ -232,15 +232,6 @@ describe('buildServices — pin file merge and ordering', () => {
     ])
   })
 
-  it('prefers the pin of the running dir over a project pin of another dir (#99)', () => {
-    const services = buildServices(
-      [container({ labels: composeLabels('foo', '/x') })],
-      [pin({ workingDir: '/y', project: 'foo', name: 'Main' }), pin({ workingDir: '/x', project: 'foo', name: 'Worktree' })]
-    )
-
-    expect(services.map((s) => s.displayName)).toEqual(['Worktree'])
-  })
-
   it('prefers a project pin of another dir over a dir-only pin of the running dir (#99)', () => {
     const services = buildServices(
       [container({ labels: composeLabels('foo', '/x') })],

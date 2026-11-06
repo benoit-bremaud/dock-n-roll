@@ -22,8 +22,8 @@ working dirs (`02_personal/sonarqube-stack` and `02_personal/dev-infra/sonarqube
   the service is shown with status `conflict` and its controls are disabled, because
   `docker compose --project-name=<name>` would act on containers of both folders.
 - The pin file (`~/.config/dock-n-roll/services.yaml`, watched) overrides by `workingDir`,
-  or by `project` when the entry names one (amended 2026-11-06, #99, see below; one dir may
-  host several projects, e.g. `-p qa1` /
+  or by `project` when the entry names one (see the #99 amendment; one dir may host several
+  projects, e.g. `-p qa1` /
   `-p qa2`): `name`, `url`, `healthUrl`, `pinned`, `hidden`. `url` / `healthUrl` must be
   `http:` or `https:`.
 
@@ -40,8 +40,8 @@ The same compose project is often started from several dirs of one app (a git wo
 second clone), so the pin stayed `off` next to an unpinned running copy. A pin with `project`
 now covers that project **whatever dir it runs from**; its `workingDir` is only where a
 never-started pin is started. Identity is unchanged: each running dir is still one service,
-and ≥ 2 dirs running the name still show `conflict`. Pin precedence for a discovered project:
-the pin of its dir naming it, then any pin naming it (first in file order), then the dir-only
-pin of its dir. A hidden project pin hides that project in every dir. Rejected: detecting git
+and ≥ 2 dirs running the name still show `conflict`. The pin file keeps one entry per project
+name (a second one is refused with an error), and a pin naming the project wins over the
+dir-only pin of its dir. A hidden project pin hides that project in every dir. Rejected: detecting git
 worktrees (`git rev-parse --git-common-dir`; covers worktrees only, adds a git call) and an
 opt-in `anyDir` key (same effect, one more key) — owner MCDA 450 / 335 / 445.

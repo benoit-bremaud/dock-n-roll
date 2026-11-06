@@ -55,7 +55,10 @@ export type ResolvedNames = ReadonlyMap<string, string>
 /** One validated entry of the pin file (spec §8); `workingDir` is normalized. */
 export interface PinEntry {
   readonly workingDir: string
-  /** Narrows the pin to one project of the dir; absent → applies to every project of that dir. */
+  /**
+   * Ties the pin to this Compose project whatever dir runs it (#99); `workingDir` is then where
+   * Start runs while nothing runs. Absent → applies to every project of `workingDir`.
+   */
   readonly project?: string
   readonly name?: string
   readonly url?: string
@@ -86,6 +89,7 @@ export interface Service {
   readonly configFiles: readonly string[]
   /** Relevant containers only (one-off containers excluded). */
   readonly containers: readonly ContainerSnapshot[]
+  /** For a pin naming a project, `pin.workingDir` may differ from `workingDir` (#99). */
   readonly pin: PinEntry | undefined
   readonly displayName: string
   /**

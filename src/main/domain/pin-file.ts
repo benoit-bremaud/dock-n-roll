@@ -115,10 +115,12 @@ export function validatePinFile(document: unknown): PinFileResult {
     const where = `services[${String(index)}]`
     const entry = validateEntry(raw, where, errors)
     if (entry === null) return
-    // Two entries for one (dir, project) would yield two services with the same id.
-    const key = `${entry.workingDir}\0${entry.project ?? ''}`
+    // Two dir-only entries for one dir would yield two services with the same id; an entry
+    // naming a project covers it in every dir (#99), so a second one could never apply.
+    const key = entry.project === undefined ? `${entry.workingDir}\0` : `\0${entry.project}`
     if (seen.has(key)) {
-      errors.push(`${where}: duplicate of an earlier entry for the same workingDir and project; entry ignored`)
+      const same = entry.project === undefined ? 'workingDir and project' : 'project'
+      errors.push(`${where}: duplicate of an earlier entry for the same ${same}; entry ignored`)
       return
     }
     seen.add(key)
