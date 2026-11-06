@@ -1,7 +1,7 @@
 // E2E smoke of the packaged app (ADR-0010, diagram 10): run under a display, e.g. `xvfb-run -a pnpm e2e:smoke`.
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -13,6 +13,9 @@ const BINARY = resolve(process.argv[2] ?? 'dist/linux-unpacked/dock-n-roll')
 const DASHBOARD_URL = 'app://dashboard/index.html'
 const TRAVERSAL_URL = 'app://dashboard/..%2f..%2fetc%2fpasswd'
 const TIMEOUT_MS = 30_000
+const DICTIONARY_WAIT_MS = 5_000
+// Hosts Chromium's spellchecker fetches its dictionary from (#95).
+const GOOGLE_DICTIONARY_HOSTS = /gvt1\.com|dl\.google\.com/
 
 /** A port free at the time of the call, for the CDP endpoint. */
 function freePort() {
@@ -69,7 +72,8 @@ async function main() {
   await writeFile(join(configHome, 'dock-n-roll', 'services.yaml'), 'services:\n  - workingDir: /nonexistent/smoke\n    pinned: true\n    groups: [QA]\n')
   const env = { ...process.env, XDG_CONFIG_HOME: configHome }
   const port = await freePort()
-  const first = spawn(BINARY, [`--remote-debugging-port=${port}`, '--remote-debugging-address=127.0.0.1'], { env, stdio: 'inherit' })
+  const netLog = join(configHome, 'net-log.json')
+  const first = spawn(BINARY, [`--remote-debugging-port=${port}`, '--remote-debugging-address=127.0.0.1', `--log-net-log=${netLog}`], { env, stdio: 'inherit' })
   const crashed = failOnExit(first)
   crashed.catch(() => undefined)
   let browser
@@ -104,6 +108,15 @@ async function main() {
     // A served page answering 200 proves the 404 below comes from the handler, not a failed fetch.
     check((await statusOf(DASHBOARD_URL)) === 200, `${DASHBOARD_URL} answers 200`)
     check((await statusOf(TRAVERSAL_URL)) === 404, `${TRAVERSAL_URL} answers 404`)
+    // Chromium requested its spellcheck dictionary from a Google host about 3 s after launch (#95).
+    // The net log records the request itself, so a blocked or slow download cannot hide it.
+    await delay(DICTIONARY_WAIT_MS)
+    await stop(second)
+    await stop(first)
+    // A log cut short by an unclean exit is not valid JSON: it must not pass as a clean one.
+    const log = await readFile(netLog, 'utf8')
+    check(Array.isArray(JSON.parse(log).events), 'the net log was flushed on exit')
+    check(!GOOGLE_DICTIONARY_HOSTS.test(log), 'no request to a Google dictionary host (#95)')
   } finally {
     await browser?.close().catch(() => undefined)
     // The app writes to its config dir until it exits: remove it afterwards.
