@@ -41,6 +41,16 @@ body {
   font-weight: 600;
 }
 
+/* `display: flex` drops the native marker: draw it, so the section reads as collapsible. */
+.group__summary::before {
+  content: '▾';
+  color: var(--color-muted);
+}
+
+.group:not([open]) > .group__summary::before {
+  content: '▸';
+}
+
 .group__count {
   color: var(--color-muted);
   font-weight: normal;
