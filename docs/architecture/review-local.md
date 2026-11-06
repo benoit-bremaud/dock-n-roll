@@ -3,18 +3,19 @@
 Pre-push review of the #95 fix that stops the Chromium spellcheck dictionary download on launch.
 
 - Date: 2026-11-06
-- Commit: a8b0356 + net-log completeness fix
+- Commit: 1afe780
 - Scope: branch diff origin/main...HEAD
-- Checks run: adversarial (Opus, 2 rounds) · design/tests/docs (architecture-guardian) · security and correctness (adversarial + diff read)
+- Checks run: adversarial (Opus, 4 rounds) · design/tests/docs (architecture-guardian) · security and correctness (adversarial + diff read)
 - Verdict: ship as-is · Must 0 · Should 0 open · Nice 3 open
 
 ## Adversarial review (#236)
 - Round 1 on `5d40a4e`: Must 0 · Should 2 · Nice 3 · unverified 1 · Push gate: open
 - Round 2 on `629edc2`: 3 fixed · 1 partly fixed (module name, accepted) · 1 not fixed (Nice, docs) · new Must 0 · new Should 2 (fixed in `b26cece`) · Push gate: open
 - Round 3 on `a8b0356` (net-log check after Codex): all prior findings fixed · new Must 0 · new Should 2 (net log must be complete JSON; this report refreshed), both fixed · **Push gate: open**. Note: `b26cece` and `a8b0356` were pushed before their verify round; it found no Must.
+- Round 4 on `1afe780`: both fixed · Must 0 · Should 0 · **Push gate: open**
 - Hosted reviewers (filled at the pre-merge run): Copilot pending · Codex reviewed `3192976` (1 P2: detect the request, not the file — fixed in `a8b0356`, thread resolved)
 
-## Pre-merge gate (head SHA b26cece)
+## Pre-merge gate (head SHA 1afe780)
 | Step | Result |
 |---|---|
 | 0 CI mirror | ✅ ci.yml: lint, typecheck, test:coverage, build, dist + `xvfb-run -a pnpm e2e:smoke` · dependency-audit.yml: `pnpm audit --audit-level=high` · gitleaks.yml: gitleaks |
