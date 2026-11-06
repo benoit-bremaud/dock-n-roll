@@ -147,7 +147,7 @@ describe('App — header and paths (diagram 09)', () => {
 })
 
 describe('App — failed command (#85)', () => {
-  const failure = { operation: 'start', message: 'Container a Waiting\ncontainer a exited (3)' } as const
+  const failure = { operation: 'start', message: 'Container a Waiting\ncontainer a exited (3)', occurrence: 1 } as const
   const announcer = (): HTMLElement => {
     const region = screen.getAllByRole('status').find((node) => node.getAttribute('aria-atomic') === 'false')
     if (region === undefined) throw new Error('no failure announcer')
@@ -168,7 +168,7 @@ describe('App — failed command (#85)', () => {
     ['stop', 'Stop failed:'],
     ['restart', 'Restart failed:']
   ] as const)('names a failed %s', async (operation, label) => {
-    render(<App api={fakeApi(state({ services: [view({ failure: { operation, message: 'boom' } })] })).api} />)
+    render(<App api={fakeApi(state({ services: [view({ failure: { operation, message: 'boom', occurrence: 1 } })] })).api} />)
 
     expect(within(await rowOf('Blog')).getByText(label)).toBeTruthy()
   })
@@ -185,6 +185,19 @@ describe('App — failed command (#85)', () => {
 
     expect(announcer()).toBe(region)
     expect([...region.querySelectorAll('p')].map((p) => p.textContent)).toEqual(['Blog: Start failed: container a exited (3)'])
+  })
+
+  it('announces a repeat of the same failure again (a new occurrence)', async () => {
+    const fake = fakeApi(state({ services: [view({ failure })] }))
+    render(<App api={fake.api} />)
+    await rowOf('Blog')
+    const first = announcer().querySelector('p')
+
+    fake.push(state({ services: [view({ failure: { ...failure, occurrence: 2 } })] }))
+
+    const lines = announcer().querySelectorAll('p')
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).not.toBe(first)
   })
 
   it('announces a service of two groups once, though both rows show the failure', async () => {

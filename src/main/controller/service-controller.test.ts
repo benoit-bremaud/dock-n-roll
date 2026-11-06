@@ -998,6 +998,23 @@ describe('review fixes — races and failures', () => {
     expect(row(BLOG)?.failure?.message.split('\n').at(-1)).toBe('timed out after 200 s')
   })
 
+  it('counts each failure, so the same text twice is two failures', async () => {
+    const { f, controller, row } = await controllerWith()
+    f.snapshot([webStopped])
+    await settle()
+    const occurrences: (number | undefined)[] = []
+    for (const index of [0, 1]) {
+      const done = controller.start(BLOG)
+      await settle()
+      f.runs[index]?.finish({ exitCode: 1, stderr: 'boom' })
+      await done
+      await settle()
+      occurrences.push(row(BLOG)?.failure?.occurrence)
+    }
+
+    expect(occurrences[1]).toBeGreaterThan(occurrences[0] ?? Infinity)
+  })
+
   it('names the exit code when the stderr is blank', async () => {
     const { f, controller, row } = await controllerWith()
     f.snapshot([webStopped])
@@ -1009,7 +1026,7 @@ describe('review fixes — races and failures', () => {
     await done
     await settle()
 
-    expect(row(BLOG)?.failure).toEqual({ operation: 'start', message: 'docker compose exited with 2' })
+    expect(row(BLOG)?.failure).toMatchObject({ operation: 'start', message: 'docker compose exited with 2' })
   })
 
   it('clears the failure once the next command succeeds', async () => {
@@ -1059,7 +1076,7 @@ describe('review fixes — races and failures', () => {
     await done
     await settle()
 
-    expect(controller.state().services).toEqual([expect.objectContaining({ id: BLOG, failure: { operation: 'start', message: 'boom' } })])
+    expect(controller.state().services).toMatchObject([{ id: BLOG, failure: { operation: 'start', message: 'boom' } }])
   })
 
   it('disables every control while Docker is unavailable', async () => {

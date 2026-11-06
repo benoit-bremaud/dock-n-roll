@@ -11,7 +11,7 @@ export function FailureAnnouncer({ services }: { readonly services: readonly Ser
     <div role="status" aria-live="polite" aria-atomic="false" className="visually-hidden">
       {services.map((service) =>
         service.failure === null ? null : (
-          <p key={`${service.id}\0${service.failure.operation}\0${service.failure.message}`}>
+          <p key={`${service.id}\0${String(service.failure.occurrence)}`}>
             {`${service.displayName}: ${failedLabel(service.failure)}: ${lastLine(service.failure)}`}
           </p>
         )

@@ -29,6 +29,7 @@ classDiagram
     <<shared/ipc.ts, crosses IPC>>
     +start|stop|restart operation
     +string message
+    +number occurrence
   }
   class ControllerState {
     <<shared/ipc.ts, crosses IPC>>
@@ -180,7 +181,7 @@ classDiagram
   missing folder or an unresolved Compose name.
 - **`failure`** (#85) is the last failed Start, Stop or Restart (spec UC1-4a, UC2-3a): the
   request and the last 5 non-blank lines of its stderr (cut to its last 500 characters), cleared when the
-  next command starts. Kept apart from `reason` so the dashboard can label and announce it.
+  next command starts; `occurrence` counts failures, so a repeat of the same text is announced again. Kept apart from `reason` so the dashboard can label and announce it.
 - **Name resolution (spec §10 P1)**: `resolveProjectName` runs only for pin dirs (without
   `project`) not resolved yet (failures retried after 30 s), outside the serialized chain and
   one batch at a time, so a slow `docker compose config` never holds another input; its result

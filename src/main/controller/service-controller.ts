@@ -157,6 +157,7 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
   const gates = new Map<string, HealthGate>()
   const probing = new Map<string, () => void>()
   const lastError = new Map<string, CommandFailure>()
+  let failures = 0
   const notifiedAt = new Map<string, number>()
   const stoppedAt = new Map<string, number>()
   const listeners = new Set<(state: ControllerState) => void>()
@@ -432,7 +433,8 @@ export async function createServiceController(deps: ControllerDeps): Promise<Ser
     if (failure !== null) {
       // Keyed by the row the developer now sees: the id may have changed during the run.
       const row = services.find((candidate) => candidate.workingDir === service.workingDir && candidate.projectName === name)
-      lastError.set(row?.id ?? service.id, { operation: request, message: failure })
+      failures += 1
+      lastError.set(row?.id ?? service.id, { operation: request, message: failure, occurrence: failures })
     }
     recompute()
     await chain

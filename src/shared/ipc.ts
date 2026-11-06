@@ -7,6 +7,8 @@ import type { BackgroundPort, Controls, ServiceStatus } from '../main/domain/typ
 export interface CommandFailure {
   readonly operation: keyof Controls
   readonly message: string
+  /** Counts failures across the controller: a repeat of the same text is still a new failure. */
+  readonly occurrence: number
 }
 
 /** One dashboard / tray row. The renderer only ever sends `id` back. */
