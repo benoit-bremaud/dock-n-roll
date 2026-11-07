@@ -22,11 +22,11 @@ pnpm install && pnpm dist
 sudo apt install ./dist/dock-n-roll_*_amd64.deb
 ```
 
-Or download the `dock-n-roll-deb` artifact of a CI run: the `.deb` sits at the root of the
-extracted archive, so run `sudo apt install ./dock-n-roll_*_amd64.deb` from that folder.
+No package is published: a release is a signed tag plus its [CHANGELOG](CHANGELOG.md) notes,
+and the `.deb` is built from it on your machine.
 
 > [!WARNING]
-> Install only a `.deb` you built yourself or downloaded from a CI run of this repository. The
+> Install only a `.deb` you built yourself from this repository. The
 > package runs as root during installation (it installs an AppArmor profile), and once **Start at
 > login** is ticked the app runs at every login.
 
@@ -122,9 +122,25 @@ provides it).
 ```bash
 pnpm install
 pnpm dev          # first run downloads the Electron runtime
-pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build
 pnpm dist         # builds dist/dock-n-roll_<version>_amd64.deb
 ```
+
+### Local CI
+
+Every check runs on the machine and in the git hooks; GitHub Actions runs nothing (reserved for a
+future `prod.yml` publishing the `.deb` on a signed release tag; ADR-0011). The toolchain is
+pinned in `mise.toml` and installed by [mise](https://mise.jdx.dev):
+
+```bash
+mise install && mise x -- just setup   # toolchain, dependencies, git hooks (once per clone)
+mise x -- just check                   # L1: eslint, tsc, typos, tests + coverage, Semgrep, pnpm audit, gitleaks
+mise x -- just gate                    # L2: check + SonarQube + .deb build + E2E smoke, then the signed attestation
+```
+
+`just fast` runs on every commit (staged files), `just check` on every push, `just gate` before
+every merge (`just merge <pr>` refuses a head without its attestation), `just nightly` from a
+systemd user timer (`scripts/systemd/`: Trivy, TruffleHog, toolchain drift). System tools:
+`xvfb-run` for the smoke, `sonar-scanner` for the gate, Docker optional.
 
 ## Conception
 

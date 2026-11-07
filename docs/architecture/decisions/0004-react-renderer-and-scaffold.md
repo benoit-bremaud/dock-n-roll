@@ -1,6 +1,6 @@
 # 0004 — React renderer, hand-written electron-vite scaffold, private-repo CI baseline
 
-- **Status**: accepted
+- **Status**: accepted; the CI baseline part is superseded by [ADR-0011](0011-local-first-ci.md) (2026-11-07)
 - **Date**: 2026-10-09
 
 ## Context and problem statement

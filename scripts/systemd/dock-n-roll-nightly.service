@@ -1,0 +1,10 @@
+[Unit]
+Description=Nightly local CI of dock-n-roll: just nightly, tier L3 (#115, skill local-ci)
+OnFailure=dock-n-roll-nightly-failed.service
+
+[Service]
+Type=oneshot
+# The user manager's PATH has no ~/.local/bin, where mise lives; mise brings the pinned tools.
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+WorkingDirectory=%h/Documents/02_personal/dock-n-roll
+ExecStart=%h/.local/bin/mise x -- just nightly

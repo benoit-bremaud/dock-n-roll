@@ -1,6 +1,6 @@
 # 0010 — E2E smoke of the packaged app over CDP
 
-- **Status**: accepted
+- **Status**: accepted; the smoke runs in the local gate since [ADR-0011](0011-local-first-ci.md) (2026-11-07)
 - **Date**: 2026-10-16
 
 ## Context and problem statement
