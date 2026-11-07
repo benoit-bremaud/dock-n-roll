@@ -15,6 +15,11 @@ file format (`services.yaml`) and the installed package.
   Stop all act on every member at once, in parallel, each failure on its own row. Nothing changes
   until a group exists (#77, #98).
 
+### Removed
+
+- The `.deb` is no longer built as a GitHub Actions artifact: build it locally with `pnpm dist`
+  (every check now runs on the machine, #115).
+
 ### Fixed
 
 - Dashboard: a failed Start, Stop or Restart is labelled ("Start failed:"), shown in an error

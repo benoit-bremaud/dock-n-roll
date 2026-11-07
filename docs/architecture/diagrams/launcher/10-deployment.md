@@ -1,7 +1,7 @@
 # Deployment diagram — launcher — installed app on the workstation
 
 > **Source specs**: `docs/architecture/specs/v1-spec.md` AC1, §2
-> **Related ADRs**: ADR-0001, ADR-0006, ADR-0010
+> **Related ADRs**: ADR-0001, ADR-0006, ADR-0010, ADR-0011
 
 ## Context
 
@@ -43,13 +43,14 @@ flowchart LR
 - Packaged builds resolve the tray icon from `process.resourcesPath`; the preload script is read
   from inside `app.asar`, which the sandboxed renderer supports.
 
-## CI smoke deployment (ADR-0010)
+## Gate smoke deployment (ADR-0010, ADR-0011)
 
-The CI `package` job runs the same unpacked build before uploading the `.deb`.
+`just smoke`, run by the pre-merge gate (`just gate`) on the developer's machine, builds the `.deb`
+and runs the same unpacked build under Xvfb.
 
 ```mermaid
 flowchart LR
-  subgraph Runner ["ubuntu-latest runner — package job"]
+  subgraph Runner ["developer machine — just smoke (L2 gate)"]
     Xvfb(("xvfb-run (virtual X display)"))
     subgraph Unpacked ["dist/linux-unpacked"]
       Exe1["dock-n-roll #1 --remote-debugging-port"]
@@ -69,4 +70,4 @@ flowchart LR
 ```
 
 - The smoke tests the hardened binary as shipped: the Node inspect fuse stays off, only the
-  Chromium `--remote-debugging-port` switch is used, and only on the CI runner.
+  Chromium `--remote-debugging-port` switch is used, and only by the smoke.

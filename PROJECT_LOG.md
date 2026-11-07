@@ -600,3 +600,23 @@ Sensitivity: C and A stay top two and G last under value 45 or effort 35; E pass
   PR #111 (`bf32fd5`) for #98.
 - Nice filed as #112 (stale failures re-read on dashboard load, rename re-announces).
 - Next: pause; then #84 (narrow width / 200 % zoom overflow).
+
+## 2026-11-07 — #115: every check moves to the local CI, no GitHub workflow left
+
+- Need (agents-skills#259 wave 0 bis, owner policy of 2026-11-07): GitHub Actions is reserved for
+  a production deploy on a signed tag; every check runs locally. Measured 2026-10-01 → 11-07:
+  389 runs / 379 min over the three workflows (409 / 420 with Dependabot's own runs), `.deb` artifact storage up to 134 GB·h a day.
+- Skill `local-ci` applied: `justfile` (fast / check / gate / nightly, sonar, smoke, merge),
+  `lefthook.yml`, `mise.toml` + `mise.lock` (Node 22.23.4, pnpm 10.30.3, 10 tools), `.nvmrc`,
+  `typos.toml`, `scripts/{attest,check-commit-msg,test-attest,test-local-ci}.sh`, systemd units
+  `scripts/systemd/dock-n-roll-nightly.*` (04:40, installed on the workstation, timer enabled after
+  the merge: the checkout it runs in has no justfile before),
+  `.github/allowed_signers`; SSH signing of commits and tags configured in the repository.
+- Owner MCDA (ADR-0011): C — no workflow at all (410) vs A `just release` attaching a local `.deb`
+  (385) vs B `prod.yml` building the `.deb` on a runner (380): the owner builds and installs the
+  `.deb` himself, the releases carry no asset. `ci.yml`, `dependency-audit.yml`, `gitleaks.yml`
+  removed (`strip-dead-workflows.sh` kept the scheduled audit: removed by hand, noted for the
+  skill); Dependabot keeps npm only; `pnpm sonar` replaced by `just sonar` (global token).
+- First local run: `just check` green (660 tests, coverage 97.33 / 92.81 / 97.95 / 98.6 %,
+  Semgrep 0, audit 1 moderate below the threshold, gitleaks clean), `just smoke` 11/11 under
+  Xvfb, Sonar PASSED.

@@ -126,7 +126,7 @@ async function main() {
   }
 }
 
-// A hang anywhere (evaluate, reload) fails the job instead of waiting for the CI timeout.
+// A hang anywhere (evaluate, reload) fails the job instead of blocking the gate.
 setTimeout(() => {
   console.error('smoke: global timeout')
   process.exit(1)

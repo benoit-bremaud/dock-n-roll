@@ -1,6 +1,6 @@
 # 0010 — E2E smoke of the packaged app over CDP
 
-- **Status**: accepted
+- **Status**: accepted; the smoke runs in the local gate since [ADR-0011](0011-local-first-ci.md) (2026-11-07)
 - **Date**: 2026-10-16
 
 ## Context and problem statement
@@ -30,7 +30,8 @@ Weights: tests the hardened binary 35, test simplicity 25, dependency / CI cost 
   CSP error, `app://dashboard/..%2f..%2fetc%2fpasswd` answers 404, and the binary's fuse wire has
   `GrantFileProtocolExtraPrivileges` off (`@electron/fuses`); after 5 s, the Chromium net log
   (`--log-net-log`) holds no request to a Google spellcheck dictionary host (#95).
-- CI `package` job: `xvfb-run -a pnpm e2e:smoke` after `pnpm dist`, before the upload.
+- CI `package` job: `xvfb-run -a pnpm e2e:smoke` after `pnpm dist`, before the upload (since
+  ADR-0011: `just smoke`, in the local gate).
 - Docker is not required: "Docker unavailable" is a valid state for the smoke.
 
 ### Consequences

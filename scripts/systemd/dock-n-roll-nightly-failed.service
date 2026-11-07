@@ -1,0 +1,6 @@
+[Unit]
+Description=Desktop notification when the dock-n-roll nightly local CI fails
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/notify-send --urgency=critical "dock-n-roll local CI nightly failed" "journalctl --user -u dock-n-roll-nightly.service"
