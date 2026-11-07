@@ -133,14 +133,18 @@ pinned in `mise.toml` and installed by [mise](https://mise.jdx.dev):
 
 ```bash
 mise install && mise x -- just setup   # toolchain, dependencies, git hooks (once per clone)
-mise x -- just check                   # L1: eslint, tsc, typos, tests + coverage, Semgrep, pnpm audit, gitleaks
-mise x -- just gate                    # L2: check + SonarQube + .deb build + E2E smoke, then the signed attestation
+mise x -- just check                   # L1, on every push
+mise x -- just gate                    # L2, before every merge (writes the signed attestation)
 ```
+
+`just --list` shows what each tier runs; [ADR-0011](docs/architecture/decisions/0011-local-first-ci.md)
+says why.
 
 `just fast` runs on every commit (staged files), `just check` on every push, `just gate` before
 every merge (`just merge <pr>` refuses a head without its attestation), `just nightly` from a
 systemd user timer (`scripts/systemd/`: Trivy, TruffleHog, toolchain drift). System tools:
-`xvfb-run` for the smoke, `sonar-scanner` for the gate, Docker optional.
+`xvfb-run` for the smoke, `sonar-scanner` for the gate, `gh` and `ssh-keygen` for the attestation,
+`notify-send` for the nightly alert, Docker optional.
 
 ## Conception
 

@@ -1,7 +1,7 @@
 # Deployment diagram — launcher — installed app on the workstation
 
 > **Source specs**: `docs/architecture/specs/v1-spec.md` AC1, §2
-> **Related ADRs**: ADR-0001, ADR-0006, ADR-0010
+> **Related ADRs**: ADR-0001, ADR-0006, ADR-0010, ADR-0011
 
 ## Context
 

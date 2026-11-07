@@ -605,11 +605,12 @@ Sensitivity: C and A stay top two and G last under value 45 or effort 35; E pass
 
 - Need (agents-skills#259 wave 0 bis, owner policy of 2026-11-07): GitHub Actions is reserved for
   a production deploy on a signed tag; every check runs locally. Measured 2026-10-01 → 11-07:
-  409 runs / 420 min over the three workflows, `.deb` artifact storage up to 134 GB·h a day.
+  389 runs / 379 min over the three workflows (409 / 420 with Dependabot's own runs), `.deb` artifact storage up to 134 GB·h a day.
 - Skill `local-ci` applied: `justfile` (fast / check / gate / nightly, sonar, smoke, merge),
   `lefthook.yml`, `mise.toml` + `mise.lock` (Node 22.23.4, pnpm 10.30.3, 10 tools), `.nvmrc`,
   `typos.toml`, `scripts/{attest,check-commit-msg,test-attest,test-local-ci}.sh`, systemd units
-  `scripts/systemd/dock-n-roll-nightly.*` (04:40, installed on the workstation),
+  `scripts/systemd/dock-n-roll-nightly.*` (04:40, installed on the workstation, timer enabled after
+  the merge: the checkout it runs in has no justfile before),
   `.github/allowed_signers`; SSH signing of commits and tags configured in the repository.
 - Owner MCDA (ADR-0011): C — no workflow at all (410) vs A `just release` attaching a local `.deb`
   (385) vs B `prod.yml` building the `.deb` on a runner (380): the owner builds and installs the

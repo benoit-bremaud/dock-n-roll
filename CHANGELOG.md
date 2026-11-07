@@ -7,6 +7,11 @@ file format (`services.yaml`) and the installed package.
 
 ## [Unreleased]
 
+### Removed
+
+- The `.deb` is no longer built as a GitHub Actions artifact: build it locally with `pnpm dist`
+  (every check now runs on the machine, #115).
+
 ### Added
 
 - Service groups (profiles): a `groups: [QA]` key on pin-file entries. The list is laid out by

@@ -53,7 +53,8 @@ write() { # write <kind>
     || die "ssh-keygen could not sign with $key (is its private key in ssh-agent?)"
   fetch_notes "$ref"
   cat "$tmp/payload" "$tmp/payload.sig" | git notes --ref "$ref" add -f -F - "$sha" 2> /dev/null
-  git push --quiet origin "$ref" || die "could not push $ref fast-forward: run the command again"
+  # --no-verify: the lefthook pre-push hook would otherwise rerun `just check` inside `just gate`
+  git push --quiet --no-verify origin "$ref" || die "could not push $ref fast-forward: run the command again"
   if [ "$1" = gate ]; then # last, so a green status always has its note
     gh api --silent -X POST "repos/$r/statuses/$sha" -f state=success -f context=gate \
       -f description="just gate passed" || die "could not write the commit status of $sha"

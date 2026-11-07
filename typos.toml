@@ -2,6 +2,7 @@
 # English; the exclusions are generated or third-party content.
 [files]
 extend-exclude = [
+  ".claude/",
   "coverage/",
   "dist/",
   "out/",

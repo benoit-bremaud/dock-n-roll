@@ -8,3 +8,5 @@ Type=oneshot
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 WorkingDirectory=%h/Documents/02_personal/dock-n-roll
 ExecStart=%h/.local/bin/mise x -- just nightly
+# A oneshot has no timeout: a hung fetch would block the timer for good.
+TimeoutStartSec=2h

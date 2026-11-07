@@ -23,8 +23,9 @@ commit-msg:
 pre-push:
   jobs:
     - name: just check (L1)
-      # The check runs on the working tree, so it must equal the pushed commits.
+      # The check runs on the working tree, so it must equal the pushed commits (untracked files
+      # included: an untracked import passes tsc locally and breaks the pushed commit).
       run: >-
-        git diff --quiet HEAD --
-        || { echo "pre-push: commit or set aside the uncommitted changes first" >&2; exit 1; };
+        [ -z "$(git status --porcelain)" ]
+        || { echo "pre-push: commit or set aside the uncommitted or untracked changes first" >&2; exit 1; };
         mise x -- just check

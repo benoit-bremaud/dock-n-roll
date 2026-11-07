@@ -13,7 +13,7 @@ owner decided on 2026-11-07 that every project follows one model: every check ru
 GitHub Actions is reserved for a production deploy on a signed release tag (agents-skills #210,
 #259). This repository is public, so its minutes are free, but the policy applies anyway. Over
 2026-10-01 → 2026-11-07 its three workflows (`ci.yml`, `dependency-audit.yml`, `gitleaks.yml`) ran
-409 times for 420 minutes, and the 7-day `.deb` artifact of every CI run peaked at 134 GB·h of
+389 times for 379 minutes (409 / 420 with GitHub's own Dependabot runs), and the 7-day `.deb` artifact of every CI run peaked at 134 GB·h of
 storage a day (measurements on #115).
 
 ## Decision 1 — the checks move to the local CI (skill `local-ci`)
@@ -23,13 +23,17 @@ hooks by lefthook, no agent needed:
 
 | Tier | Recipe | Trigger | Holds |
 |---|---|---|---|
-| L0 | `just fast` | pre-commit | staged files: gitleaks, eslint, typos, shellcheck; commit subject (Conventional Commits) |
-| L1 | `just check` | pre-push, `review-local --push` | eslint, tsc, typos, shellcheck, `lefthook validate`; vitest with the coverage floor of ADR-0007; the wiring and attestation tests; Semgrep CE (`p/javascript`, `p/typescript`, `p/react`); `pnpm audit --audit-level=high`; gitleaks on the full history |
+| L0 | `just fast` | pre-commit hook (the commit-msg hook adds the Conventional Commits subject check) | staged files: gitleaks, eslint, typos, shellcheck |
+| L1 | `just check` | pre-push, `review-local --push` | eslint, tsc, the electron-vite bundle, typos, shellcheck, `lefthook validate`; vitest with the coverage floor of ADR-0007; the wiring and attestation tests; Semgrep CE (`p/javascript`, `p/typescript`, `p/react`); `pnpm audit --audit-level=high`; gitleaks on the full history |
 | L2 | `just gate` | before every merge, on the pushed head | `check`, SonarQube quality gate (global analysis token), `pnpm dist` + E2E smoke of the unpacked build under Xvfb (ADR-0010), then `scripts/attest.sh write gate`: a signed note on `refs/notes/gate` and the commit status `gate` |
-| L3 | `just nightly` | systemd user timer, 04:40 | `check`, Trivy fs on the lockfile, TruffleHog on the history, `mise outdated --bump` |
+| L3 | `just nightly` | systemd user timer, 04:40 (+ up to 10 min; catches up after the PC was off) | `check`, Trivy fs on the lockfile, TruffleHog on the history, toolchain drift (`mise outdated --bump`, failing on any row but Node) |
 
-`just merge <pr>` refuses a head SHA without a verified attestation; the trust store is
-`.github/allowed_signers` read from `origin/main`. Nothing deploys, so there is no `deploy`,
+`just merge <pr>` refuses a head SHA without a verified attestation and merges with a merge commit
+(stacked PRs, PROJECT_LOG decision of 2026-10-09); the trust store is `.github/allowed_signers`
+read from `origin/main`. Bootstrap: this PR itself cannot be verified against `origin/main` (no
+trust store there yet), so it merges through `gh pr merge --merge --match-head-commit` on the
+owner's explicit yes, after the full gate ran on its head; every later merge goes through
+`just merge`. Nothing deploys, so there is no `deploy`,
 `attest staging` or `seed` recipe (skill `local-ci` rule 1).
 
 ## Decision 2 — no GitHub workflow at all (MCDA, owner choice C)
@@ -46,7 +50,7 @@ maintenance 15.
 | **C — no workflow; a release is a signed tag plus the CHANGELOG notes; `.deb` built locally** | **410** |
 
 Sensitivity: C stays first while reproducibility weighs 30 or less; at 35, B leads (415 vs 410).
-B is worth it only when the `.deb` is distributed to others; it is filed as a follow-up.
+B is worth it only when the `.deb` is distributed to others; it is filed as issue #116.
 
 ## Decision outcome
 
@@ -66,3 +70,5 @@ B is worth it only when the `.deb` is distributed to others; it is filed as a fo
   `mise.toml`, the Node guard and the wiring tests of `scripts/test-local-ci.sh`.
 - Bad: a PR shows no check on GitHub except the `gate` status written by the attestation; the
   branch protection, if any, must require `gate` only.
+- Bad: the nightly runs in the owner's checkout, on whatever branch it has out; it watches the
+  lockfile and the history, which rarely differ from `main`, so this is accepted.

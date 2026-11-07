@@ -37,10 +37,11 @@ fast:
 node-guard:
     @node -e 'const want=require("fs").readFileSync(".nvmrc","utf8").trim().split(".")[0]; const v=process.versions.node; if (v.split(".")[0] !== want) { console.error("Node " + v + " found, Node " + want + " required (.nvmrc). Run: mise x -- just <recipe>"); process.exit(1) }'
 
-# eslint, tsc, typos, the shell scripts, the hooks
+# eslint, tsc, the electron-vite bundle, typos, the shell scripts, the hooks
 lint: node-guard
     pnpm lint
     pnpm typecheck
+    pnpm build
     typos
     shellcheck --severity=warning scripts/*.sh
     lefthook validate
@@ -61,7 +62,7 @@ test: node-guard
 # SAST (Semgrep CE on src, e2e, scripts) + pnpm audit HIGH and above
 security:
     EIO_BACKEND=posix {{semgrep}} scan --config p/javascript --config p/typescript --config p/react --error --metrics=off --quiet -j 4 src e2e scripts
-    pnpm audit --audit-level=high
+    pnpm run audit # the threshold lives in package.json
 
 # Secrets in the whole git history (the former gitleaks workflow)
 secrets:
@@ -72,17 +73,20 @@ check: lint test security secrets
 
 # L2 — pre-merge, called by review-local § 2b (base: the branch to integrate into), 5–15 min.
 # Ends with the gate attestation (agents-skills ADR-0003): commit status `gate` + signed note on
-# HEAD, which must already be pushed, so it runs on the pushed head only.
+# HEAD, which must already be pushed and up to date with `base`, so it runs on the pushed head only;
+# the clean-tree and pushed checks run first, not after 10 minutes in `attest.sh write`.
 # L2 — pre-merge on the pushed head: check + Sonar + .deb + smoke, then the attestation (5–15 min)
 gate base="origin/main":
     #!/bin/sh
     set -eu
+    base={{quote(base)}}
+    [ -z "$(git status --porcelain)" ] || { echo "gate: commit or set aside local changes first" >&2; exit 1; }
+    case "$base" in origin/*) git fetch --quiet origin "${base#origin/}" ;; esac
+    git merge-base --is-ancestor "$base" HEAD || { echo "gate: HEAD is behind $base, merge or rebase it first" >&2; exit 1; }
+    [ -n "$(git branch -r --contains HEAD)" ] || { echo "gate: push HEAD first (the attestation is written on the pushed head)" >&2; exit 1; }
     # `check` runs from the body, not as a dependency, so the HEAD it checked is the one attested.
     start=$(git rev-parse HEAD)
     just check
-    # The full-history gitleaks scan of `check` already covers base..HEAD.
-    base={{quote(base)}}
-    case "$base" in origin/*) git fetch --quiet origin "${base#origin/}" ;; esac
     just sonar
     just smoke
     [ "$(git rev-parse HEAD)" = "$start" ] || { echo "gate: HEAD moved during the gate ($start checked), run it again" >&2; exit 1; }
@@ -114,23 +118,32 @@ smoke: node-guard
     pnpm dist
     tmp=$(mktemp -d /tmp/dnr-smoke.XXXXXX) # short: a long scratch path breaks Chromium's singleton socket
     trap 'rm -rf "$tmp"' EXIT
+    trap 'exit 130' INT TERM
     env -u WAYLAND_DISPLAY TMPDIR="$tmp" XDG_SESSION_TYPE=x11 GDK_BACKEND=x11 ELECTRON_OZONE_PLATFORM_HINT=x11 \
       xvfb-run -a pnpm e2e:smoke
-    ls dist/*.deb
+    ls dist/*.deb # fails when no package was produced
 
-# Merge a PR only when its exact head SHA carries the gate attestation (agents-skills ADR-0003)
+# Merge a PR only when its exact head SHA carries the gate attestation (agents-skills ADR-0003).
+# Merge commit, not squash: stacked PRs merge with merge commits (PROJECT_LOG 2026-10-09 decision).
 merge pr:
     #!/bin/sh
     set -eu
-    sha=$(gh pr view {{quote(pr)}} --json headRefOid -q .headRefOid)
+    pr={{quote(pr)}}
+    case "$pr" in ''|*[!0-9]*) echo "merge: usage just merge <pr number>" >&2; exit 1 ;; esac
+    sha=$(gh pr view "$pr" --json headRefOid -q .headRefOid)
     git fetch --quiet origin "$sha"
     sh scripts/attest.sh verify gate "$sha"
-    gh pr merge {{quote(pr)}} --squash --match-head-commit "$sha"
+    gh pr merge "$pr" --merge --match-head-commit "$sha"
 
 # L3 — nightly, systemd user timer (no time budget): new CVEs against the unchanged lockfile, deep
-# secret history, toolchain drift (`--bump`: without it exact pins report nothing).
-# L3 — nightly (systemd timer): check + Trivy fs + TruffleHog + mise outdated
+# secret history (the URI detector is off: it flags the fixture URLs of the pin-file tests, kept
+# in history), toolchain drift: `mise outdated` exits 0 whatever it finds and still lists the global
+# ~/.tool-versions under --no-global, so the recipe keeps the mise.toml rows and fails on a
+# non-empty report (`--bump`: without it exact pins report nothing; Node is pinned to 22 on purpose,
+# so its row is dropped, like pnpm's, which follows package.json#packageManager).
+# L3 — nightly (systemd timer): check + Trivy fs + TruffleHog + toolchain drift
 nightly: check
-    trivy fs --exit-code 1 --severity HIGH,CRITICAL --skip-dirs node_modules,dist,out,coverage .
-    trufflehog git "file://$PWD" --no-verification --fail --no-update
-    mise outdated --bump
+    trivy fs --exit-code 1 --severity HIGH,CRITICAL --skip-dirs node_modules,dist,out,coverage,.claude .
+    trufflehog git "file://$PWD" --no-verification --fail --no-update --exclude-detectors=URI
+    drift=$(mise outdated --bump --no-global --no-header | grep -F mise.toml | grep -vE '^(node|pnpm) ' || true); \
+    [ -z "$drift" ] || { echo "nightly: toolchain drift, bump mise.toml:"; echo "$drift"; exit 1; }
