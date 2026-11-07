@@ -11,18 +11,18 @@
 - Round 2 on `4551ff7`: 2 fixed · 0 not fixed · 0 regressed · new Must 1 (ADR-0011 drift rule said "any row but Node" while the recipe also skips pnpm) · new Should 3 (`mise outdated` errors swallowed; TruffleHog URI detector off instead of a path exclude; mise trust entry left by the L0 test repo) · Nice 6 · Push gate: closed
 - Round 3 on `278da88`: 8 fixed · 2 not fixed (Nices N1 upstream port, N2 Node patch releases, carried over) · 1 regressed (S2: the comment of `.trufflehog-exclude` held a literal `user:password` URL, red once committed) → Must 1 · Nice 3 · Push gate: closed
 - Round 4 on `8cc04d5`: 3 fixed · 0 not fixed · 0 regressed · new Must 0 · Nice 1 (grep -E vs Go regex in the exclude-list test) · carried over: `attest.sh --no-verify` upstream port, Node patch releases in the drift check · **Push gate: open**
-- Hosted reviewers (filled at the pre-merge run): Copilot pending · Codex optional
+- Hosted reviewers: Copilot not available on this repository (the reviewer request is accepted by the API but no reviewer is set; past PRs got none) · Codex `@codex review` quota refused on 2026-11-07 (two refusals) → the local adversarial review stands alone, per `pr-create`
 
-## Pre-merge gate (head SHA 4551ff7)
+## Pre-merge gate (checked SHA f590940; the report-only commit that follows is re-gated, see below)
 | Step | Result |
 |---|---|
 | 0 CI mirror | n/a — no PR workflow left (ADR-0011); the former jobs map onto `just check` (lint, typecheck, build, test:coverage, audit, gitleaks) and `just gate` (dist + smoke, Sonar) |
-| 1 Tests | ✅ 660 unit (38 files) · ✅ 56 wiring + 22 attestation cases · smoke: see 5 |
+| 1 Tests | ✅ 660 unit (38 files) · ✅ 59 wiring + 22 attestation cases · ✅ smoke 11/11 (step 5) |
 | 2 Coverage | tests 97.33 % stmts / 92.81 % branches / 97.95 % funcs / 98.6 % lines (floor 90/85/90/90) · docs: no doc counter in this repo (headers on 9/9 new files, doc-auditor) |
-| 3 SonarQube | ⏸ deferred to the pre-merge run (`--push`); PASSED on the pre-fix head c984517 via `just sonar` |
-| 4 Secrets | ✅ gitleaks clean (full history, 175 commits; origin/main..HEAD) · no tracked .env · diff read: only the intended public signing key and the author email |
-| 5 E2E/smoke | ⏸ deferred to the pre-merge run (`--push`); `just smoke` 11/11 on the unpacked build under Xvfb on both heads · QA pass: n/a (desktop app, nothing deploys) |
-- Gate: `--push`: **pre-push green** — `just check` passed (21 s), `just nightly` green (72 s), Sonar and smoke deferred
+| 3 SonarQube | ✅ `QUALITY GATE STATUS: PASSED` on f590940 (`just gate` → `just sonar`, localhost:9000) |
+| 4 Secrets | ✅ gitleaks clean (full history, 179 commits) · TruffleHog clean (nightly, `.trufflehog-exclude`) · no tracked .env · diff read: only the intended public signing key and the author email |
+| 5 E2E/smoke | ✅ 11/11 on the `.deb` build under Xvfb (`just smoke` inside `just gate`, ADR-0010) · JRN-: no test plan in this repo · QA pass: n/a (desktop app, nothing deploys) |
+- Gate: **GREEN with one bootstrap waiver** — `mise x -- just gate` exit 0 on f590940 (commit status `gate` success, signed note on `refs/notes/gate`), but `sh scripts/attest.sh verify gate f590940` prints `attest: no .github/allowed_signers on origin/main` and exits 1: the trust store lands with this very PR, so the verification cannot pass before the merge (ADR-0011 § bootstrap). Waiver asked of the owner as `MERGE_GATE_WAIVER="bootstrap of the local-ci attestation, ADR-0011 #115"`; the merge path is `gh pr merge --merge --match-head-commit <head>`; every later PR goes through `just merge`. The report-only commit after f590940 is re-gated (`just gate`) before the merge question; its diff against f590940 is `docs/architecture/review-local.md` alone.
 
 Timings: `just fast` 0.9 s (budget 10 s), `just check` 21 s (budget 3 min), `just smoke` 21–40 s, `just sonar` 17 s.
 
