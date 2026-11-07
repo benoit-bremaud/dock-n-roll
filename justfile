@@ -136,14 +136,15 @@ merge pr:
     gh pr merge "$pr" --merge --match-head-commit "$sha"
 
 # L3 — nightly, systemd user timer (no time budget): new CVEs against the unchanged lockfile, deep
-# secret history (the URI detector is off: it flags the fixture URLs of the pin-file tests, kept
-# in history), toolchain drift: `mise outdated` exits 0 whatever it finds and still lists the global
+# secret history (.trufflehog-exclude keeps the pin-file test out: its fixture URLs trip the URI
+# detector), toolchain drift: `mise outdated` exits 0 whatever it finds and still lists the global
 # ~/.tool-versions under --no-global, so the recipe keeps the mise.toml rows and fails on a
 # non-empty report (`--bump`: without it exact pins report nothing; Node is pinned to 22 on purpose,
 # so its row is dropped, like pnpm's, which follows package.json#packageManager).
 # L3 — nightly (systemd timer): check + Trivy fs + TruffleHog + toolchain drift
 nightly: check
     trivy fs --exit-code 1 --severity HIGH,CRITICAL --skip-dirs node_modules,dist,out,coverage,.claude .
-    trufflehog git "file://$PWD" --no-verification --fail --no-update --exclude-detectors=URI
-    drift=$(mise outdated --bump --no-global --no-header | grep -F mise.toml | grep -vE '^(node|pnpm) ' || true); \
+    trufflehog git "file://$PWD" --no-verification --fail --no-update --exclude-paths .trufflehog-exclude
+    out=$(mise outdated --bump --no-global --no-header) || { echo "nightly: mise outdated failed" >&2; exit 1; }; \
+    drift=$(printf '%s\n' "$out" | grep -F mise.toml | grep -vE '^(node|pnpm) ' || true); \
     [ -z "$drift" ] || { echo "nightly: toolchain drift, bump mise.toml:"; echo "$drift"; exit 1; }

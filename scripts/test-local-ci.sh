@@ -20,7 +20,8 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 work=$(mktemp -d)
-trap 'rm -rf "$work"' EXIT
+# The L0 hooks run `mise x --` in the throwaway repo, which records a trust entry for its path: drop it.
+trap 'rm -f "${MISE_STATE_DIR:-$HOME/.local/state/mise}"/trusted-configs/*"$(basename "$work")"*; rm -rf "$work"' EXIT
 n=0
 fail() { echo "FAIL $1"; exit 1; }
 
@@ -133,7 +134,8 @@ box_run 0 "merge: attested head merged" "gh pr merge 7 --merge --match-head-comm
 grep -q "^attest verify gate $head\$" "$LOG" || fail "merge did not verify the head SHA"; ok
 
 # sonar: the four guards, then the call with the token in the environment and the gate wait.
-box_run 1 "sonar: no scanner" "not on PATH" -- env PATH="/usr/bin:/bin" HOME="$box" "$real_just" sonar
+mkdir "$box/bare" && for b in sh git find cat; do ln -s "$(command -v "$b")" "$box/bare/$b"; done
+box_run 1 "sonar: no scanner" "not on PATH" -- env PATH="$box/bare" HOME="$box" "$real_just" sonar
 box_run 1 "sonar: no coverage report" "lcov.info missing" -- env HOME="$box" "$real_just" sonar
 touch coverage/lcov.info && sleep 1 && touch src/newer
 box_run 1 "sonar: stale coverage report" "older than" -- env HOME="$box" "$real_just" sonar

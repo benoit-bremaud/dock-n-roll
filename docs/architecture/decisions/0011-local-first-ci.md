@@ -13,8 +13,8 @@ owner decided on 2026-11-07 that every project follows one model: every check ru
 GitHub Actions is reserved for a production deploy on a signed release tag (agents-skills #210,
 #259). This repository is public, so its minutes are free, but the policy applies anyway. Over
 2026-10-01 → 2026-11-07 its three workflows (`ci.yml`, `dependency-audit.yml`, `gitleaks.yml`) ran
-389 times for 379 minutes (409 / 420 with GitHub's own Dependabot runs), and the 7-day `.deb` artifact of every CI run peaked at 134 GB·h of
-storage a day (measurements on #115).
+389 times for 379 minutes (409 / 420 with GitHub's own Dependabot runs), and the 7-day `.deb`
+artifact of every CI run peaked at 134 GB·h of storage a day (measurements on #115).
 
 ## Decision 1 — the checks move to the local CI (skill `local-ci`)
 
@@ -25,8 +25,8 @@ hooks by lefthook, no agent needed:
 |---|---|---|---|
 | L0 | `just fast` | pre-commit hook (the commit-msg hook adds the Conventional Commits subject check) | staged files: gitleaks, eslint, typos, shellcheck |
 | L1 | `just check` | pre-push, `review-local --push` | eslint, tsc, the electron-vite bundle, typos, shellcheck, `lefthook validate`; vitest with the coverage floor of ADR-0007; the wiring and attestation tests; Semgrep CE (`p/javascript`, `p/typescript`, `p/react`); `pnpm audit --audit-level=high`; gitleaks on the full history |
-| L2 | `just gate` | before every merge, on the pushed head | `check`, SonarQube quality gate (global analysis token), `pnpm dist` + E2E smoke of the unpacked build under Xvfb (ADR-0010), then `scripts/attest.sh write gate`: a signed note on `refs/notes/gate` and the commit status `gate` |
-| L3 | `just nightly` | systemd user timer, 04:40 (+ up to 10 min; catches up after the PC was off) | `check`, Trivy fs on the lockfile, TruffleHog on the history, toolchain drift (`mise outdated --bump`, failing on any row but Node) |
+| L2 | `just gate` | before every merge, on the pushed head, which must contain `base` (`origin/main`): a PR takes `main` in before its gate | `check`, SonarQube quality gate (global analysis token), `pnpm dist` + E2E smoke of the unpacked build under Xvfb (ADR-0010), then `scripts/attest.sh write gate`: a signed note on `refs/notes/gate` and the commit status `gate` |
+| L3 | `just nightly` | systemd user timer, 04:40 (+ up to 10 min; catches up after the PC was off) | `check`, Trivy fs on the lockfile, TruffleHog on the history, toolchain drift (`mise outdated --bump`, failing on any `mise.toml` row but Node and pnpm, pinned to `.nvmrc` and `packageManager`) |
 
 `just merge <pr>` refuses a head SHA without a verified attestation and merges with a merge commit
 (stacked PRs, PROJECT_LOG decision of 2026-10-09); the trust store is `.github/allowed_signers`

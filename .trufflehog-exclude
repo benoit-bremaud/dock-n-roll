@@ -1,0 +1,3 @@
+# Paths TruffleHog skips in `just nightly` (regexes): the pin-file tests hold fixture URLs with
+# credentials (`http://user:pass@host`) that the URI detector flags.
+src/main/domain/pin-file\.test\.ts$
