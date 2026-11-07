@@ -21,7 +21,7 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
 root=$(cd "$(dirname "$0")/.." && pwd)
 work=$(mktemp -d)
 # The L0 hooks run `mise x --` in the throwaway repo, which records a trust entry for its path: drop it.
-trap 'rm -f "${MISE_STATE_DIR:-$HOME/.local/state/mise}"/trusted-configs/*"$(basename "$work")"*; rm -rf "$work"' EXIT
+trap 'rm -f "${MISE_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/mise}"/trusted-configs/*"$(basename "$work")"*; rm -rf "$work"' EXIT
 n=0
 fail() { echo "FAIL $1"; exit 1; }
 
@@ -42,6 +42,13 @@ deps() { just --show "$1" | grep -E "^$1( |:)" | sed 's/.*: *//'; } # deps <reci
 deps nightly | grep -qw check || fail "nightly does not depend on check"; ok
 just --show smoke | grep -q 'pnpm e2e:smoke' || fail "smoke does not run the E2E smoke (ADR-0010)"; ok
 [ -z "$(find .github -path '*/workflows/*' -name '*.y*ml' 2>/dev/null)" ] || fail "a GitHub workflow is left (ADR-0011: none until a prod.yml is decided)"; ok
+# The nightly TruffleHog exclude list: every rule is a valid regex, and the file excludes itself (its
+# own wording trips the URI detector once committed, round 3 of the #115 review).
+just --show nightly | grep -q -- '--exclude-paths .trufflehog-exclude' || fail "nightly does not pass .trufflehog-exclude to trufflehog"; ok
+grep -v '^#' .trufflehog-exclude | grep -v '^$' | while IFS= read -r re; do
+  printf '' | grep -Eq -- "$re" 2>/dev/null; [ $? -le 1 ] || fail ".trufflehog-exclude: invalid regex: $re"
+done || exit 1; ok
+grep -qxF -- '^\.trufflehog-exclude$' .trufflehog-exclude || fail ".trufflehog-exclude does not exclude itself"; ok
 # The Node and pnpm pins are each written in two places; they must agree.
 v=$(cat .nvmrc)
 grep -qF "node = \"$v\"" mise.toml || fail "Node pin of mise.toml diverges from .nvmrc ($v)"; ok

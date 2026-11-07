@@ -1,3 +1,5 @@
-# Paths TruffleHog skips in `just nightly` (regexes): the pin-file tests hold fixture URLs with
-# credentials (`http://user:pass@host`) that the URI detector flags.
-src/main/domain/pin-file\.test\.ts$
+# Paths TruffleHog skips in `just nightly` (regexes): the pin-file tests hold fixture URLs with an
+# inline user and password that the URI detector flags. The file lists itself: its wording trips the
+# detector too once committed (TruffleHog scans the history).
+^\.trufflehog-exclude$
+^src/main/domain/pin-file\.test\.ts$
