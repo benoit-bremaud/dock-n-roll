@@ -620,3 +620,9 @@ Sensitivity: C and A stay top two and G last under value 45 or effort 35; E pass
 - First local run: `just check` green (660 tests, coverage 97.33 / 92.81 / 97.95 / 98.6 %,
   Semgrep 0, audit 1 moderate below the threshold, gitleaks clean), `just smoke` 11/11 under
   Xvfb, Sonar PASSED.
+
+## 2026-11-13 — typos 1.52.2 (#121)
+
+- The nightly of 2026-11-13 failed twice: `no justfile found` (checkout 7 commits behind, now up to date) and `@vitest/coverage-v8` missing (stale `node_modules`, `pnpm install`). A third failure remained: `mise outdated` reported typos 1.52.0 → 1.52.2.
+- Bumped `mise.toml` and `mise.lock`. Exception to the 5-day cooldown (release 2 days old), accepted by the owner: the nightly blocks on drift, the seven lock checksums match the upstream release, typos is a dev-only linter.
+- Follow-up: the nightly drift check fails on day-0 releases, against the cooldown; rule to write for the mise toolchain.
