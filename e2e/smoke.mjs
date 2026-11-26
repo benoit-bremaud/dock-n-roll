@@ -124,6 +124,24 @@ async function main() {
       })
       check(overflow <= 0, `no horizontal scroll at ${width} px (#84)${overflow > 0 ? `: ${overflow} px over` : ''}`)
       check(fits.length === 5 && fits.every(Boolean), `the five actions fit at ${width} px (#84)`)
+
+      // #132: the Running tab has wide, data-driven tables; check its entire content box too.
+      await page.getByRole('tab', { name: 'Running' }).click()
+      await page.getByRole('heading', { name: 'Containers' }).waitFor({ timeout: TIMEOUT_MS })
+      const running = await page.evaluate(() => {
+        const panel = document.querySelector('#panel-running')
+        const app = document.querySelector('.app')
+        if (!(panel instanceof HTMLElement) || !(app instanceof HTMLElement)) return null
+        const contentRight = app.getBoundingClientRect().right - parseFloat(getComputedStyle(app).paddingRight)
+        const elements = [panel, ...panel.querySelectorAll('*')]
+        const overflowing = elements.filter((element) => {
+          const rect = element.getBoundingClientRect()
+          return rect.width > 0 && rect.right > contentRight + 1
+        }).map((element) => `${element.tagName.toLowerCase()}.${String(element.className || '')}`)
+        return { scrollWidth: panel.scrollWidth, clientWidth: panel.clientWidth, overflowing }
+      })
+      check(running !== null && running.overflowing.length === 0, `Running tab stays inside the content width at ${width} px${running?.overflowing.length ? `: ${running.overflowing.join(', ')}` : ''} (#132)`)
+      await page.getByRole('tab', { name: 'Services' }).click()
     }
     // Checked before the 404 probe, which Chromium logs as a failed resource.
     check(errors.length === 0, `no console or CSP error${errors.length ? `: ${errors.join(' | ')}` : ''}`)

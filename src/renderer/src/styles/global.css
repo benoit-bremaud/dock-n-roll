@@ -274,8 +274,15 @@ button:focus-visible {
   font-size: var(--font-size-body);
 }
 
+.running {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .running table {
   width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
 }
 
